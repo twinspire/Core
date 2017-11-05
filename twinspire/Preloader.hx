@@ -69,7 +69,7 @@ class Preloader
 		g.color = fillColor;
 		
 		var actual_width = (width - border / 2 - 4) * Assets.progress;
-		g.fillRect(x + 2 + border, y + 2 + border, height - border / 2 - 2, actual_width - border / 2 - 2);
+		g.fillRect(x + 2 + border, y + 2 + border, actual_width - border / 2 - 2, height - border / 2 - 2);
 
 		g.end();
 	}
