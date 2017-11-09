@@ -10,6 +10,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 package twinspire.events;
 
+import kha.input.KeyCode;
+
 /**
 * The `Event` class contains data related to the event handling used internally by the `Game` class.
 */
@@ -47,7 +49,7 @@ class Event
 	/**
 	* The key that was pressed during a KEY_EVENT.
 	*/
-	public var key:Int;
+	public var key:KeyCode;
 	/**
 	* The key pressed during the EVENT_KEY_PRESS event.
 	*/

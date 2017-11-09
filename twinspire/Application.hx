@@ -20,6 +20,7 @@ import kha.math.Vector2 in V2;
 import kha.math.Vector4 in V4;
 import kha.graphics2.Graphics in Graphics2;
 import kha.input.Gamepad;
+import kha.input.KeyCode;
 import kha.input.Keyboard;
 import kha.input.Mouse;
 import kha.input.Surface;
@@ -153,7 +154,7 @@ class Application
 	* Event handling functions
 	*/
 
-	private function _keyboard_onKeyDown(key:Int)
+	private function _keyboard_onKeyDown(key:KeyCode)
 	{
 		var e = new Event();
 		e.type = EVENT_KEY_DOWN;
@@ -161,7 +162,7 @@ class Application
 		_events.push(e);
 	}
 
-	private function _keyboard_onKeyUp(key:Int)
+	private function _keyboard_onKeyUp(key:KeyCode)
 	{
 		var e = new Event();
 		e.type = EVENT_KEY_UP;
