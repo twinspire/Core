@@ -49,11 +49,26 @@ class Application
 	private var g2:Graphics2;
 	private var _events:Array<Event>;
 	private var _error:String;
+	private var _ctrl:Bool;
+	private var _cutTrigger:Bool;
 
 	/**
 	* Gets the currently polled event.
 	*/
 	public var currentEvent:Event;
+
+	/**
+	* Gets whether or not a cut or copy event was triggered. Check this against an `EVENT_KEY_UP` event
+	* to set the `cutData` variable just before the `CLIPBOARD_CUT` or `CLIPBOARD_COPY` event occurs.
+	**/
+	public var cutTriggered(get, null):Bool;
+	function get_cutTriggered() return _cutTrigger;
+
+	/**
+	* Set the text value of the thing to cut when the event is triggered.
+	* If this value is not filled at the time of the event, nothing will be cut.
+	**/
+	public var cutData:String;
 
 	/**
 	* Set the style of the preloader to use when loading the application.
@@ -105,6 +120,10 @@ class Application
 	private function initEvents()
 	{
 		_events = [];
+
+		System.notifyOnApplicationState(_app_foreground, _app_resume, _app_pause, _app_background, _app_shutdown);
+		System.notifyOnDropFiles(_app_dropFiles);
+		System.notifyOnCutCopyPaste(_clipboard_cut, _clipboard_copy, _clipboard_paste);
 
 		if (Keyboard.get(0) != null)
 			Keyboard.get(0).notify(_keyboard_onKeyDown, _keyboard_onKeyUp, _keyboard_onKeyPress);
@@ -163,6 +182,8 @@ class Application
 		var e = new Event();
 		e.type = EVENT_KEY_DOWN;
 		e.key = key;
+		_ctrl = key == KeyCode.Control;
+
 		_events.push(e);
 	}
 
@@ -171,6 +192,13 @@ class Application
 		var e = new Event();
 		e.type = EVENT_KEY_UP;
 		e.key = key;
+		if ((key == KeyCode.X || key == KeyCode.C) && _ctrl)
+			_cutTrigger = true;
+		else
+			_cutTrigger = false;
+
+		_ctrl = !(key == KeyCode.Control);
+
 		_events.push(e);
 	}
 
@@ -360,6 +388,78 @@ class Application
 		_events.push(e);
 	}
 
+	private function _app_foreground()
+	{
+		var e = new Event();
+		e.type = EVENT_FOREGROUND;
+		_events.push(e);
+	}
+
+	private function _app_resume()
+	{
+		var e = new Event();
+		e.type = EVENT_RESUME;
+		_events.push(e);
+	}
+
+	private function _app_pause()
+	{
+		var e = new Event();
+		e.type = EVENT_PAUSE;
+		_events.push(e);
+	}
+
+	private function _app_background()
+	{
+		var e = new Event();
+		e.type = EVENT_BACKGROUND;
+		_events.push(e);
+	}
+
+	private function _app_shutdown()
+	{
+		var e = new Event();
+		e.type = EVENT_SHUTDOWN;
+		_events.push(e);
+	}
+
+	private function _clipboard_cut()
+	{
+		var e = new Event();
+		e.type = EVENT_CLIPBOARD_CUT;
+		_events.push(e);
+
+		var temp = cutData;
+		cutData = "";
+		return temp;
+	}
+
+	private function _clipboard_copy()
+	{
+		var e = new Event();
+		e.type = EVENT_CLIPBOARD_COPY;
+		_events.push(e);
+
+		var temp = cutData;
+		cutData = "";
+		return temp;
+	}
+
+	private function _clipboard_paste(value:String)
+	{
+		var e = new Event();
+		e.type = EVENT_CLIPBOARD_PASTE;
+		e.clipboard = value;
+		_events.push(e);
+	}
+
+	private function _app_dropFiles(path:String)
+	{
+		var e = new Event();
+		e.type = EVENT_DROP_FILES;
+		e.filePath = path;
+		_events.push(e);
+	}
 
 	public static var instance:Application;
 	public static var resources:ResourceManager;

@@ -98,6 +98,14 @@ class Event
 	* The amount of pressure of the pen on the drawing tablet. The pen can still move with a pressure of zero.
 	**/
 	public var penPressure:Float;
+	/**
+	* The current text data on the clipboard.
+	**/
+	public var clipboard:String;
+	/**
+	* The file path received from a drop event.
+	**/
+	public var filePath:String;
 
 	public function new()
 	{
@@ -126,6 +134,8 @@ class Event
 		e.penX = this.penX;
 		e.penY = this.penY;
 		e.penPressure = this.penPressure;
+		e.clipboard = this.clipboard;
+		e.filePath = this.filePath;
 		return e;
 	}
 

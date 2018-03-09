@@ -64,13 +64,49 @@ abstract EventType(Int) from Int to Int
 	/**
 	* Occurs when the pen from a tablet device is pressed down.
 	**/
-	var EVENT_PEN_DOWN			=	12;
+	var EVENT_PEN_DOWN			=	13;
 	/**
 	* Occurs when the pen from a tablet device is released.
 	**/
-	var EVENT_PEN_UP			=	13;
+	var EVENT_PEN_UP			=	14;
 	/**
 	* Occurs when the pen from a tablet device moves.
 	**/
-	var EVENT_PEN_MOVE			=	14;
+	var EVENT_PEN_MOVE			=	15;
+	/**
+	* Occurs when the state of the application becomes the active window on the screen.
+	**/
+	var EVENT_FOREGROUND		=	16;
+	/**
+	* Occurs when the state of the application is no longer the active window on the screen.
+	**/
+	var EVENT_BACKGROUND		=	17;
+	/**
+	* Occurs when the state of the application is paused. Only applicable if using a gamepad with the pause button on it, or on a mobile device with any such key.
+	**/
+	var EVENT_PAUSE				=	18;
+	/**
+	* Occurs when the state of the application resumes. Only applicable if using a gamepad with the pause button on it, or on a mobile device with any such key.
+	**/
+	var EVENT_RESUME			=	19;
+	/**
+	* Occurs when a shutdown request is made to the application, including when the 'cross' in the corner is pressed (only occurs on certain targets).
+	**/
+	var EVENT_SHUTDOWN			=	20;
+	/**
+	* Occurs when a file is dropped into the client bounds of the application using drag-and-drop with the mouse.
+	**/
+	var EVENT_DROP_FILES		=	21;
+	/**
+	* Occurs when the cut event (Ctrl+X) is triggered from the keyboard. Only works with text.
+	**/
+	var EVENT_CLIPBOARD_CUT		=	22;
+	/**
+	* Occurs when the copy event (Ctrl+C) is triggered from the keyboard. Only works with text.
+	**/
+	var EVENT_CLIPBOARD_COPY	=	23;
+	/**
+	* Occurs when the paste event (Ctrl+V) is triggered from the keyboard. Only works with text.
+	**/
+	var EVENT_CLIPBOARD_PASTE	=	24;
 }
