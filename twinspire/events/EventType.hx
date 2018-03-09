@@ -61,4 +61,16 @@ abstract EventType(Int) from Int to Int
 	* Any or all fingers have moved on the game screen.
 	*/
 	var EVENT_TOUCH_MOVE		=	11;
+	/**
+	* Occurs when the pen from a tablet device is pressed down.
+	**/
+	var EVENT_PEN_DOWN			=	12;
+	/**
+	* Occurs when the pen from a tablet device is released.
+	**/
+	var EVENT_PEN_UP			=	13;
+	/**
+	* Occurs when the pen from a tablet device moves.
+	**/
+	var EVENT_PEN_MOVE			=	14;
 }

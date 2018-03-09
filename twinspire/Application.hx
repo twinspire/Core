@@ -24,6 +24,7 @@ import kha.input.KeyCode;
 import kha.input.Keyboard;
 import kha.input.Mouse;
 import kha.input.Surface;
+import kha.input.Pen;
 import kha.Font;
 import kha.System;
 import kha.Assets;
@@ -125,6 +126,9 @@ class Application
 		
 		if (Surface.get(0) != null)
 			Surface.get(0).notify(_surface_onTouchStart, _surface_onTouchEnd, _surface_onTouchMove);
+		
+		if (Pen.get(0) != null)
+			Pen.get(0).notify(_pen_onPenDown, _pen_onPenUp, _pen_onPenMove);
 	}
 
 	/**
@@ -324,6 +328,35 @@ class Application
 		e.touchIndex = index;
 		e.touchX = x;
 		e.touchY = y;
+		_events.push(e);
+	}
+
+	private function _pen_onPenDown(x:Int, y:Int, pressure:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_PEN_DOWN;
+		e.penX = x;
+		e.penY = y;
+		e.penPressure = pressure;
+		_events.push(e);
+	}
+
+	private function _pen_onPenUp(x:Int, y:Int, pressure:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_PEN_UP;
+		e.penX = x;
+		e.penY = y;
+		_events.push(e);
+	}
+
+	private function _pen_onPenMove(x:Int, y:Int, pressure:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_PEN_MOVE;
+		e.penX = x;
+		e.penY = y;
+		e.penPressure = pressure;
 		_events.push(e);
 	}
 

@@ -86,6 +86,18 @@ class Event
 	* The y position of the finger in the game.
 	*/
 	public var touchY:Int;
+	/**
+	* The x position of the pen relative to the upper-left corner of the drawing tablet.
+	**/
+	public var penX:Int;
+	/**
+	* The y position of the pen relative to the upper-left corner of the drawing tablet.
+	**/
+	public var penY:Int;
+	/**
+	* The amount of pressure of the pen on the drawing tablet. The pen can still move with a pressure of zero.
+	**/
+	public var penPressure:Float;
 
 	public function new()
 	{
@@ -111,6 +123,9 @@ class Event
 		e.touchIndex = this.touchIndex;
 		e.touchX = this.touchX;
 		e.touchY = this.touchY;
+		e.penX = this.penX;
+		e.penY = this.penY;
+		e.penPressure = this.penPressure;
 		return e;
 	}
 
