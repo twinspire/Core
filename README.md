@@ -25,7 +25,5 @@ The following features in the Core library include:
  3. Resource management
  4. Some basic, useful utilities
 
-## Community and Support
+## Support
 If you find a bug or an issue, please use the issue tracker here.
-
-You can also find and discuss information, updates and features on our [community forums](http://community.colour-id.co.uk/).
