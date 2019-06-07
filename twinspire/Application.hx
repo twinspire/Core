@@ -33,6 +33,7 @@ import kha.Assets;
 import kha.Framebuffer;
 import kha.Image;
 import kha.Blob;
+import kha.Window;
 
 import haxe.Json;
 
@@ -75,7 +76,7 @@ class Application
 	/**
 	* Set the style of the preloader to use when loading the application.
 	**/
-	public static var preloader:PreloaderStyle;
+	public static var preloader:PreloaderStyle = 0;
 
 	/**
 	* If using a custom preload style, create a class that extends `Preloader`
@@ -91,22 +92,22 @@ class Application
 	*/
 	public static function create(options:SystemOptions, callback:Void -> Void)
 	{
-		System.init(options, function()
+		System.start(options, function(window:Window)
 		{
-			if (preloader == null)
+			if (preloader == 0)
 				preloader = PRELOADER_BASIC;
 			
 			if (loader == null)
 				loader = new Preloader(preloader);
 			
-			System.notifyOnRender(loader.render);
+			System.notifyOnFrames(loader.render);
 
 			Assets.loadEverything(function()
 			{
 				instance = new Application();
 				resources = new ResourceManager();
 
-				System.removeRenderListener(loader.render);
+				System.removeFramesListener(loader.render);
 				callback();
 			});
 		});

@@ -54,9 +54,9 @@ class Preloader
 		}
 	}
 
-	public function render(buffer:Framebuffer)
+	public function render(buffers:Array<Framebuffer>)
 	{
-		var g = buffer.g2;
+		var g = buffers[0].g2;
 
 		g.begin(true, backColor);
 

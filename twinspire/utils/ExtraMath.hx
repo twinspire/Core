@@ -98,4 +98,35 @@ class ExtraMath
 		return total / count;
 	}
 
+	/**
+	* Safely divides two numbers. If the divisor is 0, returns `n`.
+	*
+	* 
+	**/
+	public static function safeRatioN(numerator:Float, divisor:Float, n:Float)
+	{
+		var result = n;
+
+		if (divisor != 0.0)
+		{
+			result = numerator / divisor;
+		}
+
+		return result;
+	}
+
+	public static function safeRatio0(numerator:Float, divisor:Float)
+	{
+		var result = safeRatioN(numerator, divisor, 0.0);
+
+		return result;
+	}
+
+	public static function random(start:Int, end:Int)
+	{
+		var result = Math.ceil(start + (end - start) * Math.random());
+
+		return result;
+	}
+
 }
