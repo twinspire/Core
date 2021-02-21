@@ -62,46 +62,6 @@ class Application
 	**/
 	public var cutData:String;
 
-	/**
-	* Set the style of the preloader to use when loading the application.
-	**/
-	public static var preloader:PreloaderStyle = 0;
-
-	/**
-	* If using a custom preload style, create a class that extends `Preloader`
-	* and assign it to this variable.
-	**/
-	public static var loader:Preloader;
-
-	/**
-	* Create an `Application`, initialise the system and load all available assets.
-	*
-	* @param options The system options used to declare title and size of the game client.
-	* @param callback The function handler that is called when all assets have been loaded.
-	*/
-	public static function create(options:SystemOptions, callback:Void -> Void)
-	{
-		System.start(options, function(window:Window)
-		{
-			if (preloader == 0)
-				preloader = PRELOADER_BASIC;
-			
-			if (loader == null)
-				loader = new Preloader(preloader);
-			
-			System.notifyOnFrames(loader.render);
-
-			Assets.loadEverything(function()
-			{
-				instance = new Application();
-				resources = new ResourceManager();
-
-				System.removeFramesListener(loader.render);
-				callback();
-			});
-		});
-	}
-
 	public function new()
 	{
 		initEvents();
@@ -459,7 +419,96 @@ class Application
 		_events.push(e);
 	}
 
+	//
+	// Static Fields and Functions
+	//
+
 	public static var instance:Application;
 	public static var resources:ResourceManager;
+
+	/**
+	* Set the style of the preloader to use when loading the application.
+	**/
+	public static var preloader:PreloaderStyle = 0;
+
+	/**
+	* If using a custom preload style, create a class that extends `Preloader`
+	* and assign it to this variable.
+	**/
+	public static var loader:Preloader;
+
+	private static var buffer:BackBuffer;
+
+	/**
+	* Creates a new secondary buffer with the following width and height values.
+	**/
+	public static function createBackBuffer(width:Int, height:Int)
+	{
+		buffer = new BackBuffer(width, height);
+	}
+
+	/**
+	* Sets a new size for the current back buffer.
+	**/
+	public static function setBufferSize(width:Int, height:Int)
+	{
+		buffer.clientWidth = width;
+		buffer.clientHeight = height;
+	}
+
+	/**
+	* Get the 2D graphics context from the current back buffer.
+	**/
+	public static function getGraphics2D()
+	{
+		if (buffer != null)
+		{
+			return buffer.g2;
+		}
+
+		return null;
+	}
+
+	/**
+	* Get the 3D graphics context from the current back buffer.
+	**/
+	public static function getGraphics3D()
+	{
+		if (buffer != null)
+		{
+			return buffer.g4;
+		}
+
+		return null;
+	}
+
+	/**
+	* Create an `Application`, initialise the system and load all available assets.
+	*
+	* @param options The system options used to declare title and size of the game client.
+	* @param callback The function handler that is called when all assets have been loaded.
+	*/
+	public static function create(options:SystemOptions, callback:Void -> Void)
+	{
+		System.start(options, (window:Window) ->
+		{
+			if (preloader == 0)
+				preloader = PRELOADER_BASIC;
+			
+			if (loader == null)
+				loader = new Preloader(preloader);
+			
+			System.notifyOnFrames(loader.render);
+
+			Assets.loadEverything(() ->
+			{
+				instance = new Application();
+				resources = new ResourceManager();
+
+				System.removeFramesListener(loader.render);
+				callback();
+			});
+		});
+	}
 
 }
