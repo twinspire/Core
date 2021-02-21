@@ -452,8 +452,15 @@ class Application
 	**/
 	public static function setBufferSize(width:Int, height:Int)
 	{
-		buffer.clientWidth = width;
-		buffer.clientHeight = height;
+		buffer.adjustBufferSize(width, height);
+	}
+
+	/**
+	* Gets the actual image from the back buffer to render.
+	**/
+	public static function getBufferContext()
+	{
+		return buffer.getImage();
 	}
 
 	/**

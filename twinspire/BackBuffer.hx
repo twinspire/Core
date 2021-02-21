@@ -8,6 +8,7 @@ class BackBuffer
 {
 
     private var _image:Image;
+    public function getImage() return _image;
 
     private var _clientWidth:Int;
     /**
