@@ -1,0 +1,11 @@
+{
+    "name": "Twinspire",
+    "classPath": "twinspire",
+    "description": "A utility framework to build Kha applications quicker and easier",
+    "license": "MIT",
+    "tags": ["utility", "kha"],
+    "releasenote": "First release.",
+    "version": "1.0.0",
+    "contributors": [ "tienery" ],
+    "url": "https://github.com/twinspire/Core"
+}

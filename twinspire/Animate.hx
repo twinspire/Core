@@ -1,5 +1,10 @@
 package twinspire;
 
+/**
+* A basic animation utility class.
+*
+* Best imported as `twinspire.Animate.*`.
+**/
 class Animate
 {
 
@@ -35,7 +40,7 @@ class Animate
 	}
 
 	/**
-	 * Create an animation at a given index.
+	 * Create an animation.
 	 * @return Returns a new index for this animation.
 	 */
 	public static function animateCreateTick()
@@ -145,7 +150,7 @@ class Animate
 	 * @param delay The number of seconds to wait before ticking again.
 	 * @return Returns `true` if the number of seconds given has passed or reaches zero, `false` otherwise.
 	 */
-	public static function animateTickLoop(index, seconds:Float, ?delay:Float = 0.0)
+	public static function animateTickLoop(index:Int, seconds:Float, ?delay:Float = 0.0)
 	{
 		var result = false;
 		lastAnimateSecondsValue = seconds;

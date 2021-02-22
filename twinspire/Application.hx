@@ -423,7 +423,14 @@ class Application
 	// Static Fields and Functions
 	//
 
+	/**
+	* Get the current Application instance.
+	**/
 	public static var instance:Application;
+
+	/**
+	* Get the current Resource Manager instance.
+	**/
 	public static var resources:ResourceManager;
 
 	/**
