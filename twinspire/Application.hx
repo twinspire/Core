@@ -13,6 +13,8 @@ import kha.input.KeyCode;
 import kha.input.Keyboard;
 import kha.input.Mouse;
 import kha.input.Surface;
+import kha.input.Sensor;
+import kha.input.SensorType;
 #if !js
 import kha.input.Pen;
 #end
@@ -81,7 +83,12 @@ class Application
 			Keyboard.get(0).notify(_keyboard_onKeyDown, _keyboard_onKeyUp, _keyboard_onKeyPress);
 		
 		if (Mouse.get(0) != null)
+		{
 			Mouse.get(0).notify(_mouse_onMouseDown, _mouse_onMouseUp, _mouse_onMouseMove, _mouse_onMouseWheel);
+			Mouse.get(0).notifyOnLockChange(_mouse_onLockChange, _mouse_onLockError);
+		}
+
+		Gamepad.notifyOnConnect(_gamepad_connected, _gamepad_disconnected);
 		
 		if (Gamepad.get(0) != null)
 			Gamepad.get(0).notify(_gamepad_onAxis0, _gamepad_onButton0);
@@ -102,6 +109,16 @@ class Application
 		if (Pen.get(0) != null)
 			Pen.get(0).notify(_pen_onPenDown, _pen_onPenUp, _pen_onPenMove);
 		#end
+
+		if (Sensor.get(Accelerometer) != null)
+		{
+			Sensor.get(Accelerometer).notify(_accelerometer_move);
+		}
+
+		if (Sensor.get(Gyroscope) != null)
+		{
+			Sensor.get(Gyroscope).notify(_gyroscope_move);
+		}
 	}
 
 	/**
@@ -200,6 +217,20 @@ class Application
 		var e = new Event();
 		e.type = EVENT_MOUSE_WHEEL;
 		e.mouseDelta = delta;
+		_events.push(e);
+	}
+
+	private function _mouse_onLockChange()
+	{
+		var e = new Event();
+		e.type = EVENT_MOUSE_LOCK_CHANGE;
+		_events.push(e);
+	}
+
+	private function _mouse_onLockError()
+	{
+		var e = new Event();
+		e.type = EVENT_MOUSE_LOCK_ERROR;
 		_events.push(e);
 	}
 
@@ -313,6 +344,26 @@ class Application
 		_events.push(e);
 	}
 
+	private function _accelerometer_move(x:Float, y:Float, z:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_ACCELEROMETER;
+		e.accelerometerX = x;
+		e.accelerometerY = y;
+		e.accelerometerZ = z;
+		_events.push(e);
+	}
+
+	private function _gyroscope_move(x:Float, y:Float, z:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GYROSCOPE;
+		e.gyroscopeX = x;
+		e.gyroscopeY = y;
+		e.gyroscopeZ = z;
+		_events.push(e);
+	}
+
 #if !js
 
 	private function _pen_onPenDown(x:Int, y:Int, pressure:Float)
@@ -417,6 +468,48 @@ class Application
 		e.type = EVENT_DROP_FILES;
 		e.filePath = path;
 		_events.push(e);
+	}
+
+	private function _gamepad_connected(id:Int)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_CONNECTED;
+		e.gamepadId = id;
+		_events.push(e);
+
+		var pad = Gamepad.get(id);
+		if (pad != null)
+		{
+			if (id == 0)
+				pad.notify(_gamepad_onAxis0, _gamepad_onButton0);
+			else if (id == 1)
+				pad.notify(_gamepad_onAxis1, _gamepad_onButton1);
+			else if (id == 2)
+				pad.notify(_gamepad_onAxis2, _gamepad_onButton2);
+			else if (id == 3)
+				pad.notify(_gamepad_onAxis3, _gamepad_onButton3);
+		}
+	}
+
+	private function _gamepad_disconnected(id:Int)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_DISCONNECTED;
+		e.gamepadId = id;
+		_events.push(e);
+
+		var pad = Gamepad.get(id);
+		if (pad != null)
+		{
+			if (id == 0)
+				pad.remove(_gamepad_onAxis0, _gamepad_onButton0);
+			else if (id == 1)
+				pad.remove(_gamepad_onAxis1, _gamepad_onButton1);
+			else if (id == 2)
+				pad.remove(_gamepad_onAxis2, _gamepad_onButton2);
+			else if (id == 3)
+				pad.remove(_gamepad_onAxis3, _gamepad_onButton3);
+		}
 	}
 
 	//

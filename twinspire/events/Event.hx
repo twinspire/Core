@@ -49,11 +49,11 @@ class Event
 	*/
 	public var gamepadId:Int;
 	/**
-	* TODO: What is this?
+	* The x or y-axis that was moved on the controller.
 	*/
 	public var gamepadAxis:Int;
 	/**
-	* TODO: What is this?
+	* A value determining how far in one direction the on which axis the analogue stick moves.
 	*/
 	public var gamepadAxisValue:Float;
 	/**
@@ -61,11 +61,11 @@ class Event
 	*/
 	public var gamepadButton:Int;
 	/**
-	* TODO: What is this?
+	* If pressure exists for a button, this value determines the pressure.
 	*/
 	public var gamepadButtonValue:Float;
 	/**
-	* TODO: What is this?
+	* If more than one finger touches the screen, this determines the index of the current finger.
 	*/
 	public var touchIndex:Int;
 	/**
@@ -96,6 +96,30 @@ class Event
 	* The file path received from a drop event.
 	**/
 	public var filePath:String;
+	/**
+	* The G-Force value of the x axis.
+	**/
+	public var accelerometerX:Float;
+	/**
+	* The G-Force value of the y axis.
+	**/
+	public var accelerometerY:Float;
+	/**
+	* The G-Force value of the z axis.
+	**/
+	public var accelerometerZ:Float;
+	/**
+	* The x rotation rate.
+	**/
+	public var gyroscopeX:Float;
+	/**
+	* The y rotation rate.
+	**/
+	public var gyroscopeY:Float;
+	/**
+	* The z rotation rate.
+	**/
+	public var gyroscopeZ:Float;
 
 	public function new()
 	{
