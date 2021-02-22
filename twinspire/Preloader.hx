@@ -23,9 +23,21 @@ class Preloader
 	var width:Float;
 	var height:Float;
 
+	/**
+	* The back colour of the entire screen.
+	**/
 	public var backColor:Color;
+	/**
+	* The colour to use for progress.
+	**/
 	public var fillColor:Color;
+	/**
+	* The border colour of the progress bar.
+	**/
 	public var borderColor:Color;
+	/**
+	* The border width, if any, to use. 0 for no border.
+	**/
 	public var border:Int;
 
 	/**
@@ -54,6 +66,9 @@ class Preloader
 		}
 	}
 
+	/**
+	* Render the progress results on screen. Override in a derived class to customise.
+	**/
 	public function render(buffers:Array<Framebuffer>)
 	{
 		var g = buffers[0].g2;
