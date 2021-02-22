@@ -28,6 +28,10 @@ class Preloader
 	public var borderColor:Color;
 	public var border:Int;
 
+	/**
+	* Create a new Preloader with the given style.
+	* Passing PRELOADER_CUSTOM means you can customise the preloader by overriding the `render` function.
+	**/
 	public function new(style:Int)
 	{
 		switch (style)
@@ -40,6 +44,13 @@ class Preloader
 				backColor = Color.White;
 				fillColor = borderColor = Color.fromFloats(.5, .5, .5);
 				border = 1;
+			case PRELOADER_STYLISH:
+				width = System.windowWidth() * .75;
+				height = 17;
+				x = (System.windowWidth() - width) / 2;
+				y = System.windowHeight() * .65;
+				backColor = Color.Black;
+				fillColor = Color.fromFloats(.8, .12, 0);
 		}
 	}
 
