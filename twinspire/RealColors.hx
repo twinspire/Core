@@ -3,7 +3,7 @@ package twinspire;
 import kha.Color;
 
 /**
-* A collection of colors as found on MSDN: https://msdn.microsoft.com/en-us/library/system.drawing.color(v=vs.110).aspx
+* A collection of colours as found on MSDN: https://msdn.microsoft.com/en-us/library/system.drawing.color(v=vs.110).aspx
 */
 abstract RealColors(Color) from Int from UInt to Int to UInt
 {

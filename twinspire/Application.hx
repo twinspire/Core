@@ -62,7 +62,7 @@ class Application
 	**/
 	public var cutData:String;
 
-	public function new()
+	private function new()
 	{
 		initEvents();
 	}
