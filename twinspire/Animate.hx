@@ -205,4 +205,14 @@ class Animate
 		return animateTicks[index] / lastAnimateSecondsValue;
 	}
 
+	/**
+	* Reset the given animation index.
+	*
+	* @param index The index of the animation to reset.
+	**/
+	public static function animateReset(index:Int)
+	{
+		animateTickReset[index] = true;
+	}
+
 }

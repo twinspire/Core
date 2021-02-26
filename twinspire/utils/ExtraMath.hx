@@ -12,7 +12,7 @@ class ExtraMath
 	* @param n The floating-point number to round.
 	* @param prec The precision to round to.
 	*
-	* @return Return the resulting rounded value;
+	* @return Return the resulting rounded value.
 	*/
 	public static function froundPrecise(n:Float, prec:Int)
 	{
@@ -88,11 +88,6 @@ class ExtraMath
 		return total / count;
 	}
 
-	/**
-	* Safely divides two numbers. If the divisor is 0, returns `n`.
-	*
-	* 
-	**/
 	public static function safeRatioN(numerator:Float, divisor:Float, n:Float)
 	{
 		var result = n;
