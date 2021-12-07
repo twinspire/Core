@@ -527,6 +527,11 @@ class Application
 	public static var resources:ResourceManager;
 
 	/**
+	 * Do not asset load on startup.
+	 */
+	public static var noAssetLoading:Bool;
+
+	/**
 	* Set the style of the preloader to use when loading the application.
 	**/
 	public static var preloader:PreloaderStyle = 0;
@@ -607,14 +612,25 @@ class Application
 			
 			System.notifyOnFrames(loader.render);
 
-			Assets.loadEverything(() ->
+			if (!noAssetLoading)
+			{
+				Assets.loadEverything(() ->
+				{
+					instance = new Application();
+					resources = new ResourceManager();
+
+					System.removeFramesListener(loader.render);
+					callback();
+				});
+			}
+			else
 			{
 				instance = new Application();
 				resources = new ResourceManager();
 
 				System.removeFramesListener(loader.render);
 				callback();
-			});
+			}
 		});
 	}
 
