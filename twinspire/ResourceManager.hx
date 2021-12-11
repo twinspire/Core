@@ -67,6 +67,25 @@ class ResourceManager
 		loadedVideos = [];
 	}
 
+	public function clearAllSounds()
+	{
+		loadedSounds = [];
+		for (k => v in soundMap)
+		{
+			soundMap.remove(k);	
+		}
+	}
+
+	public function clearSound(name:String)
+	{
+		if (soundMap.exists(name))
+		{
+			var index = soundMap.get(name);
+			loadedSounds.splice(index, 1);
+			soundMap.remove(name);
+		}
+	}
+
 	/**
 	 * Retrieve a font by their respective kha-generated name.
 	 * @param name The provided kha-generated name.
@@ -175,6 +194,7 @@ class ResourceManager
 	*/
 	public function loadImages(names:Array<String>)
 	{
+		assetsLoaded = 0;
 		requestLoadImages = [];
 		for (i in 0...names.length)
 		{
@@ -184,9 +204,9 @@ class ResourceManager
 			for (found in foundAssets)
 			{
 				var exists = false;
-				for (loaded in requestLoadImages)
+				for (k => v in imageMap)
 				{
-					if (found == loaded)
+					if (found == k)
 					{
 						exists = true;
 						break;
@@ -212,6 +232,7 @@ class ResourceManager
 	*/
 	public function loadFonts(names:Array<String>)
 	{
+		assetsLoaded = 0;
 		requestLoadFonts = [];
 		for (i in 0...names.length)
 		{
@@ -221,9 +242,9 @@ class ResourceManager
 			for (found in foundAssets)
 			{
 				var exists = false;
-				for (loaded in requestLoadFonts)
+				for (k => v in fontMap)
 				{
-					if (found == loaded)
+					if (found == k)
 					{
 						exists = true;
 						break;
@@ -252,6 +273,7 @@ class ResourceManager
 	*/
 	public function loadSounds(names:Array<String>)
 	{
+		assetsLoaded = 0;
 		requestLoadSounds = [];
 		for (i in 0...names.length)
 		{
@@ -261,9 +283,9 @@ class ResourceManager
 			for (found in foundAssets)
 			{
 				var exists = false;
-				for (loaded in requestLoadSounds)
+				for (k => v in soundMap)
 				{
-					if (found == loaded)
+					if (found == k)
 					{
 						exists = true;
 						break;
@@ -292,6 +314,7 @@ class ResourceManager
 	*/
 	public function loadVideos(names:Array<String>)
 	{
+		assetsLoaded = 0;
 		requestLoadVideos = [];
 		for (i in 0...names.length)
 		{
@@ -301,9 +324,9 @@ class ResourceManager
 			for (found in foundAssets)
 			{
 				var exists = false;
-				for (loaded in requestLoadVideos)
+				for (k => v in videoMap)
 				{
-					if (found == loaded)
+					if (found == k)
 					{
 						exists = true;
 						break;
@@ -329,6 +352,7 @@ class ResourceManager
 	*/
 	public function loadBlobs(names:Array<String>)
 	{
+		assetsLoaded = 0;
 		requestLoadBlobs = [];
 		for (i in 0...names.length)
 		{
@@ -338,9 +362,9 @@ class ResourceManager
 			for (found in foundAssets)
 			{
 				var exists = false;
-				for (loaded in requestLoadBlobs)
+				for (k => v in blobMap)
 				{
-					if (found == loaded)
+					if (found == k)
 					{
 						exists = true;
 						break;
@@ -448,7 +472,10 @@ class ResourceManager
 					progress(assetsLoaded, assetLoadCount);
 				
 				if (assetsLoaded == assetLoadCount)
+				{
+					clearRequests();
 					complete();
+				}
 			});
 		}
 
@@ -465,7 +492,10 @@ class ResourceManager
 					progress(assetsLoaded, assetLoadCount);
 				
 				if (assetsLoaded == assetLoadCount)
+				{
+					clearRequests();
 					complete();
+				}
 			});
 		}
 
@@ -475,14 +505,21 @@ class ResourceManager
 			var request:String = requestLoadSounds[i];
 			Assets.loadSound(request, (f:Sound) -> 
 			{
-				loadedSounds.push(f);
-				soundMap.set(request, loadedSounds.length - 1);
-				assetsLoaded++;
-				if (progress != null)
-					progress(assetsLoaded, assetLoadCount);
-				
-				if (assetsLoaded == assetLoadCount)
-					complete();
+				f.uncompress(() -> {
+					loadedSounds.push(f);
+					soundMap.set(request, loadedSounds.length - 1);
+					assetsLoaded++;
+					if (progress != null)
+						progress(assetsLoaded, assetLoadCount);
+					
+					if (assetsLoaded == assetLoadCount)
+					{
+						clearRequests();
+						complete();
+					}
+				});
+			}, (e) -> {
+				trace(e.error);
 			});
 		}
 
@@ -499,7 +536,10 @@ class ResourceManager
 					progress(assetsLoaded, assetLoadCount);
 				
 				if (assetsLoaded == assetLoadCount)
+				{
+					clearRequests();
 					complete();
+				}
 			});
 		}
 
@@ -516,9 +556,22 @@ class ResourceManager
 					progress(assetsLoaded, assetLoadCount);
 				
 				if (assetsLoaded == assetLoadCount)
+				{
+					clearRequests();
 					complete();
+				}
 			});
 		}
+	}
+
+	private function clearRequests()
+	{
+		assetLoadCount = 0;
+		requestLoadBlobs = [];
+		requestLoadFonts = [];
+		requestLoadImages = [];
+		requestLoadSounds = [];
+		requestLoadVideos = [];
 	}
 
 }
