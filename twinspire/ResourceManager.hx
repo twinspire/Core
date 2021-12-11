@@ -8,15 +8,15 @@ import kha.Video;
 import kha.Sound;
 
 import twinspire.ResourceType;
+import twinspire.ResourceGroup;
 
 using StringTools;
 
 /**
-* The `ResourceManager` divides resources into groups, so that you only load resources as and when
-* they are required. When creating an `Application`, a `ResourceManager` is automatically created.
-* If you have a resource named `Manager.txt`, this is resembled as a `Blob` in the name `Manager_txt`.
-* The Application will automatically detect this, and perform group management of the resources you
-* include.
+* The `ResourceManager` as a convenience class for managing resources as and
+* when needed. This should be used over directly managing resources with `Kha.Assets`
+* for more efficient memory handling, and only loads resources into memory
+* when they are required.
 *
 * You can still load specific resources using `Kha.Assets` if you prefer.
 **/
@@ -67,8 +67,16 @@ class ResourceManager
 		loadedVideos = [];
 	}
 
+	/**
+	 * Clear all sounds currently loaded in memory.
+	 */
 	public function clearAllSounds()
 	{
+		for (loaded in loadedSounds)
+		{
+			loaded.unload();
+		}
+
 		loadedSounds = [];
 		for (k => v in soundMap)
 		{
@@ -76,13 +84,204 @@ class ResourceManager
 		}
 	}
 
+	/**
+	 * Remove from memory the sound of the specified name.
+	 * @param name The Kha-generated name of the specific sound to remove.
+	 */
 	public function clearSound(name:String)
 	{
 		if (soundMap.exists(name))
 		{
 			var index = soundMap.get(name);
+			loadedSounds[index].unload();
 			loadedSounds.splice(index, 1);
 			soundMap.remove(name);
+		}
+	}
+
+	/**
+	 * Clear all fonts currently loaded in memory.
+	 */
+	public function clearAllFonts()
+	{
+		for (loaded in loadedFonts)
+		{
+			loaded.unload();
+		}
+
+		loadedFonts = [];
+		for (k => v in fontMap)
+		{
+			fontMap.remove(k);	
+		}
+	}
+
+	/**
+	 * Remove from memory the font of the specified name.
+	 * @param name The Kha-generated name of the specific font to remove.
+	 */
+	public function clearFont(name:String)
+	{
+		if (fontMap.exists(name))
+		{
+			var index = fontMap.get(name);
+			loadedFonts[index].unload();
+			loadedFonts.splice(index, 1);
+			fontMap.remove(name);
+		}
+	}
+
+	/**
+	 * Clear all images currently loaded in memory.
+	 */
+	public function clearAllImages()
+	{
+		for (loaded in loadedImages)
+		{
+			loaded.unload();
+		}
+
+		loadedImages = [];
+		for (k => v in imageMap)
+		{
+			imageMap.remove(k);	
+		}
+	}
+
+	/**
+	 * Remove from memory the image of the specified name.
+	 * @param name The Kha-generated name of the specific image to remove.
+	 */
+	public function clearImage(name:String)
+	{
+		if (imageMap.exists(name))
+		{
+			var index = imageMap.get(name);
+			loadedImages[index].unload();
+			loadedImages.splice(index, 1);
+			imageMap.remove(name);
+		}
+	}
+
+	/**
+	 * Clear all blobs currently loaded in memory.
+	 */
+	public function clearAllBlobs()
+	{
+		for (loaded in loadedBlobs)
+		{
+			loaded.unload();
+		}
+
+		loadedBlobs = [];
+		for (k => v in blobMap)
+		{
+			blobMap.remove(k);	
+		}
+	}
+
+	/**
+	 * Remove from memory the blob of the specified name.
+	 * @param name The Kha-generated name of the specific blob to remove.
+	 */
+	public function clearBlob(name:String)
+	{
+		if (blobMap.exists(name))
+		{
+			var index = blobMap.get(name);
+			loadedBlobs[index].unload();
+			loadedBlobs.splice(index, 1);
+			blobMap.remove(name);
+		}
+	}
+
+	/**
+	 * Clear all videos currently loaded in memory.
+	 */
+	public function clearAllVideos()
+	{
+		for (loaded in loadedVideos)
+		{
+			loaded.unload();
+		}
+
+		loadedVideos = [];
+		for (k => v in videoMap)
+		{
+			videoMap.remove(k);	
+		}
+	}
+
+	/**
+	 * Remove from memory the video of the specified name.
+	 * @param name The Kha-generated name of the specific video to remove.
+	 */
+	public function clearVideo(name:String)
+	{
+		if (videoMap.exists(name))
+		{
+			var index = videoMap.get(name);
+			loadedVideos[index].unload();
+			loadedVideos.splice(index, 1);
+			videoMap.remove(name);
+		}
+	}
+
+	/**
+	 * Clear all the resources from memory within this group.
+	 * Naming rules, including wildcards, will apply when clearing resources.
+	 * @param group The group of resources to clear.
+	 */
+	public function clearGroup(group:ResourceGroup)
+	{
+		if (group.blobs != null && group.blobs.length > 0)
+		{
+			for (name in group.blobs)
+			{
+				var assets = findAssets(name, RESOURCE_MISC);
+				for (a in assets)
+					clearBlob(a);
+			}
+		}
+
+		if (group.fonts != null && group.fonts.length > 0)
+		{
+			for (name in group.fonts)
+			{
+				var assets = findAssets(name, RESOURCE_FONT);
+				for (a in assets)
+					clearFont(a);
+			}
+		}
+
+		if (group.images != null && group.images.length > 0)
+		{
+			for (name in group.images)
+			{
+				var assets = findAssets(name, RESOURCE_ART);
+				for (a in assets)
+					clearImage(a);
+			}
+		}
+
+		if (group.sounds != null && group.sounds.length > 0)
+		{
+			for (name in group.sounds)
+			{
+				var assets = findAssets(name, RESOURCE_SOUND);
+				for (a in assets)
+					clearSound(a);
+			}
+		}
+
+		if (group.videos != null && group.videos.length > 0)
+		{
+			for (name in group.videos)
+			{
+				var assets = findAssets(name, RESOURCE_VIDEO);
+				for (a in assets)
+					clearVideo(a);
+			}
 		}
 	}
 
