@@ -12,6 +12,9 @@ You will require `Git` to install Twinspire on your computer. It is recommended 
 
 Alternatively, you can use `git clone` but you will have to setup a `haxelib dev` environment yourself.
 
+## How to Use Twinspire
+The [WIKI page](https://github.com/twinspire/Core/wiki) contains tutorials and information on how you can get started with using Twinspire.
+
 ## Features
 
 The following features in the Core library include:
