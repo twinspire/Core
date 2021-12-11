@@ -382,6 +382,39 @@ class ResourceManager
 		}
 	}
 
+	/**
+	 * Loads a group of resources of varying types. Convenience method to organise resources.
+	 * Naming rules apply in the same way as individual load functions.
+	 * @param group The group of resources to load.
+	 */
+	public function loadGroup(group:ResourceGroup)
+	{
+		if (group.blobs != null && group.blobs.length > 0)
+		{
+			loadBlobs(group.blobs);
+		}
+
+		if (group.fonts != null && group.fonts.length > 0)
+		{
+			loadFonts(group.fonts);
+		}
+
+		if (group.images != null && group.images.length > 0)
+		{
+			loadImages(group.images);
+		}
+
+		if (group.sounds != null && group.sounds.length > 0)
+		{
+			loadSounds(group.sounds);
+		}
+
+		if (group.videos != null && group.videos.length > 0)
+		{
+			loadVideos(group.videos);
+		}
+	}
+
 	private function findAssets(name:String, type:ResourceType):Array<String>
 	{
 		var array:Array<String> = [];
