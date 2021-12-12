@@ -150,6 +150,12 @@ class Event
 		e.penPressure = this.penPressure;
 		e.clipboard = this.clipboard;
 		e.filePath = this.filePath;
+		e.accelerometerX = this.accelerometerX;
+		e.accelerometerY = this.accelerometerY;
+		e.accelerometerZ = this.accelerometerZ;
+		e.gyroscopeX = this.gyroscopeX;
+		e.gyroscopeY = this.gyroscopeY;
+		e.gyroscopeZ = this.gyroscopeZ;
 		return e;
 	}
 
