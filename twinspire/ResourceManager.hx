@@ -691,6 +691,12 @@ class ResourceManager
 	 */
 	public function submitLoadRequest(complete:() -> Void, ?progress:(Int, Int) -> Void)
 	{
+		if (assetLoadCount == 0 && complete != null)
+		{
+			complete();
+			return;
+		}
+
 		// font loading
 		for (i in 0...requestLoadFonts.length)
 		{
