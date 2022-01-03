@@ -12,6 +12,10 @@ import twinspire.ResourceGroup;
 
 using StringTools;
 
+#if js
+import js.Promise;
+#end
+
 /**
 * The `ResourceManager` as a convenience class for managing resources as and
 * when needed. This should be used over directly managing resources with `Kha.Assets`
@@ -689,11 +693,11 @@ class ResourceManager
 	 * @param complete The callback function to execute when this operation completes.
 	 * @param progress The callback function to execute when progress has been performed.
 	 */
-	public function submitLoadRequest(complete:() -> Void, ?progress:(Int, Int) -> Void)
+	public function submitLoadRequest(complete:(Int) -> Void, ?progress:(Int, Int) -> Void)
 	{
 		if (assetLoadCount == 0 && complete != null)
 		{
-			complete();
+			complete(assetLoadCount);
 			return;
 		}
 
@@ -712,7 +716,7 @@ class ResourceManager
 				if (assetsLoaded == assetLoadCount)
 				{
 					clearRequests();
-					complete();
+					complete(assetsLoaded);
 				}
 			});
 		}
@@ -732,7 +736,7 @@ class ResourceManager
 				if (assetsLoaded == assetLoadCount)
 				{
 					clearRequests();
-					complete();
+					complete(assetsLoaded);
 				}
 			});
 		}
@@ -753,7 +757,7 @@ class ResourceManager
 					if (assetsLoaded == assetLoadCount)
 					{
 						clearRequests();
-						complete();
+						complete(assetsLoaded);
 					}
 				});
 			}, (e) -> {
@@ -776,7 +780,7 @@ class ResourceManager
 				if (assetsLoaded == assetLoadCount)
 				{
 					clearRequests();
-					complete();
+					complete(assetsLoaded);
 				}
 			});
 		}
@@ -796,11 +800,24 @@ class ResourceManager
 				if (assetsLoaded == assetLoadCount)
 				{
 					clearRequests();
-					complete();
+					complete(assetsLoaded);
 				}
 			});
 		}
 	}
+
+	#if js
+	public function submitLoadRequestAsync():Promise<Int>
+	{
+		return new Promise<Int>((resolve, reject) -> {
+			submitLoadRequest((assetsLoaded) -> {
+				resolve(assetsLoaded);
+			}, (count, total) -> {
+				
+			});
+		});
+	}
+	#end
 
 	private function clearRequests()
 	{
