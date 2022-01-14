@@ -24,6 +24,9 @@ import js.Promise;
 *
 * You can still load specific resources using `Kha.Assets` if you prefer.
 **/
+#if tink_await
+@await
+#end
 class ResourceManager
 {
 
@@ -180,7 +183,7 @@ class ResourceManager
 		loadedBlobs = [];
 		for (k => v in blobMap)
 		{
-			blobMap.remove(k);	
+			blobMap.remove(k);
 		}
 	}
 
@@ -806,18 +809,14 @@ class ResourceManager
 		}
 	}
 
-	#if js
-	public function submitLoadRequestAsync():Promise<Int>
-	{
-		return new Promise<Int>((resolve, reject) -> {
-			submitLoadRequest((assetsLoaded) -> {
-				resolve(assetsLoaded);
-			}, (count, total) -> {
-				
-			});
-		});
-	}
+	#if tink_await
+	@async
 	#end
+	public function submitLoadRequestAsync(complete:(Int) -> Void, ?progress:(Int, Int) -> Void):Int
+	{
+		submitLoadRequest(complete, progress);
+		return assetLoadCount;
+	}
 
 	private function clearRequests()
 	{
