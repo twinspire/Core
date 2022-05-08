@@ -696,12 +696,24 @@ class ResourceManager
 	 * @param complete The callback function to execute when this operation completes.
 	 * @param progress The callback function to execute when progress has been performed.
 	 */
-	public function submitLoadRequest(complete:(Int) -> Void, ?progress:(Int, Int) -> Void)
+	public function submitLoadRequest(complete:() -> Void, ?progress:(Int, Int) -> Void)
 	{
 		if (assetLoadCount == 0 && complete != null)
 		{
-			complete(assetLoadCount);
+			complete();
 			return;
+		}
+
+		function onLoaded():Void {
+			assetsLoaded++;
+			if (progress != null)
+				progress(assetsLoaded, assetLoadCount);
+				
+			if (assetsLoaded == assetLoadCount)
+			{
+				clearRequests();
+				complete();
+			}
 		}
 
 		// font loading
@@ -712,15 +724,7 @@ class ResourceManager
 			{ 
 				loadedFonts.push(f);
 				fontMap.set(request, loadedFonts.length - 1);
-				assetsLoaded++;
-				if (progress != null)
-					progress(assetsLoaded, assetLoadCount);
-				
-				if (assetsLoaded == assetLoadCount)
-				{
-					clearRequests();
-					complete(assetsLoaded);
-				}
+				onLoaded();
 			});
 		}
 
@@ -732,15 +736,7 @@ class ResourceManager
 			{
 				loadedImages.push(f);
 				imageMap.set(request, loadedImages.length - 1);
-				assetsLoaded++;
-				if (progress != null)
-					progress(assetsLoaded, assetLoadCount);
-				
-				if (assetsLoaded == assetLoadCount)
-				{
-					clearRequests();
-					complete(assetsLoaded);
-				}
+				onLoaded();
 			});
 		}
 
@@ -753,15 +749,7 @@ class ResourceManager
 				f.uncompress(() -> {
 					loadedSounds.push(f);
 					soundMap.set(request, loadedSounds.length - 1);
-					assetsLoaded++;
-					if (progress != null)
-						progress(assetsLoaded, assetLoadCount);
-					
-					if (assetsLoaded == assetLoadCount)
-					{
-						clearRequests();
-						complete(assetsLoaded);
-					}
+					onLoaded();
 				});
 			}, (e) -> {
 				trace(e.error);
@@ -776,15 +764,7 @@ class ResourceManager
 			{
 				loadedVideos.push(f);
 				videoMap.set(request, loadedVideos.length - 1);
-				assetsLoaded++;
-				if (progress != null)
-					progress(assetsLoaded, assetLoadCount);
-				
-				if (assetsLoaded == assetLoadCount)
-				{
-					clearRequests();
-					complete(assetsLoaded);
-				}
+				onLoaded();
 			});
 		}
 
@@ -796,15 +776,7 @@ class ResourceManager
 			{
 				loadedBlobs.push(f);
 				blobMap.set(request, loadedBlobs.length - 1);
-				assetsLoaded++;
-				if (progress != null)
-					progress(assetsLoaded, assetLoadCount);
-				
-				if (assetsLoaded == assetLoadCount)
-				{
-					clearRequests();
-					complete(assetsLoaded);
-				}
+				onLoaded();
 			});
 		}
 	}
@@ -812,7 +784,7 @@ class ResourceManager
 	#if tink_await
 	@async
 	#end
-	public function submitLoadRequestAsync(complete:(Int) -> Void, ?progress:(Int, Int) -> Void):Int
+	public function submitLoadRequestAsync(complete:() -> Void, ?progress:(Int, Int) -> Void):Int
 	{
 		submitLoadRequest(complete, progress);
 		return assetLoadCount;

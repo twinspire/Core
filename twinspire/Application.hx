@@ -1,5 +1,6 @@
 package twinspire;
 
+import kha.math.FastVector2;
 import twinspire.events.Event;
 
 import kha.math.FastVector2 in FV2;
@@ -558,6 +559,20 @@ class Application
 	public static function setBufferSize(width:Int, height:Int)
 	{
 		buffer.adjustBufferSize(width, height);
+	}
+
+	/**
+	 * Get the current size of the current back buffer. If no back buffer is found, `null` is returned.
+	 * Note that this returns the size of the buffer, NOT the size of the game window. Use native `Kha.System` functions for this.
+	 */
+	public static function getBufferSize():FastVector2
+	{
+		if (buffer != null)
+		{
+			return new FastVector2(buffer.clientWidth, buffer.clientHeight);
+		}
+		
+		return null;
 	}
 
 	/**

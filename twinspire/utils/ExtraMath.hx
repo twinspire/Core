@@ -8,6 +8,7 @@ class ExtraMath
 
 	/**
 	* Round a floating-point number to the nearest integral or decimal number with the given precision.
+	* Unlike `froundPrecise2`, only the multiplication part is rounded and its result divided by its power.
 	*
 	* @param n The floating-point number to round.
 	* @param prec The precision to round to.
@@ -15,6 +16,32 @@ class ExtraMath
 	* @return Return the resulting rounded value.
 	*/
 	public static function froundPrecise(n:Float, prec:Int)
+	{
+		var pow:Int = cast Math.pow(10, prec);
+		var result = Math.round(n * pow) / pow;
+		return result;
+	}
+
+
+	public static function froundAddPrecise(a:Float, b:Float, prec:Int)
+	{
+		var _aI:Int = cast (a * prec);
+		var _bI:Int = cast (b * prec);
+		var sum:Int = _aI + _bI;
+		var result:Float = sum / prec;
+		return result;
+	}
+
+	/**
+	* Round a floating-point number to the nearest integral or decimal number with the given precision.
+	* Unlike `froundPrecise`, the full result of the precision multiplication/division is rounded.
+	*
+	* @param n The floating-point number to round.
+	* @param prec The precision to round to.
+	*
+	* @return Return the resulting rounded value.
+	*/
+	public static function froundPrecise2(n:Float, prec:Int)
 	{
 		var pow = Math.pow(10, prec);
 		var result = Math.round((n * pow) / pow);
@@ -57,6 +84,15 @@ class ExtraMath
 		}
 		
 		return result;
+	}
+
+
+	public static function getRadians(angle:Float):Float
+	{
+		var total = Math.PI * 2;
+		var totalDegrees = 360.0;
+		var ratioDegrees = angle / totalDegrees;
+		return total * ratioDegrees;
 	}
 
 	/**
