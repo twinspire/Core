@@ -2,6 +2,8 @@ package twinspire;
 
 import twinspire.geom.Dim;
 import twinspire.Application;
+
+import kha.math.FastVector2;
 import kha.System;
 
 enum abstract HorizontalAlign(Int) from Int to Int
@@ -28,7 +30,7 @@ class Dimensions
 	 * @param width The width of the object to centre.
 	 * @param height The height of the object to centre.
 	 */
-	function centreScreenFromSize(width:Float, height:Float)
+	public static function centreScreenFromSize(width:Float, height:Float)
     {
         var x = (System.windowWidth() - width) / 2;
         var y = (System.windowHeight() - height) / 2;
@@ -41,7 +43,7 @@ class Dimensions
      * @param height The height of the object.
      * @param offsetY The offset from the top of the screen.
      */
-    function centreScreenY(width:Float, height:Float, offsetY:Float)
+    public static function centreScreenY(width:Float, height:Float, offsetY:Float)
     {
         var x = (System.windowWidth() - width) / 2;
         return new Dim(x, offsetY, width, height);
@@ -53,7 +55,7 @@ class Dimensions
      * @param height The height of the object.
      * @param offsetX The offset from the top of the screen.
      */
-    function centreScreenX(width:Float, height:Float, offsetX:Float)
+    public static function centreScreenX(width:Float, height:Float, offsetX:Float)
     {
         var y = (System.windowHeight() - height) / 2;
         return new Dim(offsetX, y, width, height);
@@ -65,7 +67,7 @@ class Dimensions
      * @param height The height of the object.
      * @param offsetY The offset from the top of the screen.
      */
-    function centreBufferY(width:Float, height:Float, offsetY:Float)
+    public static function centreBufferY(width:Float, height:Float, offsetY:Float)
     {
         var x = (Application.getBufferSize().x - width) / 2;
         return new Dim(x, offsetY, width, height);
@@ -77,7 +79,7 @@ class Dimensions
      * @param halign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    inline function screenAlignX(a:Dim, halign:Int, offset:FastVector2)
+    public static inline function screenAlignX(a:Dim, halign:Int, offset:FastVector2)
     {
         if (halign == HALIGN_LEFT)
         {
@@ -102,7 +104,7 @@ class Dimensions
      * @param valign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    inline function screenAlignY(a:Dim, valign:Int, offset:FastVector2)
+    public static inline function screenAlignY(a:Dim, valign:Int, offset:FastVector2)
     {
         if (valign == VALIGN_TOP)
         {
@@ -126,7 +128,7 @@ class Dimensions
      * @param halign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    inline function bufferAlignX(a:Dim, halign:Int, offset:FastVector2)
+    public static inline function bufferAlignX(a:Dim, halign:Int, offset:FastVector2)
     {
         if (halign == HALIGN_LEFT)
         {
@@ -151,7 +153,7 @@ class Dimensions
      * @param valign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    inline function bufferAlignY(a:Dim, valign:Int, offset:FastVector2)
+    public static inline function bufferAlignY(a:Dim, valign:Int, offset:FastVector2)
     {
         if (valign == VALIGN_TOP)
         {
@@ -175,7 +177,7 @@ class Dimensions
      * @param height The height of the object.
      * @param offsetX The offset from the top of the screen.
      */
-    function centreBufferX(width:Float, height:Float, offsetX:Float)
+    public static function centreBufferX(width:Float, height:Float, offsetX:Float)
     {
         var y = (Application.getBufferSize().y - height) / 2;
         return new Dim(offsetX, y, width, height);
@@ -188,7 +190,7 @@ class Dimensions
      * @param a The current dimension to use.
      * @param offsetX The value to offset the new dimension.
      */
-    function dimOffsetX(a:Dim, offsetX:Float)
+    public static function dimOffsetX(a:Dim, offsetX:Float)
     {
         if (offsetX >= 0)
             return new Dim(a.x + a.width + offsetX, a.y, a.width, a.height);
@@ -205,7 +207,7 @@ class Dimensions
      * @param a The current dimension to use.
      * @param offsetY The value to offset the new dimension.
      */
-    function dimOffsetY(a:Dim, offsetY:Float)
+    public static function dimOffsetY(a:Dim, offsetY:Float)
     {
         if (offsetY >= 0)
             return new Dim(a.x, a.y + a.height + offsetY, a.width, a.height);
@@ -222,7 +224,7 @@ class Dimensions
      * @param valign The vertical alignment `b` should be to `a`.
      * @param halign The horizontal alignment `b` should be to `a`.
      */
-    inline function dimAlign(a:Dim, b:Dim, valign:Int, halign:Int)
+    public static inline function dimAlign(a:Dim, b:Dim, valign:Int, halign:Int)
     {
         dimVAlign(a, b, valign);
         dimHAlign(a, b, halign);
@@ -234,7 +236,7 @@ class Dimensions
      * @param b The second dimension.
      * @param valign The vertical alignment `b` should be to `a`.
      */
-    inline function dimVAlign(a:Dim, b:Dim, valign:Int)
+    public static inline function dimVAlign(a:Dim, b:Dim, valign:Int)
     {
         if (valign == VALIGN_TOP)
         {
@@ -256,7 +258,7 @@ class Dimensions
      * @param b The second dimension.
      * @param valign The horizontal alignment `b` should be to `a`.
      */
-    inline function dimHAlign(a:Dim, b:Dim, halign:Int)
+    public static inline function dimHAlign(a:Dim, b:Dim, halign:Int)
     {
         if (halign == HALIGN_LEFT)
         {
