@@ -59,6 +59,7 @@ class Dimensions
     static var groups:Array<String>;
     static var groupDims:Array<Array<Dim>>;
     static var groupDimTypes:Array<Array<Int>>;
+    static var groupDimNames:Array<Array<String>>;
 
     /**
      * Create a new dimensions group encapsulating all the dimensions that belong in this group.
@@ -76,6 +77,18 @@ class Dimensions
         {
             groupDims = [];
             groupDims.push([]);
+        }
+
+        if (groupDimTypes == null)
+        {
+            groupDimTypes = [];
+            groupDimTypes.push([]);
+        }
+
+        if (groupDimNames == null)
+        {
+            groupDimNames = [];
+            groupDimNames.push([]);
         }
 
         return groups.push(id) - 1;
@@ -188,7 +201,7 @@ class Dimensions
      * @param dimType The type this dimension should use.
      * @return Int
      */
-    public static function createDimensionIndex(dimType:Int):DimIndexResult
+    public static function createDimensionIndex(name:String, dimType:Int):DimIndexResult
     {
         #if assertion
         assert(groupDims != null);
@@ -200,12 +213,55 @@ class Dimensions
         var index = groupDims.length - 1;
         var dimensions = groupDims[index];
         var dimensionTypes = groupDimTypes[index];
+        var dimensionNames = groupDimNames[index];
         dimensions.push(Dim.zero);
         dimensionTypes.push(dimType);
+        dimensionNames.push(name);
         return {
             dimIndex: dimensions.length - 1,
             groupIndex: index
         };
+    }
+
+    /**
+     * Get a dimension by a `DimIndexResult`.
+     * @param indexResult A given dim index result.
+     * @return Dim
+     */
+    public static function getDimension(indexResult:DimIndexResult):Dim
+    {
+        return groupDims[indexResult.groupIndex][indexResult.dimIndex];
+    }
+
+    /**
+     * Get a dimension by the given group and dim name.
+     * @param groupName The name of the group.
+     * @param dimName The name of the dimension.
+     * @return Dim
+     */
+    public static function getDimensionByName(groupName:String, dimName:String):Dim
+    {
+        var groupIndex = getDimGroupIndex(groupName);
+        return getDimensionByGroupIndexAndName(groupIndex, dimName);
+    }
+
+    /**
+     * Get a dimension by the given group index and dim name.
+     * @param groupName The index of the group.
+     * @param dimName The name of the dimension.
+     * @return Dim
+     */
+    public static function getDimensionByGroupIndexAndName(groupIndex:Int, dimName:String):Dim
+    {
+        for (i in 0...groupDimNames[groupIndex].length)
+        {
+            if (groupDimNames[groupIndex][i] == dimName)
+            {
+                return groupDims[groupIndex][i];
+            }
+        }
+
+        return null;
     }
 
     /**
