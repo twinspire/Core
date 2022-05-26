@@ -1,6 +1,8 @@
 package twinspire;
 
 import twinspire.geom.Dim;
+import twinspire.geom.DimCellSize;
+import twinspire.geom.DimCellSize.DimCellSizing;
 import twinspire.Application;
 
 import kha.math.FastVector2;
@@ -172,6 +174,156 @@ class Dimensions
     }
 
     /**
+     * Create a series of dimensions representing a grid, with each column and row of 
+     * equal width and height proportionate to the number of given columns and rows to the container.
+     * @param container The container dimension to create the grid from.
+     * @param columns The number of equally sized columns.
+     * @param rows The number of equally sized rows.
+     */
+    public static function dimGridEquals(container:Dim, columns:Int, rows:Int):Array<Dim>
+    {
+        var cellWidth = container.width / columns;
+        var cellHeight = container.height / rows;
+        var results = [];
+
+        for (c in 0...columns)
+        {
+            for (r in 0...rows)
+            {
+                results.push(new Dim(c * cellWidth + container.x, r * cellHeight + container.y, cellWidth, cellHeight));
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Create a series of dimensions representing a grid, containing specific ratios for each set of columns and rows based on the size of the given container.
+     * @param container The container dimension to create the grid from.
+     * @param columns An array representing the ratios for the columns in the grid.
+     * @param rows An array representing the ratios for the rows in the grid.
+     */
+    public static function dimGridFloats(container:Dim, columns:Array<Float>, rows:Array<Float>):Array<Dim>
+    {
+        var results = [];
+        var startY = 0.0;
+        for (r in 0...rows.length)
+        {
+            var cellHeight = container.height * rows[r];
+            var startX = 0.0;
+            for (c in 0...columns.length)
+            {
+                var cellWidth = container.width * columns[c];
+                results.push(new Dim(startX + container.x, startY + container.y, cellWidth, cellHeight));
+                startX += cellWidth;
+            }
+
+            startY += cellHeight;
+        }
+        return results;
+    }
+
+    /**
+     * Create a series of dimensions representing a grid, using the specific given columns and rows with varying size methods.
+     * Any cell sizes with the method `DIM_SIZING_PIXELS` are calculated first, and the remaining width or height of the
+     * column or row is then used to determine any sizes with the method `DIM_SIZING_PERCENT`. Any pixel sizes that
+     * are greater than the width or height of the given container will supersede any provided percentage sizes.
+     * @param container The container dimension to create the grid from.
+     * @param columns An array of column sizes.
+     * @param rows An array of row sizes.
+     */
+    public static function dimGrid(container:Dim, columns:Array<DimCellSize>, rows:Array<DimCellSize>):Array<Dim>
+    {
+        var totalPreciseWidth = 0.0;
+        var totalPreciseHeight = 0.0;
+        for (c in columns)
+        {
+            if (c.sizing == DIM_SIZING_PIXELS)
+                totalPreciseWidth += c.value;
+        }
+
+        for (r in rows)
+        {
+            if (r.sizing == DIM_SIZING_PIXELS)
+                totalPreciseHeight += r.value;
+        }
+
+        var remainingWidth = container.width - totalPreciseWidth;
+        var remainingHeight = container.height - totalPreciseHeight;
+        var contentWidth = totalPreciseWidth;
+        var contentHeight = totalPreciseHeight;
+
+        for (c in columns)
+        {
+            if (c.sizing == DIM_SIZING_PERCENT)
+                contentWidth += (c.value * remainingWidth);
+        }
+
+        for (r in rows)
+        {
+            if (r.sizing == DIM_SIZING_PERCENT)
+                contentHeight += (r.value * remainingHeight);
+        }
+
+        var contentX = ((container.width - contentWidth) / 2) + container.x;
+        var contentY = ((container.height - contentHeight) / 2) + container.y;
+
+        var results = [];
+
+        var startY = contentY;
+        for (r in rows)
+        {
+            var y = 0.0;
+            var height = 0.0;
+
+            if (r.sizing == DIM_SIZING_PERCENT)
+            {
+                height = (r.value * remainingHeight);
+                y = startY;
+                startY += height;
+            }
+            else if (r.sizing == DIM_SIZING_PIXELS)
+            {
+                y = startY;
+                height = r.value;
+                startY += height;
+            }
+
+            var startX = contentX;
+            for (c in columns)
+            {
+                var x = 0.0;
+                var width = 0.0;
+                
+                if (c.sizing == DIM_SIZING_PERCENT)
+                {
+                    width = (c.value * remainingWidth);
+                    x = startX;
+                    startX += width;
+                }
+                else if (c.sizing == DIM_SIZING_PIXELS)
+                {
+                    x = startX;
+                    width = c.value;
+                    startX += width;
+                }
+
+                results.push(new Dim(x, y, width, height));
+            }
+        }
+
+        return results;
+    }
+
+    public static function dimMultiCellSize(cellSize:DimCellSize, count:Int):Array<DimCellSize>
+    {
+        var results = [];
+        for (i in 0...count)
+            results.push({ value: cellSize.value, sizing: cellSize.sizing });
+        return results;
+    }
+
+    /**
      * Create a dimension block from the given width and given offset on the X-axis.
      * @param width The width of the object.
      * @param height The height of the object.
@@ -272,6 +424,83 @@ class Dimensions
         {
             b.x = a.x - ((b.width - a.width) / 2);
         }
+    }
+
+    public static inline function dimAlignOffset(a:Dim, b:Dim, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0)
+    {
+        dimVAlignOffset(a, b, valign, voffset);
+        dimHAlignOffset(a, b, halign, hoffset);
+    }
+
+    public static inline function dimVAlignOffset(a:Dim, b:Dim, valign:Int, offset:Float = 0.0)
+    {
+        if (valign == VALIGN_TOP)
+        {
+            b.y = a.y - b.height - offset;
+        }
+        else if (valign == VALIGN_BOTTOM)
+        {
+            b.y = a.y + a.height + offset;
+        }
+        else if (valign == VALIGN_CENTRE)
+        {
+            b.y = a.y - ((b.height - a.height) / 2);
+        }
+    }
+
+    public static inline function dimHAlignOffset(a:Dim, b:Dim, halign:Int, offset:Float = 0.0)
+    {
+        if (halign == HALIGN_LEFT)
+        {
+            b.x = a.x - b.width - offset;
+        }
+        else if (halign == HALIGN_RIGHT)
+        {
+            b.x = a.x + a.width + offset;
+        }
+        else if (halign == HALIGN_MIDDLE)
+        {
+            b.x = a.x - ((b.width - a.width) / 2);
+        }
+    }
+
+    /**
+     * Scale a given dimension along the X-Axis and Y-Axis and return a new dimension with the results.
+     * @param a The dimension to scale.
+     * @param scaleX How much to scale, as a percentage (0-1), along the X-Axis.
+     * @param scaleY How much to scale, as a percentage (0-1), along the Y-Axis.
+     */
+    public static function dimScale(a:Dim, scaleX:Float, scaleY:Float)
+    {
+        var ratioWidth = a.width * scaleX;
+        var ratioX = a.x + ((a.width - ratioWidth) / 2);
+        var ratioHeight = a.height * scaleY;
+        var ratioY = a.y + ((a.height - ratioHeight) / 2);
+        return new Dim(ratioX, ratioY, ratioWidth, ratioHeight);
+    }
+
+    /**
+     * Scale a given dimension along the X-Axis and return a new dimension with the results.
+     * @param a The dimension to scale.
+     * @param scaleX How much to scale, as a percentage (0-1), along the X-Axis.
+     */
+    public static function dimScaleX(a:Dim, scaleX:Float)
+    {
+        var ratioWidth = a.width * scaleX;
+        var ratioX = a.x + ((a.width - ratioWidth) / 2);
+        return new Dim(ratioX, a.y, ratioWidth, a.height);
+    }
+
+    /**
+     * Scale a given dimension along the Y-Axis and return a new dimension with the results.
+     * @param a The dimension to scale.
+     * @param scaleY How much to scale, as a percentage (0-1), along the Y-Axis.
+     */
+    public static function dimScaleY(a:Dim, scaleY:Float)
+    {
+        var ratioHeight = a.height * scaleY;
+        var ratioY = a.y + ((a.height - ratioHeight) / 2);
+        return new Dim(a.x, ratioY, a.width, ratioHeight);
     }
 
 }
