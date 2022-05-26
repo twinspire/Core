@@ -8,6 +8,10 @@ import twinspire.Application;
 import kha.math.FastVector2;
 import kha.System;
 
+#if assertion
+import Assertion.*;
+#end
+
 enum abstract HorizontalAlign(Int) from Int to Int
 {
 	var HALIGN_NONE				=	0;
@@ -24,8 +28,194 @@ enum abstract VerticalAlign(Int) from Int to Int
 	var VALIGN_BOTTOM			=	3;
 }
 
+enum abstract DimBehaviourFlags(Int) from Int to Int
+{
+    /**
+     * A dimension behaviour which specifies no events are to be handled by the simulation engine.
+     */
+    var DIM_NO_EVENTS           =   0;
+    /**
+     * A dimension behaviour specifying mouse movements in and out of the dimension affects the render results.
+     */
+    var DIM_MOUSE_EVENTS        =   0x01;
+    /**
+     * A dimension behaviour specifying that the mouse wheel affects the position of dimensions contained in this dimension.
+     */
+    var DIM_SCROLL_EVENTS       =   0x02;
+}
+
+typedef DimIndexResult = {
+    var dimIndex:Int;
+    var groupIndex:Int;
+}
+
 class Dimensions
 {
+
+    static var dimTypes:Array<String>;
+    static var dimTypesBehaviours:Array<Int>;
+
+    static var activeGroups:Array<Int>;
+    static var groups:Array<String>;
+    static var groupDims:Array<Array<Dim>>;
+    static var groupDimTypes:Array<Array<Int>>;
+
+    /**
+     * Create a new dimensions group encapsulating all the dimensions that belong in this group.
+     * @param id The name of the group.
+     * @return Int
+     */
+    public static function createGroup(id:String):Int
+    {
+        if (groups == null)
+        {
+            groups = [];
+        }
+
+        if (groupDims == null)
+        {
+            groupDims = [];
+            groupDims.push([]);
+        }
+
+        return groups.push(id) - 1;
+    }
+
+    /**
+     * Activate a group by a given name. If used, it is assumed that you will use `getActiveGroups()` to identify
+     * what to render.
+     * @param id The name of the group to activate.
+     */
+    public static function activateGroup(id:String)
+    {
+        for (i in 0...activeGroups.length)
+        {
+            if (activeGroups[i] == getDimGroupIndex(id))
+            {
+                return;
+            }
+        }
+
+        activeGroups.push(getDimGroupIndex(id));
+    }
+
+    /**
+     * Deactivate a group by name, preventing that group from being captured for rendering.
+     * @param id The name of the group to deactivate.
+     */
+    public static function deactivateGroup(id:String)
+    {
+        var remove = -1;
+        for (i in 0...activeGroups.length)
+        {
+            if (activeGroups[i] == getDimGroupIndex(id))
+            {
+                remove = i;
+                break;
+            }
+        }
+
+        if (remove > -1)
+            activeGroups.splice(remove, 1);
+    }
+
+    /**
+     * Order all dimensions of a given group by the specified order value.
+     * @param id The name of the group.
+     * @param order The new order value each dimension should have in this group.
+     */
+    public static function orderGroup(id:String, order:Int)
+    {
+        var index = getDimGroupIndex(id);
+        if (index > -1)
+        {
+            var dims = groupDims[index];
+            for (i in 0...dims.length)
+            {
+                dims[i].order = order;
+            }
+        }
+    }
+
+    public static function getActiveGroups():Array<Int>
+    {
+        return activeGroups;
+    }
+
+    /**
+     * Get the index of a group of dimensions by a given name. Returns `-1` if nothing is found.
+     * @param id The name of the group to find.
+     * @return Int
+     */
+    public static function getDimGroupIndex(id:String):Int
+    {
+        for (i in 0...groups.length)
+        {
+            if (groups[i] == id)
+                return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Create a new type with the given name and behaviour flags.
+     * Behaviours will affect the resulting dimension statuses, whether it is active, dormant, hovered over
+     * by the mouse, etc.
+     * @param name The name for this type.
+     * @param behaviourFlags The behaviour flags associated with this type.
+     * @return Int
+     */
+    public static function createDimensionType(name:String, behaviourFlags:Int):Int
+    {
+        if (dimTypes == null)
+        {
+            dimTypes = [];
+        }
+
+        if (dimTypesBehaviours == null)
+        {
+            dimTypesBehaviours = [];
+        }
+
+        dimTypes.push(name);
+        dimTypesBehaviours.push(behaviourFlags);
+        return dimTypes.length - 1;
+    }
+
+    /**
+     * Create a new dimension with zero values with the given type. Returns the index of the dimension
+     * and the index of the currently active group.
+     * @param dimType The type this dimension should use.
+     * @return Int
+     */
+    public static function createDimensionIndex(dimType:Int):DimIndexResult
+    {
+        #if assertion
+        assert(groupDims != null);
+        #else
+        if (groupDims == null)
+            return null;
+        #end
+
+        var index = groupDims.length - 1;
+        var dimensions = groupDims[index];
+        var dimensionTypes = groupDimTypes[index];
+        dimensions.push(Dim.zero);
+        dimensionTypes.push(dimType);
+        return {
+            dimIndex: dimensions.length - 1,
+            groupIndex: index
+        };
+    }
+
+    /**
+     * Perform event-handling simulations on all active groups.
+     * Requires use of the `GlobalEvents` class.
+     */
+    public static function simulateDimGroups()
+    {
+
+    }
 
     /**
 	 * Create a dimension block from the given width and height, centering in the middle of the screen.

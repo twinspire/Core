@@ -18,8 +18,12 @@ class Dim
         this.order = order;
 	}
 
-	public static var Zero(get, never):Dim;
-	private static function get_Zero()
+	/**
+	 * Return a new dimension with all zero values.
+	 * This value should not be used as is.
+	 */
+	public static var zero(get, never):Dim;
+	private static function get_zero()
 	{
 		return new Dim(0, 0, 0, 0);
 	}
