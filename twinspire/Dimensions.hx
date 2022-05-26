@@ -150,6 +150,12 @@ class Dimensions
         }
     }
 
+    
+
+    /**
+     * Get all currently active groups.
+     * @return Array<Int>
+     */
     public static function getActiveGroups():Array<Int>
     {
         return activeGroups;

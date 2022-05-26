@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.GlobalEvents;
 import kha.math.FastVector2;
 import twinspire.events.Event;
 
@@ -74,6 +75,7 @@ class Application
 
 	private function initEvents()
 	{
+		GlobalEvents.init();
 		_events = [];
 
 		System.notifyOnApplicationState(_app_foreground, _app_resume, _app_pause, _app_background, _app_shutdown);
@@ -142,9 +144,6 @@ class Application
 		return true;
 	}
 
-
-
-
 	/**
 	* Event handling functions
 	*/
@@ -155,6 +154,8 @@ class Application
 		e.type = EVENT_KEY_DOWN;
 		e.key = key;
 		_ctrl = key == KeyCode.Control;
+
+		@:privateAccess(GlobalEvents) GlobalEvents.keysDown[e.key] = true;
 
 		_events.push(e);
 	}
@@ -171,6 +172,9 @@ class Application
 
 		_ctrl = !(key == KeyCode.Control);
 
+		@:privateAccess(GlobalEvents) GlobalEvents.keysUp[e.key] = true;
+		@:privateAccess(GlobalEvents) GlobalEvents.keysDown[e.key] = false;
+
 		_events.push(e);
 	}
 
@@ -179,6 +183,9 @@ class Application
 		var e = new Event();
 		e.type = EVENT_KEY_PRESS;
 		e.char = char;
+
+		@:privateAccess(GlobalEvents) GlobalEvents.keyChar = char;
+
 		_events.push(e);
 	}
 
@@ -189,6 +196,11 @@ class Application
 		e.mouseButton = button;
 		e.mouseX = x;
 		e.mouseY = y;
+
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseButton = button;
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseX = mouseX;
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseY = mouseY;
+
 		_events.push(e);
 	}
 
@@ -199,6 +211,11 @@ class Application
 		e.mouseButton = button;
 		e.mouseX = x;
 		e.mouseY = y;
+
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseButton = button;
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseX = x;
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseY = y;
+
 		_events.push(e);
 	}
 
@@ -210,6 +227,12 @@ class Application
 		e.mouseY = y;
 		e.mouseMovementX = movementX;
 		e.mouseMovementY = movementY;
+
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseX = x;
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseY = y;
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseMoveX = movementX;
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseMoveY = movementY;
+
 		_events.push(e);
 	}
 
@@ -218,6 +241,9 @@ class Application
 		var e = new Event();
 		e.type = EVENT_MOUSE_WHEEL;
 		e.mouseDelta = delta;
+
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseDelta = delta;
+
 		_events.push(e);
 	}
 
@@ -225,6 +251,9 @@ class Application
 	{
 		var e = new Event();
 		e.type = EVENT_MOUSE_LOCK_CHANGE;
+
+		@:privateAccess(GlobalEvents) GlobalEvents.mouseLocked = !GlobalEvents.mouseLocked;
+
 		_events.push(e);
 	}
 
@@ -242,6 +271,9 @@ class Application
 		e.gamepadId = 0;
 		e.gamepadAxis = axis;
 		e.gamepadAxisValue = value;
+
+		
+
 		_events.push(e);
 	}
 
