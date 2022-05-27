@@ -1,48 +1,86 @@
 package twinspire;
 
+import kha.math.Vector3;
+import kha.math.Vector2;
+import twinspire.Application;
 import twinspire.events.Event;
 import twinspire.events.EventType;
+import twinspire.events.TouchState;
+import twinspire.events.GamepadState;
+import twinspire.events.KeyModifiers;
 
 import kha.input.KeyCode;
 
+@:allow(Application)
 @:build(twinspire.macros.StaticBuilder.build())
 class GlobalEvents
 {
 
 	@:local
-	var mouseX:Int;
-	var mouseY:Int;
-	var mouseMoveX:Int;
-	var mouseMoveY:Int;
-	var mouseButton:Int;
-	var mouseReleased:Bool;
-	var mouseDown:Bool;
-	var mouseDelta:Int;
-	var mouseLocked:Bool;
+	@:noCompletion var mouseX:Int;
+	@:noCompletion var mouseY:Int;
+	@:noCompletion var mouseMoveX:Int;
+	@:noCompletion var mouseMoveY:Int;
+	@:noCompletion var mouseButton:Int;
+	@:noCompletion var mouseReleased:Bool;
+	@:noCompletion var mouseDown:Bool;
+	@:noCompletion var mouseDelta:Int;
+	@:noCompletion var mouseLocked:Bool;
 
-	var keysUp:Array<Bool>;
-	var keysDown:Array<Bool>;
-	var keyChar:String;
+	@:noCompletion var keysUp:Array<Bool>;
+	@:noCompletion var keysDown:Array<Bool>;
+	@:noCompletion var keyChar:String;
 
-	var touchX:Int;
-	var touchY:Int;
-	var touchDown:Bool;
-	var touchReleased:Bool;
-	var touchFingers:Int;
+	@:noCompletion var recentlyTouchedIndex:Int;
+	@:noCompletion var lastTouchedIndex:Int;
+	@:noCompletion var touchStates:Array<TouchState>;
 
-	var filesDropped:Array<String>;
+	@:noCompletion var accelerometerX:Float;
+	@:noCompletion var accelerometerY:Float;
+	@:noCompletion var accelerometerZ:Float;
 
-	var appActivated:Bool;
-	var appDeactivated:Bool;
+	@:noCompletion var gyroscopeX:Float;
+	@:noCompletion var gyroscopeY:Float;
+	@:noCompletion var gyroscopeZ:Float;
+
+	@:noCompletion var penX:Int;
+	@:noCompletion var penY:Int;
+	@:noCompletion var penPressure:Float;
+	@:noCompletion var penReleased:Bool;
+	@:noCompletion var penDown:Bool;
+
+	@:noCompletion var filesDropped:Array<String>;
+
+	@:noCompletion var appActivated:Bool;
+	@:noCompletion var appDeactivated:Bool;
+	@:noCompletion var appPaused:Bool;
+	@:noCompletion var appShutdownRequested:Bool;
+
+	@:noCompletion var pasteData:String;
+
+	@:noCompletion var recentlyConnectedGamepad:Int;
+	@:noCompletion var gamepadStates:Array<GamepadState>;
 
 
 	@:global
+	var copyValue:String;
+
+	/**
+	 * Initialise the fields for this `GlobalEvents` class.
+	 */
 	function init()
 	{
+		touchStates = [];
+		gamepadStates = [];
+		filesDropped = [];
 		keysUp = [ for (i in 0...255) false ];
 		keysDown = [ for (i in 0...255) false ];
 	}
 
+	/**
+	 * This function should be called at the end of each render loop to
+	 * reset one-time event values.
+	 */
 	function end()
 	{
 		mouseReleased = false;
@@ -51,14 +89,488 @@ class GlobalEvents
 		filesDropped = [];
 		keysUp = [ for (i in 0...255) false ];
 		mouseDelta = 0;
-		touchReleased = false;
 		mouseMoveX = mouseMoveY = 0;
+		for (touch in touchStates)
+		{
+			touch.touchReleased = false;
+		}
 
+		recentlyTouchedIndex = 0;
+		lastTouchedIndex = 0;
+		pasteData = "";
 	}
 
-	function isKeyUp(code:KeyCode)
+	/**
+	 * Determine if the following key has been released.
+	 * @param code The key to look for.
+	 */
+	function isKeyUp(code:KeyCode, modifiers:Int)
 	{
-		return keysUp[code];
+		var needsShift = (modifiers & MOD_SHIFT) != 0;
+		var needsAlt = (modifiers & MOD_ALT) != 0;
+		var needsControl = (modifiers & MOD_CONTROL) != 0;
+		var needsAltGr = (modifiers & MOD_ALTGR) != 0;
+		var hasShift = false;
+		var hasAlt = false;
+		var hasControl = false;
+		var hasAltGr = false;
+
+		if (modifiers != 0)
+		{
+			hasShift = needsShift && keysDown[KeyCode.Shift];
+			hasControl = needsControl && keysDown[KeyCode.Control];
+			hasAlt = needsAlt && keysDown[KeyCode.Alt];
+			hasAltGr = needsAltGr && keysDown[KeyCode.AltGr];
+		}
+
+		return keysUp[code] && (needsAlt && hasAlt) && (needsAltGr && hasAltGr) && (needsControl && hasControl) && (needsShift && hasShift);
+	}
+
+	/**
+	 * Determines if the following key is held down by the user.
+	 * @param code The key to check.
+	 */
+	function isKeyDown(code:KeyCode)
+	{
+		return keysDown[code];
+	}
+
+	/**
+	 * Gets the recently pressed character(s) as ASCII character(s).
+	 * If the code value of the character being passed is not an ASCII character (0-255),
+	 * the value is ignored.
+	 * 
+	 * This function is useful if you need to ensure compatibility with an
+	 * ASCII character set.
+	 * 
+	 * Returns an `Array<Int>` representing the character codes recently pressed.
+	 */
+	function getKeyCharCodesA():Array<Int>
+	{
+		var result = [];
+		for (i in 0...keyChar.length)
+		{
+			if ((StringTools.fastCodeAt(keyChar, i) | 0xFF) == 0xFF)
+				result.push(StringTools.fastCodeAt(keyChar, i));
+		}
+		return result;
+	}
+
+	/**
+	 * Gets the recently pressed character(s) as ASCII character(s).
+	 * If the code value of the character being passed is not an ASCII character (0-255),
+	 * the value is ignored.
+	 * 
+	 * This function is useful if you need to ensure compatibility with an
+	 * ASCII character set.
+	 * 
+	 * Returns a `String` representing the characters recently pressed.
+	 */
+	function getKeyCharA()
+	{
+		var result = "";
+		for (i in 0...keyChar.length)
+		{
+			if ((StringTools.fastCodeAt(keyChar, i) | 0xFF) == 0xFF)
+				result += keyChar.charAt(i);
+		}
+		return result;
+	}
+
+	/**
+	 * Gets the recently pressed character(s) as Unicode.
+	 */
+	function getKeyChar():String
+	{
+		return keyChar;
+	}
+
+	/**
+	 * Gets the recently pressed character(s) as Unicode code-points as an array of integers.
+	 * @return Array<Int>
+	 */
+	function getKeyCharCode():Array<Int>
+	{
+		var result = [];
+		for (i in 0...keyChar.length)
+		{
+			result.push(StringTools.fastCodeAt(keyChar, i));
+		}
+		return result;
+	}
+
+	/**
+	 * Get the current mouse position in the client window.
+	 * @return Vector2
+	 */
+	function getMousePosition():Vector2
+	{
+		return new Vector2(mouseX, mouseY);
+	}
+
+	/**
+	 * Get a value determining if the given mouse button has been pressed.
+	 * 
+	 * Pressed checks if no other mouse buttons are currently being pressed down.
+	 * @param button Which button to check.
+	 * @return Bool
+	 */
+	function isMouseButtonPressed(button:Int):Bool
+	{
+		return (mouseButton == button && mouseReleased && !mouseDown);
+	}
+
+	/**
+	 * Get a value determining if the given mouse button has been pressed down.
+	 * @param button Which button to check.
+	 * @return Bool
+	 */
+	function isMouseButtonDown(button:Int):Bool
+	{
+		return (mouseButton == button && mouseDown);
+	}
+
+	/**
+	 * Get a value determining if the given mouse button has been released.
+	 * Released is not the same as Pressed. 
+	 * @param button 
+	 * @return Bool
+	 */
+	function isMouseButtonReleased(button:Int):Bool
+	{
+		return (mouseButton == button && mouseReleased);
+	}
+	
+	/**
+	 * Get a value determing how far the mouse has moved since the last frame.
+	 * @return Vector2
+	 */
+	function getMouseMovement():Vector2
+	{
+		return new Vector2(mouseMoveX, mouseMoveY);
+	}
+
+	/**
+	 * Gets the delta of the mouse wheel to determine if it is either scrolling up or down.
+	 * @return Int
+	 */
+	function getMouseDelta():Int
+	{
+		return mouseDelta;
+	}
+
+	/**
+	 * Get the index of the finger that was first pressed on the screen.
+	 * @return Int
+	 */
+	function getTouchFingerStarted():Int
+	{
+		return recentlyTouchedIndex;
+	}
+
+	/**
+	 * Get the index of the finger that was released on the screen.
+	 * @return Int
+	 */
+	function getTouchFingerEnded():Int
+	{
+		return lastTouchedIndex;
+	}
+
+	/**
+	 * Get the position of a finger at a given index.
+	 * @param index The index of a given finger.
+	 * @return Vector2
+	 */
+	function getTouchFingerPosition(index:Int):Vector2
+	{
+		if (index < touchStates.length)
+		{
+			return new Vector2(touchStates[index].touchX, touchStates[index].touchY);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get a value determining if all fingers have been released from the screen.
+	 * @return Bool
+	 */
+	function isTouchReleasedAll():Bool
+	{
+		var result = true;
+		for (i in 0...touchStates.length)
+		{
+			if (touchStates[i].touchDown)
+				return false;
+		}
+		return result;
+	}
+
+	/**
+	 * Get a value determining if the finger at the given index has been released from the screen.
+	 * @param index The index of the finger.
+	 * @return Bool
+	 */
+	function isTouchReleased(index:Int):Bool
+	{
+		if (index < touchStates.length)
+		{
+			return !touchStates[index].touchDown && touchStates[index].touchReleased;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get a value determining if the finger at the given index is currently pressing down on the screen.
+	 * @param index The index of the finger.
+	 * @return Bool
+	 */
+	function isTouchDown(index:Int):Bool
+	{
+		if (index < touchStates.length)
+		{
+			return touchStates[index].touchDown;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get a value determining how many fingers are currently pressed down on the screen.
+	 * @return Int
+	 */
+	function getTotalTouchesDown():Int
+	{
+		var result = 0;
+		for (i in 0...touchStates.length)
+		{
+			if (touchStates[i].touchDown)
+				result += 1;
+		}
+		return result;
+	}
+
+	/**
+	 * Gets the current position of the accelerometer.
+	 * @return Vector3
+	 */
+	function getAccelerometerPosition():Vector3
+	{
+		return new Vector3(accelerometerX, accelerometerY, accelerometerZ);
+	}
+
+	/**
+	 * Gets the current position of the gyroscope.
+	 * @return Vector3
+	 */
+	function getGyroscopePosition():Vector3
+	{
+		return new Vector3(gyroscopeX, gyroscopeY, gyroscopeZ);
+	}
+
+	/**
+	 * Gets the position of the pen.
+	 * @return Vector2
+	 */
+	function getPenPosition():Vector2
+	{
+		return new Vector2(penX, penY);
+	}
+
+	/**
+	 * Get a value determining the pressure of the pen on the display.
+	 * @return Float
+	 */
+	function getPenPressure():Float
+	{
+		return penPressure;
+	}
+
+	/**
+	 * Get a value determining if the pen is pressing down on the display.
+	 * @return Bool
+	 */
+	function isPenDown():Bool
+	{
+		return penDown;
+	}
+
+	/**
+	 * Get a value determining if the pen has released from the display.
+	 * @return Bool
+	 */
+	function isPenReleased():Bool
+	{
+		return penReleased;
+	}
+
+	/**
+	 * Get a value determining if the pan has pressed down and released from the display.
+	 * @return Bool
+	 */
+	function isPenPressed():Bool
+	{
+		return !penDown && penReleased;
+	}
+
+	/**
+	 * Get all the file paths for recently dragged files into the client.
+	 * @return Array<String>
+	 */
+	function getFilesDropped():Array<String>
+	{
+		return filesDropped;
+	}
+
+	/**
+	 * Get a value determining if the application is currently active.
+	 * @return Bool
+	 */
+	function isAppActive():Bool
+	{
+		return appActivated;
+	}
+
+	/**
+	 * Get a value determining if the application is running (i.e. not paused).
+	 * @return Bool
+	 */
+	function isAppRunning():Bool
+	{
+		return !appPaused;
+	}
+
+	/**
+	 * Get a value determining if the app is currently deactivated.
+	 * @return Bool
+	 */
+	function isAppDeactivated():Bool
+	{
+		return appDeactivated;
+	}
+
+	/**
+	 * Get a value determining if the application has requested shutdown.
+	 * @return Bool
+	 */
+	function hasAppRequestedShutdown():Bool
+	{
+		return appShutdownRequested;
+	}
+
+	/**
+	 * If a value has been pasted, such as when the user types `CTRL+V` on the keyboard, this
+	 * value represents the pasted data.
+	 * @return String
+	 */
+	function getPasteData():String
+	{
+		return pasteData;
+	}
+
+	/**
+	 * Get the last gamepad that was connected to the computer or device as an index.
+	 * @return Int
+	 */
+	function getConnectedGamepad():Int
+	{
+		return recentlyConnectedGamepad;
+	}
+
+	/**
+	 * Get a value determining if the given gamepad index is currently connected.
+	 * 
+	 * If the index cannot be found, `false` is returned.
+	 * @param index The index of the gamepad.
+	 * @return Bool
+	 */
+	function isGamepadConnected(index:Int):Bool
+	{
+		if (index < gamepadStates.length)
+		{
+			return gamepadStates[index].connected;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Gets a value determining if a gamepad button was fully pressed and released.
+	 * @param index The index of the gamepad to check.
+	 * @param button The button index on the gamepad.
+	 * @return Bool
+	 */
+	function isGamepadButtonPressed(index:Int, button:Int):Bool
+	{
+		if (index < gamepadStates.length)
+		{
+			var state = gamepadStates[index];
+			if (state.previousButtons[button] > 0.0 && state.buttons[button] == 0.0)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Gets a value determining if a gamepad button is currently being pressed down.
+	 * @param index The index of the gamepad to check.
+	 * @param button The button index on the gamepad.
+	 * @return Bool
+	 */
+	function isGamepadButtonDown(index:Int, button:Int):Bool
+	{
+		if (index < gamepadStates.length)
+		{
+			var state = gamepadStates[index];
+			// Should probably check if 0.8 is a reasonable value
+			// on gamepad controls, like the left and right trigger
+			// buttons on PS3/XBOX controllers where pressure is likely
+			// to be recorded, and if this value should be considered
+			// pressed down or not.
+			if (state.buttons[button] >= 0.8)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get a value of the pressure for a specific button on the gamepad.
+	 * @param index The index of the gamepad to check.
+	 * @param button The button index on the gamepad.
+	 * @return Float
+	 */
+	function getGamepadButtonPressure(index:Int, button:Int):Float
+	{
+		if (index < gamepadStates.length)
+		{
+			var state = gamepadStates[index];
+			return state.buttons[button];
+		}
+
+		return 0.0;
+	}
+
+	/**
+	 * 
+	 * @param index 
+	 * @param axis 
+	 * @return Vector2
+	 */
+	function getGamepadAxisValue(index:Int, axis:Int):Vector2
+	{
+		if (index < gamepadStates.length)
+		{
+			var state = gamepadStates[index];
+			
+		}
 	}
 
 }

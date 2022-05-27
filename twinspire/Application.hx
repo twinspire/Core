@@ -3,6 +3,7 @@ package twinspire;
 import twinspire.GlobalEvents;
 import kha.math.FastVector2;
 import twinspire.events.Event;
+import twinspire.events.JoyStickButtons;
 
 import kha.math.FastVector2 in FV2;
 import kha.math.FastVector3 in FV3;
@@ -131,6 +132,7 @@ class Application
 	*
 	* @return Returns `true` if there are events waiting to be processed. Otherwise `false`.
 	*/
+	@:deprecated("Please use `GlobalEvents` instead. `pollEvent` is due to be removed from the API.")
 	public function pollEvent():Bool
 	{
 		if (_events.length == 0)
@@ -154,8 +156,10 @@ class Application
 		e.type = EVENT_KEY_DOWN;
 		e.key = key;
 		_ctrl = key == KeyCode.Control;
-
-		@:privateAccess(GlobalEvents) GlobalEvents.keysDown[e.key] = true;
+		
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.keysDown[e.key] = true;
+		}
 
 		_events.push(e);
 	}
@@ -172,8 +176,10 @@ class Application
 
 		_ctrl = !(key == KeyCode.Control);
 
-		@:privateAccess(GlobalEvents) GlobalEvents.keysUp[e.key] = true;
-		@:privateAccess(GlobalEvents) GlobalEvents.keysDown[e.key] = false;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.keysUp[e.key] = true;
+			GlobalEvents.keysDown[e.key] = false;
+		}
 
 		_events.push(e);
 	}
@@ -184,7 +190,9 @@ class Application
 		e.type = EVENT_KEY_PRESS;
 		e.char = char;
 
-		@:privateAccess(GlobalEvents) GlobalEvents.keyChar = char;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.keyChar = char;
+		}
 
 		_events.push(e);
 	}
@@ -197,9 +205,11 @@ class Application
 		e.mouseX = x;
 		e.mouseY = y;
 
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseButton = button;
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseX = mouseX;
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseY = mouseY;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.mouseButton = button;
+			GlobalEvents.mouseX = x;
+			GlobalEvents.mouseY = y;
+		}
 
 		_events.push(e);
 	}
@@ -212,9 +222,11 @@ class Application
 		e.mouseX = x;
 		e.mouseY = y;
 
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseButton = button;
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseX = x;
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseY = y;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.mouseButton = button;
+			GlobalEvents.mouseX = x;
+			GlobalEvents.mouseY = y;
+		}
 
 		_events.push(e);
 	}
@@ -228,10 +240,12 @@ class Application
 		e.mouseMovementX = movementX;
 		e.mouseMovementY = movementY;
 
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseX = x;
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseY = y;
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseMoveX = movementX;
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseMoveY = movementY;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.mouseX = x;
+			GlobalEvents.mouseY = y;
+			GlobalEvents.mouseMoveX = movementX;
+			GlobalEvents.mouseMoveY = movementY;
+		}
 
 		_events.push(e);
 	}
@@ -242,7 +256,9 @@ class Application
 		e.type = EVENT_MOUSE_WHEEL;
 		e.mouseDelta = delta;
 
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseDelta = delta;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.mouseDelta = delta;
+		}
 
 		_events.push(e);
 	}
@@ -252,7 +268,9 @@ class Application
 		var e = new Event();
 		e.type = EVENT_MOUSE_LOCK_CHANGE;
 
-		@:privateAccess(GlobalEvents) GlobalEvents.mouseLocked = !GlobalEvents.mouseLocked;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.mouseLocked = !GlobalEvents.mouseLocked;
+		}
 
 		_events.push(e);
 	}
@@ -264,89 +282,6 @@ class Application
 		_events.push(e);
 	}
 
-	private function _gamepad_onAxis0(axis:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_AXIS;
-		e.gamepadId = 0;
-		e.gamepadAxis = axis;
-		e.gamepadAxisValue = value;
-
-		
-
-		_events.push(e);
-	}
-
-	private function _gamepad_onButton0(button:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_BUTTON;
-		e.gamepadId = 0;
-		e.gamepadButton = button;
-		e.gamepadButtonValue = value;
-		_events.push(e);
-	}
-
-	private function _gamepad_onAxis1(axis:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_AXIS;
-		e.gamepadId = 1;
-		e.gamepadAxis = axis;
-		e.gamepadAxisValue = value;
-		_events.push(e);
-	}
-
-	private function _gamepad_onButton1(button:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_BUTTON;
-		e.gamepadId = 1;
-		e.gamepadButton = button;
-		e.gamepadButtonValue = value;
-		_events.push(e);
-	}
-
-	private function _gamepad_onAxis2(axis:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_AXIS;
-		e.gamepadId = 2;
-		e.gamepadAxis = axis;
-		e.gamepadAxisValue = value;
-		_events.push(e);
-	}
-
-	private function _gamepad_onButton2(button:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_BUTTON;
-		e.gamepadId = 2;
-		e.gamepadButton = button;
-		e.gamepadButtonValue = value;
-		_events.push(e);
-	}
-
-	private function _gamepad_onAxis3(axis:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_AXIS;
-		e.gamepadId = 3;
-		e.gamepadAxis = axis;
-		e.gamepadAxisValue = value;
-		_events.push(e);
-	}
-
-	private function _gamepad_onButton3(button:Int, value:Float)
-	{
-		var e = new Event();
-		e.type = EVENT_GAMEPAD_BUTTON;
-		e.gamepadId = 3;
-		e.gamepadButton = button;
-		e.gamepadButtonValue = value;
-		_events.push(e);
-	}
-
 	private function _surface_onTouchStart(index:Int, x:Int, y:Int)
 	{
 		var e = new Event();
@@ -354,6 +289,30 @@ class Application
 		e.touchIndex = index;
 		e.touchX = x;
 		e.touchY = y;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.recentlyTouchedIndex = index;
+
+			if (index >= GlobalEvents.touchStates.length)
+			{
+				GlobalEvents.touchStates.push({
+					touchDown: true,
+					touchReleased: false,
+					touchX: x,
+					touchY: y
+				});
+			}
+			else
+			{
+				var state = GlobalEvents.touchStates[index];
+				state.touchDown = true;
+				state.touchReleased = false;
+				state.touchX = x;
+				state.touchY = y;
+			}
+		}
+
+
 		_events.push(e);
 	}
 
@@ -364,6 +323,17 @@ class Application
 		e.touchIndex = index;
 		e.touchX = x;
 		e.touchY = y;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.lastTouchedIndex = index;
+
+			var state = GlobalEvents.touchStates[index];
+			state.touchReleased = true;
+			state.touchDown = false;
+			state.touchX = x;
+			state.touchY = y;
+		}
+
 		_events.push(e);
 	}
 
@@ -374,6 +344,13 @@ class Application
 		e.touchIndex = index;
 		e.touchX = x;
 		e.touchY = y;
+
+		@:privateAccess(GlobalEvents) {
+			var state = GlobalEvents.touchStates[index];
+			state.touchX = x;
+			state.touchY = y;
+		}
+
 		_events.push(e);
 	}
 
@@ -384,6 +361,13 @@ class Application
 		e.accelerometerX = x;
 		e.accelerometerY = y;
 		e.accelerometerZ = z;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.accelerometerX = x;
+			GlobalEvents.accelerometerY = y;
+			GlobalEvents.accelerometerZ = z;
+		}
+
 		_events.push(e);
 	}
 
@@ -394,6 +378,13 @@ class Application
 		e.gyroscopeX = x;
 		e.gyroscopeY = y;
 		e.gyroscopeZ = z;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gyroscopeX = x;
+			GlobalEvents.gyroscopeY = y;
+			GlobalEvents.gyroscopeZ = z;
+		}
+		
 		_events.push(e);
 	}
 
@@ -406,6 +397,14 @@ class Application
 		e.penX = x;
 		e.penY = y;
 		e.penPressure = pressure;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.penX = x;
+			GlobalEvents.penY = y;
+			GlobalEvents.penPressure = pressure;
+			GlobalEvents.penDown = true;
+		}
+
 		_events.push(e);
 	}
 
@@ -415,6 +414,14 @@ class Application
 		e.type = EVENT_PEN_UP;
 		e.penX = x;
 		e.penY = y;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.penX = x;
+			GlobalEvents.penY = y;
+			GlobalEvents.penDown = false;
+			GlobalEvents.penReleased = true;
+		}
+
 		_events.push(e);
 	}
 
@@ -425,6 +432,12 @@ class Application
 		e.penX = x;
 		e.penY = y;
 		e.penPressure = pressure;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.penX = x;
+			GlobalEvents.penY = y;
+		}
+
 		_events.push(e);
 	}
 
@@ -434,6 +447,12 @@ class Application
 	{
 		var e = new Event();
 		e.type = EVENT_FOREGROUND;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.appActivated = true;
+			GlobalEvents.appDeactivated = false;
+		}
+
 		_events.push(e);
 	}
 
@@ -441,6 +460,11 @@ class Application
 	{
 		var e = new Event();
 		e.type = EVENT_RESUME;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.appPaused = false;
+		}
+
 		_events.push(e);
 	}
 
@@ -448,6 +472,11 @@ class Application
 	{
 		var e = new Event();
 		e.type = EVENT_PAUSE;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.appPaused = true;
+		}
+
 		_events.push(e);
 	}
 
@@ -455,6 +484,12 @@ class Application
 	{
 		var e = new Event();
 		e.type = EVENT_BACKGROUND;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.appActivated = false;
+			GlobalEvents.appDeactivated = true;
+		}
+
 		_events.push(e);
 	}
 
@@ -462,6 +497,11 @@ class Application
 	{
 		var e = new Event();
 		e.type = EVENT_SHUTDOWN;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.appShutdownRequested = true;
+		}
+
 		_events.push(e);
 	}
 
@@ -470,6 +510,11 @@ class Application
 		var e = new Event();
 		e.type = EVENT_CLIPBOARD_CUT;
 		_events.push(e);
+
+		@:privateAccess(GlobalEvents) {
+			if (GlobalEvents.copyValue != null && GlobalEvents.copyValue != "")
+				return GlobalEvents.copyValue;
+		}
 
 		var temp = cutData;
 		cutData = "";
@@ -482,6 +527,11 @@ class Application
 		e.type = EVENT_CLIPBOARD_COPY;
 		_events.push(e);
 
+		@:privateAccess(GlobalEvents) {
+			if (GlobalEvents.copyValue != null && GlobalEvents.copyValue != "")
+				return GlobalEvents.copyValue;
+		}
+
 		var temp = cutData;
 		cutData = "";
 		return temp;
@@ -492,6 +542,10 @@ class Application
 		var e = new Event();
 		e.type = EVENT_CLIPBOARD_PASTE;
 		e.clipboard = value;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.pasteData = value;
+		}
+
 		_events.push(e);
 	}
 
@@ -500,6 +554,11 @@ class Application
 		var e = new Event();
 		e.type = EVENT_DROP_FILES;
 		e.filePath = path;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.filesDropped.push(path);
+		}
+
 		_events.push(e);
 	}
 
@@ -509,6 +568,23 @@ class Application
 		e.type = EVENT_GAMEPAD_CONNECTED;
 		e.gamepadId = id;
 		_events.push(e);
+
+		@:privateAccess(GlobalEvents) {
+			if (id >= GlobalEvents.gamepadStates.length)
+			{
+				GlobalEvents.gamepadStates.push({
+					id: id,
+					connected: true,
+					axes: [ for (i in 0...4) 0.0 ],
+					buttons: [ for (i in 0...JOYSTICK_MAX) 0.0 ],
+					previousButtons: [ for (i in 0...JOYSTICK_MAX) 0.0 ]
+				});
+			}
+			else
+			{
+				GlobalEvents.gamepadStates[id].connected = true;
+			}
+		}
 
 		var pad = Gamepad.get(id);
 		if (pad != null)
@@ -531,6 +607,10 @@ class Application
 		e.gamepadId = id;
 		_events.push(e);
 
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[id].connected = false;
+		}
+
 		var pad = Gamepad.get(id);
 		if (pad != null)
 		{
@@ -543,6 +623,126 @@ class Application
 			else if (id == 3)
 				pad.remove(_gamepad_onAxis3, _gamepad_onButton3);
 		}
+	}
+
+	private function _gamepad_onAxis0(axis:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_AXIS;
+		e.gamepadId = 0;
+		e.gamepadAxis = axis;
+		e.gamepadAxisValue = value;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[0].axes[axis] = value;
+		}
+
+		_events.push(e);
+	}
+
+	private function _gamepad_onButton0(button:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_BUTTON;
+		e.gamepadId = 0;
+		e.gamepadButton = button;
+		e.gamepadButtonValue = value;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[0].previousButtons[button] = GlobalEvents.gamepadStates[0].buttons[button];
+			GlobalEvents.gamepadStates[0].buttons[button] = value;
+		}
+
+		_events.push(e);
+	}
+
+	private function _gamepad_onAxis1(axis:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_AXIS;
+		e.gamepadId = 1;
+		e.gamepadAxis = axis;
+		e.gamepadAxisValue = value;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[1].axes[axis] = value;
+		}
+
+		_events.push(e);
+	}
+
+	private function _gamepad_onButton1(button:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_BUTTON;
+		e.gamepadId = 1;
+		e.gamepadButton = button;
+		e.gamepadButtonValue = value;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[1].previousButtons[button] = GlobalEvents.gamepadStates[1].buttons[button];
+			GlobalEvents.gamepadStates[1].buttons[button] = value;
+		}
+
+		_events.push(e);
+	}
+
+	private function _gamepad_onAxis2(axis:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_AXIS;
+		e.gamepadId = 2;
+		e.gamepadAxis = axis;
+		e.gamepadAxisValue = value;
+
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[2].axes[axis] = value;
+		}
+
+		_events.push(e);
+	}
+
+	private function _gamepad_onButton2(button:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_BUTTON;
+		e.gamepadId = 2;
+		e.gamepadButton = button;
+		e.gamepadButtonValue = value;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[2].previousButtons[button] = GlobalEvents.gamepadStates[2].buttons[button];
+			GlobalEvents.gamepadStates[2].buttons[button] = value;
+		}
+
+		_events.push(e);
+	}
+
+	private function _gamepad_onAxis3(axis:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_AXIS;
+		e.gamepadId = 3;
+		e.gamepadAxis = axis;
+		e.gamepadAxisValue = value;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[3].axes[axis] = value;
+		}
+
+		_events.push(e);
+	}
+
+	private function _gamepad_onButton3(button:Int, value:Float)
+	{
+		var e = new Event();
+		e.type = EVENT_GAMEPAD_BUTTON;
+		e.gamepadId = 3;
+		e.gamepadButton = button;
+		e.gamepadButtonValue = value;
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.gamepadStates[3].previousButtons[button] = GlobalEvents.gamepadStates[3].buttons[button];
+			GlobalEvents.gamepadStates[3].buttons[button] = value;
+		}
+
+		_events.push(e);
 	}
 
 	//
