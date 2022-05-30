@@ -559,9 +559,9 @@ class GlobalEvents
 	}
 
 	/**
-	 * 
-	 * @param index 
-	 * @param axis 
+	 * Get a value determining the axis values as a `Vector2`, for a given analogue stick.
+	 * @param index The index of the gamepad to check.
+	 * @param axis The index of the analogue stick.
 	 * @return Vector2
 	 */
 	function getGamepadAxisValue(index:Int, axis:Int):Vector2
@@ -569,8 +569,12 @@ class GlobalEvents
 		if (index < gamepadStates.length)
 		{
 			var state = gamepadStates[index];
-			
+			var axis1 = axis * 2;
+			var axis2 = axis1 + 1;
+			return new Vector2(state.axes[axis1], state.axes[axis2]);
 		}
+
+		return null;
 	}
 
 }
