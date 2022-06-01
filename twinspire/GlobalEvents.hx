@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.geom.Dim;
 import kha.math.Vector3;
 import kha.math.Vector2;
 import twinspire.Application;
@@ -17,6 +18,9 @@ class GlobalEvents
 {
 
 	@:local
+	@:noCompletion var lastMouseX:Int;
+	@:noCompletion var lastMouseY:Int;
+
 	@:noCompletion var mouseX:Int;
 	@:noCompletion var mouseY:Int;
 	@:noCompletion var mouseMoveX:Int;
@@ -575,6 +579,18 @@ class GlobalEvents
 		}
 
 		return null;
+	}
+
+
+	/**
+	 * Determines if the mouse is over the current dimension.
+	 * @param dim The dim instance to check against.
+	 */
+	@:global
+	function isMouseOverDim(dim:Dim)
+	{
+		var result = (mouseX > dim.x && mouseX < dim.x + dim.width && mouseY > dim.y && mouseY < dim.y + dim.height);
+		return result;
 	}
 
 }

@@ -209,6 +209,7 @@ class Application
 			GlobalEvents.mouseButton = button;
 			GlobalEvents.mouseX = x;
 			GlobalEvents.mouseY = y;
+			GlobalEvents.mouseDown = true;
 		}
 
 		_events.push(e);
@@ -226,6 +227,8 @@ class Application
 			GlobalEvents.mouseButton = button;
 			GlobalEvents.mouseX = x;
 			GlobalEvents.mouseY = y;
+			GlobalEvents.mouseDown = false;
+			GlobalEvents.mouseReleased = true;
 		}
 
 		_events.push(e);
@@ -858,6 +861,7 @@ class Application
 				loader = new Preloader(preloader);
 			
 			System.notifyOnFrames(loader.render);
+			GlobalEvents.init();
 
 			if (!noAssetLoading)
 			{

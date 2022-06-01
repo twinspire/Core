@@ -25,7 +25,7 @@ class Dim
 	public static var zero(get, never):Dim;
 	private static function get_zero()
 	{
-		return new Dim(0, 0, 0, 0);
+		return new Dim(0, 0, 0, 0, 0);
 	}
 
 }

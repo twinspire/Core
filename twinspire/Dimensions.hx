@@ -5,6 +5,7 @@ import twinspire.geom.DimCellSize;
 import twinspire.geom.DimCellSize.DimCellSizing;
 import twinspire.Application;
 
+import kha.graphics2.Graphics;
 import kha.math.FastVector2;
 import kha.System;
 
@@ -60,6 +61,7 @@ class Dimensions
     static var groupDims:Array<Array<Dim>>;
     static var groupDimTypes:Array<Array<Int>>;
     static var groupDimNames:Array<Array<String>>;
+    static var groupDimExtra:Array<Array<Dynamic>>;
 
     /**
      * Create a new dimensions group encapsulating all the dimensions that belong in this group.
@@ -76,20 +78,26 @@ class Dimensions
         if (groupDims == null)
         {
             groupDims = [];
-            groupDims.push([]);
         }
-
+        groupDims.push([]);
+        
         if (groupDimTypes == null)
         {
             groupDimTypes = [];
-            groupDimTypes.push([]);
         }
+        groupDimTypes.push([]);
 
         if (groupDimNames == null)
         {
             groupDimNames = [];
-            groupDimNames.push([]);
         }
+        groupDimNames.push([]);
+
+        if (groupDimExtra == null)
+        {
+            groupDimExtra = [];
+        }
+        groupDimExtra.push([]);
 
         return groups.push(id) - 1;
     }
@@ -207,7 +215,7 @@ class Dimensions
      * @param dimType The type this dimension should use.
      * @return Int
      */
-    public static function createDimensionIndex(name:String, dimType:Int):DimIndexResult
+    public static function createDimensionIndex(name:String, dimType:Int, extraData:Dynamic = null):DimIndexResult
     {
         #if assertion
         assert(groupDims != null);
@@ -220,6 +228,7 @@ class Dimensions
         var dimensions = groupDims[index];
         var dimensionTypes = groupDimTypes[index];
         var dimensionNames = groupDimNames[index];
+
         dimensions.push(Dim.zero);
         dimensionTypes.push(dimType);
         dimensionNames.push(name);
@@ -754,5 +763,16 @@ class Dimensions
         var ratioY = a.y + ((a.height - ratioHeight) / 2);
         return new Dim(a.x, ratioY, a.width, ratioHeight);
     }
+
+    /**
+     * Measure the width and height of the given text with font and fontSize parameters provided by
+     * the given `g2` instance.
+     * @param g2 The instance of the graphics context from Kha.
+     * @param text The text to measure.
+     */
+    public static function getTextDim(g2:Graphics, text:String)
+	{
+		return new Dim(0, 0, g2.font.width(g2.fontSize, text), g2.font.height(g2.fontSize));
+	}
 
 }
