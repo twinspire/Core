@@ -99,8 +99,9 @@ class GlobalEvents
 			touch.touchReleased = false;
 		}
 
-		recentlyTouchedIndex = 0;
-		lastTouchedIndex = 0;
+		recentlyConnectedGamepad = -1;
+		recentlyTouchedIndex = -1;
+		lastTouchedIndex = -1;
 		pasteData = "";
 	}
 
@@ -246,7 +247,7 @@ class GlobalEvents
 	}
 	
 	/**
-	 * Get a value determing how far the mouse has moved since the last frame.
+	 * Get a value determining how far the mouse has moved since the last frame.
 	 * @return Vector2
 	 */
 	function getMouseMovement():Vector2
