@@ -10,6 +10,8 @@ class TextFormat
 	public var end:Int;
 	public var color:Color;
 	public var font:Font;
+	public var underline:Bool;
+	public var super:Bool;
 
 	public inline function new()
 	{
