@@ -10,6 +10,7 @@ class TextState
 	public var lines:Array<LineInfo>;
 	public var characters:Array<Int>;
 	public var formats:Array<TextFormat>;
+	public var clipping:Bool;
 
 	public inline function new(x:Float, y:Float, width:Float, height:Float)
 	{
@@ -17,6 +18,7 @@ class TextState
 		lines = [];
 		characters = [];
 		formats = [];
+		clipping = false;
 	}
 
 }

@@ -1,6 +1,11 @@
 package twinspire.text;
 
+import twinspire.text.TextFormat;
 import twinspire.text.LineInfo;
+import twinspire.Dimensions.*;
+using twinspire.extensions.Graphics2;
+
+
 import kha.graphics4.DepthStencilFormat;
 import kha.graphics4.TextureFormat;
 import kha.graphics2.Graphics;
@@ -21,6 +26,13 @@ class TextBuffer
 
 	public var paragraphSpacing:Float = 18.0;
 
+	/**
+	 * Create a new `TextBuffer` with the given width and height.
+	 * The size given is the constraints of the text to be drawn to the buffer.
+	 * Any text that is drawn outside these constraints will not be rendered.
+	 * @param width The width of the text buffer.
+	 * @param height The height of the text buffer.
+	 */
 	public function new(width:Int, height:Int)
 	{
 		_textBuffer = Image.createRenderTarget(width, height);
@@ -28,22 +40,76 @@ class TextBuffer
 		_requiresUpdates = [];
 	}
 
+	/**
+	 * Set the default font and font size for the Text Buffer.
+	 * @param font The default font to use when no other format is used.
+	 * @param fontSize The default font size to use when no other font size is used.
+	 */
 	public function setDefaults(font:Font, fontSize:Int)
 	{
 		_defaultFont = font;
 		_defaultFontSize = fontSize;
 	}
 
-	public function createNewState(id:String, x:Float, y:Float, width:Float, height:Float)
+	/**
+	 * Create a new state in which contains a chunk of text that will be rendered on screen.
+	 * @param id The name of this state.
+	 * @param x The X-position in the display buffer this state should be displayed at.
+	 * @param y The Y-position in the display buffer this state should be displayed at.
+	 * @param width The maximum width of the text. Text will automatically wrap based on this value.
+	 * @param height The maximum height of the text. Ignored if clipping is not applied to the final render.
+	 * @param clipping Determine if the text in this state's dimensions should clip.
+	 */
+	public function createNewState(id:String, x:Float, y:Float, width:Float, height:Float, clipping:Bool = false)
 	{
 		var state = new TextState(x, y, width, height);
 		state.name = id;
+		state.clipping = clipping;
 		_requiresUpdates.push(false);
 		return _textStates.push(state) - 1;
 	}
 
+	/**
+	 * Add text to the given index using the default font and font size.
+	 * 
+	 * This function will perform a full update on the `TextState` and is not recommended
+	 * for small quantities of text.
+	 * 
+	 * Paragraphs detected by `\n` will be separated into new states, unless `crlf` is `true`, meaning
+	 * a `\r` should precede the `\n` to detect a new line.
+	 * 
+	 * @param stateIndex The state index to add text to.
+	 * @param value The text to add.
+	 * @param crlf Use CRLF (`\r\n`) for detecting new lines.
+	 */
 	public function addText(stateIndex:Int, value:String, crlf:Bool = false)
 	{
+		var format = new TextFormat();
+		format.color = Color.Black;
+		format.font = _defaultFont;
+		format.fontSize = _defaultFontSize;
+		format.start = _textStates[stateIndex].characters.length == 0 ? 0 : _textStates[stateIndex].characters.length - 1;
+		format.end = value.length;
+		addTextFormat(stateIndex, value, format, crlf);
+	}
+
+	/**
+	 * Add text to the given index using the given format.
+	 * 
+	 * This function will perform a full update on the `TextState` and is not recommended
+	 * for small quantities of text.
+	 * 
+	 * Paragraphs detected by `\n` will be separated into new states, unless `crlf` is `true`, meaning
+	 * a `\r` should precede the `\n` to detect a new line.
+	 * @param stateIndex The state index to add text to.
+	 * @param value The text to add.
+	 * @param format The text format to use for the text to be added.
+	 * @param crlf Use CRLF (`\r\n`) for detecting new lines.
+	 */
+	public function addTextFormat(stateIndex:Int, value:String, format:TextFormat, crlf:Bool = false)
+	{
+		var clonedFormat = format.clone();
+
 		// new paragraphs will be made into new `TextState`'s for efficiency
 		var first = "";
 		var upto = -1;
@@ -124,9 +190,12 @@ class TextBuffer
 		var linesAdded = 0;
 		var maxHeight = 0.0;
 
+		clonedFormat.start = index;
+		clonedFormat.end = endIndex;
+
 		while (index <= endIndex)
 		{
-			currentTextWidth = _defaultFont.widthOfCharacters(_defaultFontSize, state.characters, currentLine.start, index - currentLine.start);
+			currentTextWidth = clonedFormat.font.widthOfCharacters(clonedFormat.fontSize, state.characters, currentLine.start, index - currentLine.start);
 			if (currentTextWidth >= measurableWidth)
 			{
 				if (lastChance < 0)
@@ -140,7 +209,7 @@ class TextBuffer
 
 				var line = new LineInfo(currentLine.end, 0);
 				line.lineStartX = state.dimension.x;
-				line.lineEndY = line.lineStartY = currentLine.lineStartY + _defaultFont.height(_defaultFontSize);
+				line.lineEndY = line.lineStartY = currentLine.lineStartY + clonedFormat.font.height(clonedFormat.fontSize);
 				line.lineEndX = state.dimension.x + currentTextWidth;
 				state.lines.push(line);
 				currentLine = state.lines[state.lines.length - 1];
@@ -148,7 +217,7 @@ class TextBuffer
 				lastBreak = lastChance + 1;
 				index = lastBreak;
 				lastChance = -1;
-				maxHeight += _defaultFont.height(_defaultFontSize);
+				maxHeight += clonedFormat.font.height(clonedFormat.fontSize);
 			}
 
 			if (state.characters[index] == " ".charCodeAt(0))
@@ -160,6 +229,7 @@ class TextBuffer
 			currentLine.end = index;
 		}
 
+		state.formats.push(clonedFormat);
 		_requiresUpdates[stateIndex] = true;
 
 		if (upto < value.length)
@@ -169,6 +239,12 @@ class TextBuffer
 			var startNext = upto;
 			while (StringTools.fastCodeAt(value, startNext) == 10 || StringTools.fastCodeAt(value, startNext) == 13)
 				startNext += 1;
+
+			if (state.clipping)
+			{
+				if (maxHeight > state.dimension.height)
+					maxHeight = state.dimension.height;
+			}
 
 			for (i in upto...value.length)
 			{
@@ -186,8 +262,13 @@ class TextBuffer
 						current += value.charAt(i);
 				}
 			}
+			var newFormat = new TextFormat();
+			newFormat.font = format.font;
+			newFormat.fontSize = format.fontSize;
+			newFormat.color = format.color;
+			newFormat.underline = format.underline;
 
-			addText(stateToUpdate, current, crlf);
+			addTextFormat(stateToUpdate, current, newFormat, crlf);
 		}
 	}
 
@@ -206,13 +287,56 @@ class TextBuffer
 		for (i in 0..._textStates.length)
 		{
 			var state = _textStates[i];
-			for (i in 0...state.lines.length)
+			if (state.clipping)
+				g2.scissorDim(state.dimension);
+
+			for (j in 0...state.lines.length)
 			{
-				var line = state.lines[i];
-				var x = state.dimension.x + line.lineStartX;
-				var y = state.dimension.y + line.lineStartY;
-				g2.drawCharacters(state.characters, line.start, line.end - line.start, x, y);
+				var line = state.lines[j];
+				var startX = line.lineStartX;
+				var lastStartIndex = 0;
+				var lastEndIndex = 0;
+
+				for (f in state.formats)
+				{
+					if ((f.start >= line.start && f.start <= line.end) ||
+						(f.end <= line.end && f.start <= line.end))
+					{
+						g2.font = f.font;
+						g2.fontSize = f.fontSize;
+						var start = lastStartIndex;
+						var end = 0;
+						if (f.start < line.start)
+							start = line.start;
+						else if (f.start > line.start && lastStartIndex != 0)
+							start = f.start;
+
+						if (f.end < line.end)
+							end = f.end;
+						else
+							end = line.end;
+
+						var textWidth = g2.font.widthOfCharacters(g2.fontSize, state.characters, start, end - start);
+						if (f.backColor != null)
+						{
+							g2.color = f.backColor;
+							g2.fillRect(startX, line.lineStartY, textWidth, g2.font.height(g2.fontSize));
+						}
+
+						g2.color = f.color;
+						g2.drawCharacters(state.characters, start, end - start, startX, line.lineStartY);
+
+						if (f.underline)
+							g2.drawLine(startX, line.lineStartY + g2.font.height(g2.fontSize), startX + textWidth, line.lineStartY + g2.font.height(g2.fontSize));
+
+						startX += textWidth;
+						lastStartIndex = end;
+					}
+				}
 			}
+
+			if (state.clipping)
+				g2.disableScissor();
 		}
 
 		g2.end();

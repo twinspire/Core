@@ -9,13 +9,29 @@ class TextFormat
 	public var start:Int;
 	public var end:Int;
 	public var color:Color;
+	public var backColor:Color;
 	public var font:Font;
+	public var fontSize:Int;
 	public var underline:Bool;
-	public var super:Bool;
+	public var superscript:Bool;
 
 	public inline function new()
 	{
 		
+	}
+
+	public function clone()
+	{
+		var format = new TextFormat();
+		format.font = this.font;
+		format.fontSize = this.fontSize;
+		format.start = this.start;
+		format.end = this.end;
+		format.color = this.color;
+		format.backColor = this.backColor;
+		format.underline = this.underline;
+		format.superscript = this.superscript;
+		return format;
 	}
 
 }
