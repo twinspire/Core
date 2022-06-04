@@ -9,6 +9,7 @@ using twinspire.extensions.Graphics2;
 import kha.graphics4.DepthStencilFormat;
 import kha.graphics4.TextureFormat;
 import kha.graphics2.Graphics;
+import kha.math.Vector2;
 import kha.Image;
 import kha.Font;
 import kha.Color;
@@ -22,6 +23,7 @@ class TextBuffer
 
 	private var _textBuffer:Image;
 	private var _textStates:Array<TextState>;
+	private var _textFormats:Array<TextFormat>;
 	private var _requiresUpdates:Array<Bool>;
 
 	public var paragraphSpacing:Float = 18.0;
@@ -38,6 +40,7 @@ class TextBuffer
 		_textBuffer = Image.createRenderTarget(width, height);
 		_textStates = [];
 		_requiresUpdates = [];
+		_textFormats = [];
 	}
 
 	/**
@@ -49,6 +52,23 @@ class TextBuffer
 	{
 		_defaultFont = font;
 		_defaultFontSize = fontSize;
+
+		var defaultFormat = new TextFormat();
+		defaultFormat.name = "Default";
+		defaultFormat.color = Color.Black;
+		defaultFormat.font = _defaultFont;
+		defaultFormat.fontSize = _defaultFontSize;
+		_textFormats.push(defaultFormat);
+	}
+
+	/**
+	 * Add a new `TextFormat` instance to this buffer that can be used between
+	 * states.
+	 * @param format The `TextFormat` to add.
+	 */
+	public function addTextFormat(format:TextFormat)
+	{
+		_textFormats.push(format);
 	}
 
 	/**
@@ -70,6 +90,21 @@ class TextBuffer
 	}
 
 	/**
+	 * Add a single character value as an Integer character code using the default font and font size.
+	 * @param stateIndex 
+	 * @param value 
+	 */
+	public function addChar(stateIndex:Int, value:Int)
+	{
+
+	}
+
+	public function addCharFormat(stateIndex:Int, value:Int)
+	{
+
+	}
+
+	/**
 	 * Add text to the given index using the default font and font size.
 	 * 
 	 * This function will perform a full update on the `TextState` and is not recommended
@@ -84,13 +119,7 @@ class TextBuffer
 	 */
 	public function addText(stateIndex:Int, value:String, crlf:Bool = false)
 	{
-		var format = new TextFormat();
-		format.color = Color.Black;
-		format.font = _defaultFont;
-		format.fontSize = _defaultFontSize;
-		format.start = _textStates[stateIndex].characters.length == 0 ? 0 : _textStates[stateIndex].characters.length - 1;
-		format.end = value.length;
-		addTextFormat(stateIndex, value, format, crlf);
+		addTextFormatted(stateIndex, value, "Default", crlf);
 	}
 
 	/**
@@ -103,12 +132,24 @@ class TextBuffer
 	 * a `\r` should precede the `\n` to detect a new line.
 	 * @param stateIndex The state index to add text to.
 	 * @param value The text to add.
-	 * @param format The text format to use for the text to be added.
+	 * @param format The name of the text format to use. This should match the name of the format previously added to this buffer.
 	 * @param crlf Use CRLF (`\r\n`) for detecting new lines.
 	 */
-	public function addTextFormat(stateIndex:Int, value:String, format:TextFormat, crlf:Bool = false)
+	public function addTextFormatted(stateIndex:Int, value:String, formatName:String, crlf:Bool = false)
 	{
-		var clonedFormat = format.clone();
+		var state = _textStates[stateIndex];
+
+		var formatIndex:Int = 0;
+		
+		for (i in 0..._textFormats.length)
+			if (_textFormats[i].name == formatName)
+			{
+				formatIndex = i;
+				break;
+			}
+		
+		state.formatRanges.push(new Vector2(0, 0));
+		state.formatIndices.push(formatIndex);
 
 		// new paragraphs will be made into new `TextState`'s for efficiency
 		var first = "";
@@ -130,7 +171,7 @@ class TextBuffer
 		if (upto == -1)
 			upto = value.length;
 
-		var state = _textStates[stateIndex];
+		
 		var chars = value.toCharArray();
 		var startIndex:Int = 0;
 		var lastChar:String = null;
@@ -190,12 +231,13 @@ class TextBuffer
 		var linesAdded = 0;
 		var maxHeight = 0.0;
 
-		clonedFormat.start = index;
-		clonedFormat.end = endIndex;
+		var range = state.formatRanges[state.formatRanges.length - 1];
+		range.x = index;
+		range.y = endIndex;
 
 		while (index <= endIndex)
 		{
-			currentTextWidth = clonedFormat.font.widthOfCharacters(clonedFormat.fontSize, state.characters, currentLine.start, index - currentLine.start);
+			currentTextWidth = _textFormats[formatIndex].font.widthOfCharacters(_textFormats[formatIndex].fontSize, state.characters, currentLine.start, index - currentLine.start);
 			if (currentTextWidth >= measurableWidth)
 			{
 				if (lastChance < 0)
@@ -209,7 +251,7 @@ class TextBuffer
 
 				var line = new LineInfo(currentLine.end, 0);
 				line.lineStartX = state.dimension.x;
-				line.lineEndY = line.lineStartY = currentLine.lineStartY + clonedFormat.font.height(clonedFormat.fontSize);
+				line.lineEndY = line.lineStartY = currentLine.lineStartY + _textFormats[formatIndex].font.height(_textFormats[formatIndex].fontSize);
 				line.lineEndX = state.dimension.x + currentTextWidth;
 				state.lines.push(line);
 				currentLine = state.lines[state.lines.length - 1];
@@ -217,7 +259,7 @@ class TextBuffer
 				lastBreak = lastChance + 1;
 				index = lastBreak;
 				lastChance = -1;
-				maxHeight += clonedFormat.font.height(clonedFormat.fontSize);
+				maxHeight += _textFormats[formatIndex].font.height(_textFormats[formatIndex].fontSize);
 			}
 
 			if (state.characters[index] == " ".charCodeAt(0))
@@ -229,7 +271,6 @@ class TextBuffer
 			currentLine.end = index;
 		}
 
-		state.formats.push(clonedFormat);
 		_requiresUpdates[stateIndex] = true;
 
 		if (upto < value.length)
@@ -262,13 +303,8 @@ class TextBuffer
 						current += value.charAt(i);
 				}
 			}
-			var newFormat = new TextFormat();
-			newFormat.font = format.font;
-			newFormat.fontSize = format.fontSize;
-			newFormat.color = format.color;
-			newFormat.underline = format.underline;
 
-			addTextFormat(stateToUpdate, current, newFormat, crlf);
+			addTextFormatted(stateToUpdate, current, formatName, crlf);
 		}
 	}
 
@@ -297,22 +333,24 @@ class TextBuffer
 				var lastStartIndex = 0;
 				var lastEndIndex = 0;
 
-				for (f in state.formats)
+				for (k in 0...state.formatRanges.length)
 				{
-					if ((f.start >= line.start && f.start <= line.end) ||
-						(f.end <= line.end && f.start <= line.end))
+					var fr = state.formatRanges[k];
+					if ((fr.x >= line.start && fr.x <= line.end) ||
+						(fr.y <= line.end && fr.y <= line.end))
 					{
+						var f = _textFormats[state.formatIndices[k]];
 						g2.font = f.font;
 						g2.fontSize = f.fontSize;
 						var start = lastStartIndex;
 						var end = 0;
-						if (f.start < line.start)
+						if (fr.x < line.start)
 							start = line.start;
-						else if (f.start > line.start && lastStartIndex != 0)
-							start = f.start;
+						else if (fr.x > line.start && lastStartIndex != 0)
+							start = cast fr.x;
 
-						if (f.end < line.end)
-							end = f.end;
+						if (fr.y < line.end)
+							end = cast fr.y;
 						else
 							end = line.end;
 

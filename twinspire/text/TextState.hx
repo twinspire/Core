@@ -1,5 +1,6 @@
 package twinspire.text;
 
+import kha.math.Vector2;
 import twinspire.geom.Dim;
 
 class TextState
@@ -9,7 +10,8 @@ class TextState
 	public var dimension:Dim;
 	public var lines:Array<LineInfo>;
 	public var characters:Array<Int>;
-	public var formats:Array<TextFormat>;
+	public var formatRanges:Array<Vector2>;
+	public var formatIndices:Array<Int>;
 	public var clipping:Bool;
 
 	public inline function new(x:Float, y:Float, width:Float, height:Float)
@@ -17,7 +19,8 @@ class TextState
 		dimension = new Dim(x, y, width, height);
 		lines = [];
 		characters = [];
-		formats = [];
+		formatRanges = [];
+		formatIndices = [];
 		clipping = false;
 	}
 

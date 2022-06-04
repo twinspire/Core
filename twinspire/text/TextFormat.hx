@@ -6,8 +6,7 @@ import kha.Font;
 class TextFormat
 {
 
-	public var start:Int;
-	public var end:Int;
+	public var name:String;
 	public var color:Color;
 	public var backColor:Color;
 	public var font:Font;
@@ -25,8 +24,6 @@ class TextFormat
 		var format = new TextFormat();
 		format.font = this.font;
 		format.fontSize = this.fontSize;
-		format.start = this.start;
-		format.end = this.end;
 		format.color = this.color;
 		format.backColor = this.backColor;
 		format.underline = this.underline;
