@@ -457,17 +457,20 @@ class TextBuffer
 		for (i in 0..._textStates.length)
 		{
 			var state = _textStates[i];
-			var startY = state.lines[0].lineStartY;
-			var endY = state.lines[0].lineEndY;
-			if (state.lines.length > 1)
-				endY = state.lines[state.lines.length - 1].lineEndY;
+			if (state.lines.length > 0)
+			{
+				var startY = state.lines[0].lineStartY;
+				var endY = state.lines[0].lineEndY;
+				if (state.lines.length > 1)
+					endY = state.lines[state.lines.length - 1].lineEndY;
 
-			var height = endY - startY;
-			if (state.clipping)
-				height = state.dimension.height;
+				var height = endY - startY;
+				if (state.clipping)
+					height = state.dimension.height;
 
-			if (_requiresUpdates[i])
-				_textBuffer.clear(cast state.dimension.x, cast state.dimension.y, 0, cast state.dimension.width, cast height, 0, Color.fromFloats(0, 0, 0, 0));
+				if (_requiresUpdates[i])
+					_textBuffer.clear(cast state.dimension.x, cast state.dimension.y, 0, cast state.dimension.width, cast height, 0, Color.fromFloats(0, 0, 0, 0));
+			}
 		}
 
 		for (i in 0..._textStates.length)
