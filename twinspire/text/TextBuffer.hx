@@ -113,15 +113,25 @@ class TextBuffer
 	/**
 	 * Add a single character value as an Integer character code using the default font and font size.
 	 * 
-	 * Do not use this function yet, it has not been tested!
-	 * @param stateIndex 
-	 * @param value 
+	 * This function is faster that `addText` for single character input, but should be used sparingly.
+	 * @param stateIndex The index of the state to add to.
+	 * @param value The integer value representing a character code.
+	 * @param crlf Determine the line feed character should be `\r\n`.
 	 */
 	public function addChar(stateIndex:Int, value:Int, crlf:Bool = false)
 	{
 		addCharFormatted(stateIndex, value, "Default", crlf);
 	}
 
+	/**
+	 * Add a single character value as an Integer character code using the given format by name.
+	 * 
+	 * This function is faster that `addTextFormatted` for single character input, but should be used sparingly.
+	 * @param stateIndex The index of the state to add to.
+	 * @param value The integer value representing a character code.
+	 * @param formatName The name of the format to use.
+	 * @param crlf Determine the line feed character should be `\r\n`.
+	 */
 	public function addCharFormatted(stateIndex:Int, value:Int, formatName:String, crlf:Bool = false)
 	{
 		var state = _textStates[stateIndex];
@@ -167,7 +177,11 @@ class TextBuffer
 
 		if (requiresNewFormat)
 		{
-			state.formatRanges.push(new Vector2(state.characters.length, state.characters.length + 1));
+			var start = 0;
+			if (lastLine != null)
+				start = lastLine.end;
+
+			state.formatRanges.push(new Vector2(start, start + 1));
 			state.formatIndices.push(formatIndex);
 		}
 		
@@ -180,7 +194,7 @@ class TextBuffer
 				if (lastLine != null)
 					line.start = lastLine.end + 1;
 				
-				line.end += 1;
+				line.end = line.start + 1;
 				line.lineStartX = state.dimension.x;
 				line.lineEndX += widthOfChar;
 
@@ -229,6 +243,16 @@ class TextBuffer
 				lastLine.end += 1;
 				lastLine.lineEndX += widthOfChar;
 			}
+		}
+
+		if (lastLine == null) // probably adding characters to the state for the first time
+		{
+			var line = new LineInfo(0, 1);
+			line.lineStartX = state.dimension.x;
+			line.lineStartY = state.dimension.y;
+			line.lineEndX = state.dimension.x + widthOfChar;
+			line.lineEndY = line.lineStartY + _textFormats[formatIndex].font.height(_textFormats[formatIndex].fontSize);
+			state.lines.push(line);
 		}
 		
 		_requiresUpdates[stateIndex] = true;
@@ -440,6 +464,30 @@ class TextBuffer
 		}
 	}
 
+	/**
+	 * Update all states within the buffer.
+	 */
+	public function updateAll()
+	{
+		for (i in 0..._requiresUpdates.length)
+		{
+			_requiresUpdates[i] = true;
+		}
+
+		updateBuffer();
+	}
+
+	/**
+	 * Updates the buffer. Only updates the states that require updating.
+	 * This function is best used when you are dealing with large amounts of text
+	 * and states.
+	 * 
+	 * This function will clear areas on the buffer where states update. This means
+	 * that if one state overlaps another, the state being overlapped will also be cleared,
+	 * but not updated if it is not tagged to update. As such, if states are likely to
+	 * overlap, ensure those states are also updated and their positions moved
+	 * accordingly.
+	 */
 	public function updateBuffer()
 	{
 		var g2 = _textBuffer.g2;
@@ -535,6 +583,12 @@ class TextBuffer
 		g2.end();
 	}
 
+	/**
+	 * Render the buffer to the given 2D drawing context.
+	 * @param g2 The `kha.graphics2.Graphics` graphics context to draw to.
+	 * @param offsetX The x-position of the buffer.
+	 * @param offsetY The y-position of the buffer.
+	 */
 	public function render(g2:Graphics, offsetX:Float, offsetY:Float)
 	{
 		g2.color = Color.White;
