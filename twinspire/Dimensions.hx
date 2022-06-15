@@ -584,6 +584,62 @@ class Dimensions
         return results;
     }
 
+    static var containerColumnOrRow:Dim;
+    static var containerDirection:Int;
+    static var containerCellSize:Float;
+    static var containerCell:Int;
+
+    /**
+     * Create a dimension column, within which each time the function `getNewDim` is called,
+     * a row is created within this column below the last row created.
+     * @param container The container to use for creating new rows.
+     * @param height The height of each row.
+     * @param direction 1 for up, 2 for down, 3 for left, 4 for right
+     */
+    public static function dimColumn(container:Dim, size:Float, direction:Int)
+    {
+        containerColumnOrRow = container;
+        containerCellSize = size;
+        containerDirection = direction;
+        containerCell = 0;
+    }
+
+    public static function getNewDim()
+    {
+        if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize > 0)
+        {
+            var x = containerColumnOrRow.getX();
+            var y = containerColumnOrRow.getY();
+            var width = containerColumnOrRow.getWidth();
+            var height = containerColumnOrRow.getHeight();
+            if (containerDirection == 1)
+            {
+                y -= (containerCellSize * containerCell);
+                height = containerCellSize;
+            }
+            else if (containerDirection == 2)
+            {
+                y += (containerCellSize * containerCell);
+                height = containerCellSize;
+            }
+            else if (containerDirection == 3)
+            {
+                x -= (containerCellSize * containerCell);
+                width = containerCellSize;
+            }
+            else if (containerDirection == 4)
+            {
+                x += (containerCellSize * containerCell);
+                width = containerCellSize;
+            }
+
+            containerCell += 1;
+            return new Dim(x, y, width, height);
+        }
+
+        return null;
+    }
+
     /**
      * Create a dimension block from the given width and given offset on the X-axis.
      * @param width The width of the object.

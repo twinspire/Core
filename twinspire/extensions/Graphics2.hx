@@ -18,6 +18,7 @@ class Graphics2
 {
 
 	private static var _forceMultilineUpdate:Bool;
+	private static var _useCrlf:Bool;
 
 	public static function drawImageDim(g2:Graphics, img:Image, dim:Dim)
 	{
@@ -57,6 +58,16 @@ class Graphics2
 	public static function forceMultilineUpdate()
 	{
 		_forceMultilineUpdate = true;
+	}
+
+	public static function disableMultilineUpdate()
+	{
+		_forceMultilineUpdate = false;
+	}
+
+	public static function useCRLF(crlf:Bool)
+	{
+		_useCrlf = crlf;
 	}
 
 	/**
@@ -122,6 +133,12 @@ class Graphics2
 					}
 					else if (characters[index] == "\n".charCodeAt(0) || characters[index] == "\r".charCodeAt(0))
 					{
+						if (_useCrlf && characters[index] == "\n".charCodeAt(0))
+						{
+							index += 1;
+							continue;
+						}
+
 						currentBreaks.push(index + 1);
 						lastBreak = index + 1;
 						lastChance = -1;
@@ -129,8 +146,6 @@ class Graphics2
 
 					index += 1;
 				}
-
-				_forceMultilineUpdate = false;
 			}
 
 			var currentY = 0.0;
