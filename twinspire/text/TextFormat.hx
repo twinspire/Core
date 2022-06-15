@@ -14,7 +14,7 @@ class TextFormat
 	public var underline:Bool;
 	public var superscript:Bool;
 
-	public inline function new()
+	public function new()
 	{
 		
 	}
