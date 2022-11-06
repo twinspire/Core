@@ -46,6 +46,12 @@ class Dim
 		return height;
 	}
 
+	public function clone()
+	{
+		var dim = new Dim(this.x, this.y, this.width, this.height, this.order);
+		return dim;
+	}
+
 	/**
 	 * Return a new dimension with all zero values.
 	 * This value should not be used as is.

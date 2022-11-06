@@ -128,7 +128,19 @@ class GlobalEvents
 			hasAltGr = needsAltGr && keysDown[KeyCode.AltGr];
 		}
 
-		return keysUp[code] && (needsAlt && hasAlt) && (needsAltGr && hasAltGr) && (needsControl && hasControl) && (needsShift && hasShift);
+		if (!needsShift && !keysDown[KeyCode.Shift])
+			hasShift = true;
+		
+		if (!needsAlt && !keysDown[KeyCode.Alt])
+			hasAlt = true;
+		
+		if (!needsAltGr && !keysDown[KeyCode.AltGr])
+			hasAltGr = true;
+
+		if (!needsControl && !keysDown[KeyCode.Control])
+			hasControl = true;
+
+		return keysUp[code] && (hasAlt) && (hasAltGr) && (hasControl) && (hasShift);
 	}
 
 	/**

@@ -22,7 +22,7 @@ class ArrayExtensions
 	 * Return the first item's index that matches the given condition from a callback
 	 * function.
 	 */
-	public static function findIndex<T>(arr:Array<T>, callback:(T) -> Bool):Null<Int>
+	public static function findIndex<T>(arr:Array<T>, callback:(T) -> Bool):Int
 	{
 		for (i in 0...arr.length)
 		{
@@ -30,7 +30,7 @@ class ArrayExtensions
 				return i;
 		}
 
-		return null;
+		return -1;
 	}
 
 	/**
