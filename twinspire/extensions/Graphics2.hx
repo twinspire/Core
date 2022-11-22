@@ -14,6 +14,16 @@ enum abstract TriangleDirection(Int) from Int to Int
 	var TRIANGLE_DOWN			=	0x08;
 }
 
+enum abstract BorderFlags(Int) from Int to Int
+{
+	var BORDER_NONE				=	0;
+	var BORDER_TOP				=	0x01;
+	var BORDER_LEFT				=	0x02;
+	var BORDER_RIGHT			=	0x04;
+	var BORDER_BOTTOM			=	0x08;
+	var BORDER_ALL				=	0x0F;
+}
+
 class Graphics2
 {
 
@@ -43,6 +53,33 @@ class Graphics2
 	public static function drawRectDim(g2:Graphics, destination:Dim, lineThickness:Float = 1.0)
 	{
 		g2.drawRect(destination.x, destination.y, destination.width, destination.height, lineThickness);
+	}
+
+	public static function drawBorders(g2:Graphics, destination:Dim, lineThickness:Float = 1.0, borders:Int = BORDER_ALL)
+	{
+		if ((borders & BORDER_TOP) != 0)
+		{
+			g2.drawLine(destination.x + lineThickness / 2, destination.y + lineThickness / 2, 
+				destination.x + destination.width - lineThickness / 2, destination.y + lineThickness / 2, lineThickness);
+		}
+
+		if ((borders & BORDER_LEFT) != 0)
+		{
+			g2.drawLine(destination.x + lineThickness / 2, destination.y + lineThickness / 2, 
+				destination.x + lineThickness / 2, destination.y + destination.height - lineThickness / 2, lineThickness);
+		}
+
+		if ((borders & BORDER_RIGHT) != 0)
+		{
+			g2.drawLine(destination.x + destination.width + lineThickness / 2, destination.y + lineThickness / 2, 
+				destination.x + destination.width - lineThickness / 2, destination.y + destination.height - lineThickness / 2, lineThickness);
+		}
+
+		if ((borders & BORDER_BOTTOM) != 0)
+		{
+			g2.drawLine(destination.x + lineThickness / 2, destination.y + destination.height - lineThickness / 2,
+				destination.x + destination.width - lineThickness / 2, destination.y + destination.height - lineThickness / 2, lineThickness);
+		}
 	}
 
 	public static function fillRectDim(g2:Graphics, destination:Dim)

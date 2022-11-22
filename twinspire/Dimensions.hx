@@ -50,6 +50,12 @@ typedef DimIndexResult = {
     var groupIndex:Int;
 }
 
+enum abstract ContainerMethods(Int) from Int to Int
+{
+    var FLOW_FIXED      =   0;
+    var FLOW_VARIABLE   =   1;
+}
+
 class Dimensions
 {
 
@@ -316,12 +322,56 @@ class Dimensions
      * Create a dimension block from the given width and given offset on the X-axis.
      * @param width The width of the object.
      * @param height The height of the object.
-     * @param offsetX The offset from the top of the screen.
+     * @param offsetX The offset from the left of the screen.
      */
     public static function centreScreenX(width:Float, height:Float, offsetX:Float)
     {
         var y = (System.windowHeight() - height) / 2;
         return new Dim(offsetX, y, width, height);
+    }
+
+    /**
+     * 
+     * @param width 
+     * @param height 
+     * @param offsetX 
+     * @param offsetY 
+     */
+    public static function createDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offsetX:Float, offsetY:Float)
+    {
+        var x = 0.0;
+        var y = 0.0;
+        if (valign == VALIGN_TOP)
+        {
+            y += offsetY;
+        }
+        else if (valign == VALIGN_CENTRE)
+        {
+            y = (System.windowHeight() - height) / 2;
+            y += offsetY;
+        }
+        else if (valign == VALIGN_BOTTOM)
+        {
+            y = System.windowHeight() - height;
+            y -= offsetY;
+        }
+
+        if (halign == HALIGN_LEFT)
+        {
+            x = offsetX;
+        }
+        else if (halign == HALIGN_MIDDLE)
+        {
+            x = (System.windowWidth() - width) / 2;
+            x += offsetX;
+        }
+        else if (halign == HALIGN_RIGHT)
+        {
+            x = System.windowWidth() - width;
+            x -= offsetX;
+        }
+
+        return new Dim(x, y, width, height);
     }
 
     /**
@@ -586,27 +636,50 @@ class Dimensions
 
     static var containerColumnOrRow:Dim;
     static var containerDirection:Int;
-    static var containerCellSize:Float;
+    static var containerCellSize:Dim;
     static var containerCell:Int;
+    static var containerMethod:Int;
 
     /**
      * Create a dimension column, within which each time the function `getNewDim` is called,
      * a row is created within this column below the last row created.
      * @param container The container to use for creating new rows.
-     * @param height The height of each row.
+     * @param size The dim of each cell.
      * @param direction 1 for up, 2 for down, 3 for left, 4 for right
      */
-    public static function dimColumn(container:Dim, size:Float, direction:Int)
+    public static function dimFixedFlow(container:Dim, size:Dim, direction:Int)
     {
         containerColumnOrRow = container;
         containerCellSize = size;
         containerDirection = direction;
+        containerMethod = FLOW_FIXED;
         containerCell = 0;
     }
 
-    public static function getNewDim()
+    /**
+     * 
+     * @param container The container to use for creating new rows.
+     * @param height The height of each row.
+     * @param direction 1 for up, 2 for down, 3 for left, 4 for right
+     */
+    public static function dimVariableFlow(container:Dim, direction:Int)
     {
-        if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize > 0)
+        containerColumnOrRow = container;
+        containerDirection = direction;
+        containerMethod = FLOW_VARIABLE;
+        containerCellSize = new Dim(0, 0, 0, 0);
+        containerCell = 0;
+    }
+
+    public static function dimVariableSetNextDim(dim:Dim)
+    {
+        if (containerMethod == FLOW_VARIABLE)
+            containerCellSize = dim.clone();
+    }
+
+    public static function getNewDim(padding:Float = 0)
+    {
+        if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize != null)
         {
             var x = containerColumnOrRow.getX();
             var y = containerColumnOrRow.getY();
@@ -614,23 +687,39 @@ class Dimensions
             var height = containerColumnOrRow.getHeight();
             if (containerDirection == 1)
             {
-                y -= (containerCellSize * containerCell);
-                height = containerCellSize;
+                if (containerMethod == FLOW_FIXED)
+                    y -= (containerCellSize.height * containerCell) - padding;
+                else if (containerMethod == FLOW_VARIABLE)
+                    y -= containerCellSize.height - padding;
+
+                height = containerCellSize.height;
             }
             else if (containerDirection == 2)
             {
-                y += (containerCellSize * containerCell);
-                height = containerCellSize;
+                if (containerMethod == FLOW_FIXED)
+                    y += (containerCellSize.height * containerCell) + padding;
+                else if (containerMethod == FLOW_VARIABLE)
+                    y += containerCellSize.height + padding;
+
+                height = containerCellSize.height;
             }
             else if (containerDirection == 3)
             {
-                x -= (containerCellSize * containerCell);
-                width = containerCellSize;
+                if (containerMethod == FLOW_FIXED)
+                    x -= (containerCellSize.width * containerCell) - padding;
+                else if (containerMethod == FLOW_VARIABLE)
+                    x -= containerCellSize.width - padding;
+
+                width = containerCellSize.width;
             }
             else if (containerDirection == 4)
             {
-                x += (containerCellSize * containerCell);
-                width = containerCellSize;
+                if (containerMethod == FLOW_FIXED)
+                    x += (containerCellSize.width * containerCell) + padding;
+                else if (containerMethod == FLOW_VARIABLE)
+                    x += containerCellSize.width + padding;
+
+                width = containerCellSize.width;
             }
 
             containerCell += 1;
@@ -713,11 +802,11 @@ class Dimensions
         }
         else if (valign == VALIGN_BOTTOM)
         {
-            b.y = a.y - (b.height - a.height);
+            b.y = a.y + a.height - b.height;
         }
         else if (valign == VALIGN_CENTRE)
         {
-            b.y = a.y - ((b.height - a.height) / 2);
+            b.y = a.y + ((a.height - b.height) / 2);
         }
     }
 
@@ -735,11 +824,11 @@ class Dimensions
         }
         else if (halign == HALIGN_RIGHT)
         {
-            b.x = a.x - (b.width - a.width);
+            b.x = a.x + a.width - b.width;
         }
         else if (halign == HALIGN_MIDDLE)
         {
-            b.x = a.x - ((b.width - a.width) / 2);
+            b.x = a.x + ((a.width - b.width) / 2);
         }
     }
 
