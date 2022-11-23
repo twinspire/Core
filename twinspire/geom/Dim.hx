@@ -62,4 +62,15 @@ class Dim
 		return new Dim(0, 0, 0, 0, 0);
 	}
 
+	/**
+	 * Return a zero location Dim with the given width and height.
+	 * @param width The width.
+	 * @param height The height.
+	 * @return Dim
+	 */
+	public static function ofSize(width:Float, height:Float):Dim
+	{
+		return new Dim(0, 0, width, height);
+	}
+
 }
