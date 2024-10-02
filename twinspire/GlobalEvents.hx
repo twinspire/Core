@@ -144,12 +144,38 @@ class GlobalEvents
 	}
 
 	/**
+	* Get the integer value of the first `kha.input.KeyCode` found to be released by
+	* the user.
+	**/
+	function isAnyKeyUp():Array<Int> {
+		var temp = [];
+		for (i in 0...keysUp.length) {
+			if (keysUp[i]) temp.push(i);
+		}
+
+		return temp;
+	}
+
+	/**
 	 * Determines if the following key is held down by the user.
 	 * @param code The key to check.
 	 */
 	function isKeyDown(code:KeyCode)
 	{
 		return keysDown[code];
+	}
+
+	/**
+	* Get the integer value of the first `kha.input.KeyCode` found to be pressed by
+	* the user.
+	**/
+	function isAnyKeyDown():Array<Int> {
+		var temp = [];
+		for (i in 0...keysDown.length) {
+			if (keysDown[i]) temp.push(i);
+		}
+
+		return temp;
 	}
 
 	/**
