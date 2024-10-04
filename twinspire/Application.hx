@@ -1,5 +1,10 @@
 package twinspire;
 
+#if js
+import js.html.FileReader;
+import js.Browser;
+#end
+
 import twinspire.GlobalEvents;
 import kha.math.FastVector2;
 import twinspire.events.Event;
@@ -78,6 +83,23 @@ class Application
 	{
 		GlobalEvents.init();
 		_events = [];
+
+		#if js
+		Browser.document.addEventListener("drop", function(event: js.html.DragEvent) {
+			event.preventDefault();
+			if (event.dataTransfer != null && event.dataTransfer.files != null) {
+				for (file in event.dataTransfer.files) {
+					var reader = new FileReader();
+					reader.onload = (e) -> {
+						@:privateAccess(System) {
+							System.dropFiles(e.target.result);
+						}
+					};
+					reader.readAsDataURL(file);
+				}
+			}
+		});
+		#end
 
 		System.notifyOnApplicationState(_app_foreground, _app_resume, _app_pause, _app_background, _app_shutdown);
 		System.notifyOnDropFiles(_app_dropFiles);
@@ -554,6 +576,9 @@ class Application
 
 	private function _app_dropFiles(path:String)
 	{
+		if (path.indexOf("drop://") > -1) // discard paths using the drop: prefix
+			return;
+
 		var e = new Event();
 		e.type = EVENT_DROP_FILES;
 		e.filePath = path;
