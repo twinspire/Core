@@ -5,6 +5,8 @@ import js.html.FileReader;
 import js.Browser;
 #end
 
+import twinspire.render.UpdateContext;
+import twinspire.render.GraphicsContext;
 import twinspire.GlobalEvents;
 import kha.math.FastVector2;
 import twinspire.events.Event;
@@ -53,6 +55,30 @@ class Application
 	private var _error:String;
 	private var _ctrl:Bool;
 	private var _cutTrigger:Bool;
+
+	private var _graphicsContext:GraphicsContext;
+
+
+	/**
+	* An update callback for use by this Application instance.
+	*
+	* This is optional and you can use your own update loop and use kha directly if you prefer.
+	**/
+	public var update:(UpdateContext) -> Void;
+
+	/**
+	* A render callback for use by this Application instance.
+	*
+	* This is optional and you can use your own render loop and use kha directly if you prefer.
+	**/
+	public var render:(GraphicsContext) -> Void;
+
+	/**
+	* An end callback for use by this Application instance.
+	*
+	* This is optional.
+	**/
+	public var end:(UpdateContext) -> Void;
 
 	/**
 	* Gets the currently polled event.
