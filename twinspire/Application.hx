@@ -57,7 +57,7 @@ class Application
 	private var _cutTrigger:Bool;
 
 	private var _graphicsContext:GraphicsContext;
-
+	private var _updateContext:UpdateContext;
 
 	/**
 	* An update callback for use by this Application instance.
