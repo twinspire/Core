@@ -64,25 +64,33 @@ class Application
 	private var _isRunning:Bool;
 
 	/**
+	* An initialisation callback for use by Application instance.
+	*
+	* Unlike the other callbacks, this is only called once at startup or between scenes. Use this callback to
+	* add or remove dimensions from the `GraphicsContext`.
+	**/
+	public var init:(GraphicsContext) -> Void;
+
+	/**
 	* An update callback for use by this Application instance.
 	*
-	* This is optional and you can use your own update loop and use kha directly if you prefer.
+	* This is called every frame to simulate events and/or physics. Use this to check user input.
 	**/
 	public var update:(UpdateContext) -> Void;
 
 	/**
 	* A render callback for use by this Application instance.
 	*
-	* This is optional and you can use your own render loop and use kha directly if you prefer.
+	* This is called every frame to render the graphics. Use the dimensions and render queries to generate the buffer.
 	**/
 	public var render:(GraphicsContext) -> Void;
 
 	/**
 	* An end callback for use by this Application instance.
 	*
-	* This is optional.
+	* This is called at the end of each frame for cleanup. Both the update and graphics contexts are provided if necessary.
 	**/
-	public var end:(UpdateContext) -> Void;
+	public var end:(UpdateContext, GraphicsContext) -> Void;
 
 	/**
 	* Gets the currently polled event.
