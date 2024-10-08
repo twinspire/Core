@@ -65,7 +65,6 @@ class GlobalEvents
 	@:noCompletion var recentlyConnectedGamepad:Int;
 	@:noCompletion var gamepadStates:Array<GamepadState>;
 
-
 	@:global
 	var copyValue:String;
 
@@ -619,7 +618,6 @@ class GlobalEvents
 
 		return null;
 	}
-
 
 	/**
 	 * Determines if the mouse is over the current dimension.

@@ -1,12 +1,15 @@
 package twinspire.render;
 
+import twinspire.Application;
 import twinspire.events.Buttons;
 import twinspire.GlobalEvents;
 import twinspire.render.GraphicsContext;
 import twinspire.render.RenderQuery;
 import twinspire.render.QueryType;
+import twinspire.render.MouseScrollValue;
 import twinspire.geom.Dim;
 
+@:allow(Application)
 class UpdateContext {
 
     private var _gctx:GraphicsContext;
@@ -18,6 +21,10 @@ class UpdateContext {
     private var _mouseIsScrolling:Int;
     private var _mouseScrollValue:Int;
     private var _mouseIsReleased:Int;
+    private var _deltaTime:Float;
+
+    public var deltaTime(get, default):Float;
+    function get_deltaTime() return _deltaTime;
 
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
@@ -45,8 +52,8 @@ class UpdateContext {
         }
 
         _mouseIsDown = -1;
-        var isMouseScrolling = -1;
-        var isMouseReleased = -1;
+        _mouseIsReleased = -1;
+        _mouseIsScrolling = -1;
         var isMouseOver = -1;
 
         var mouseScrollDelta = 0;
@@ -59,18 +66,18 @@ class UpdateContext {
             isMouseOver = index;
 
             if (GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
-                isMouseUp = index;
+                _mouseIsReleased = index;
                 break;
             }
 
             if (GlobalEvents.isMouseButtonDown(BUTTON_LEFT)) {
-                isMouseDown = index;
+                _mouseIsDown = index;
                 break;
             }
 
             if (GlobalEvents.getMouseDelta() != 0) {
                 mouseScrollDelta = GlobalEvents.getMouseDelta();
-                isMouseScrolling = index;
+                _mouseIsScrolling = index;
                 break;
             }
         }

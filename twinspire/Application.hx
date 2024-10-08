@@ -1,5 +1,6 @@
 package twinspire;
 
+import js.lib.webassembly.Global;
 #if js
 import js.html.FileReader;
 import js.Browser;
@@ -35,6 +36,7 @@ import kha.Framebuffer;
 import kha.Image;
 import kha.Blob;
 import kha.Window;
+import kha.Color;
 
 import haxe.Json;
 
@@ -55,6 +57,7 @@ class Application
 	private var _error:String;
 	private var _ctrl:Bool;
 	private var _cutTrigger:Bool;
+	private var _lastTime:Float;
 
 	private var _graphicsContext:GraphicsContext;
 	private var _updateContext:UpdateContext;
@@ -87,6 +90,11 @@ class Application
 	public var currentEvent:Event;
 
 	/**
+	* The default color to use for clearing the buffer.
+	**/
+	public var backColor:Color;
+
+	/**
 	* Gets whether or not a cut or copy event was triggered. Check this against an `EVENT_KEY_UP` event
 	* to set the `cutData` variable just before the `CLIPBOARD_CUT` or `CLIPBOARD_COPY` event occurs.
 	**/
@@ -102,6 +110,11 @@ class Application
 	private function new()
 	{
 		initEvents();
+
+		_lastTime = System.time;
+		Animate.animateMax = 1000;
+		Animate.animateInit();
+		backColor = Color.Black;
 	}
 
 	/**
@@ -124,7 +137,35 @@ class Application
 		return _isRunning;
 	}
 
-	
+	/**
+	* Starts the running of the application.
+	**/
+	public function start() {
+		System.notifyOnFrames(app_render);
+	}
+
+	private function app_render(buffers:Array<Framebuffer>) {
+		var g2 = buffers[0].g2;
+		var deltaTime = System.time - _lastTime;
+		Animate.animateTime(deltaTime);
+
+		@:privateAccess(UpdateContext) {
+			_updateContext._deltaTime = deltaTime;
+		}
+
+		update(_updateContext);
+
+		g2.begin();
+		g2.clear(backColor);
+
+		render(_graphicsContext);
+		end(_updateContext);
+
+		g2.end();
+
+		GlobalEvents.end();
+		_lastTime = System.time;
+	}
 
 	// Event Handling routines
 
