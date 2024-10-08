@@ -7,7 +7,6 @@ import twinspire.render.RenderQuery;
 import twinspire.render.QueryType;
 import twinspire.geom.Dim;
 
-
 class UpdateContext {
 
     private var _gctx:GraphicsContext;
@@ -15,6 +14,10 @@ class UpdateContext {
     // UI stuff
     private var _tempUI:Array<Int>;
     private var _mouseFocusIndexUI:Int;
+    private var _mouseIsDown:Int;
+    private var _mouseIsScrolling:Int;
+    private var _mouseScrollValue:Int;
+    private var _mouseIsReleased:Int;
 
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
@@ -41,7 +44,7 @@ class UpdateContext {
             }
         }
 
-        var isMouseDown = -1;
+        _mouseIsDown = -1;
         var isMouseScrolling = -1;
         var isMouseReleased = -1;
         var isMouseOver = -1;
@@ -75,12 +78,46 @@ class UpdateContext {
         _mouseFocusIndexUI = isMouseOver;
     }
 
+    /**
+    * Checks that the following dimension at the given index is receiving a mouse
+    * down event.
+    * @param index The index of the dimension to check.
+    **/
+    public function isMouseDown(index:Int) {
+        return _mouseIsDown == index;
+    }
+
+    /**
+    * Checks that the following dimension at the given index is receiving a mouse
+    * released event.
+    *
+    * @param index The index of the dimension to check.
+    **/
+    public function isMouseReleased(index:Int) {
+        return _mouseIsReleased == index;
+    }
+
+    /**
+    * Checks that the following dimension at the given index is receiving a mouse
+    * scroll event.
+    *
+    * @param index The index of the dimension to check.
+    * @return Returns the value of the scroll. `0` or `MOUSE_SCROLL_NONE` is returned if no scroll event is passed.
+    **/
+    public function isMouseScrolling(index:Int):Int {
+        if (_mouseIsScrolling == index) {
+            return _mouseScrollValue;
+        }
+
+        return MOUSE_SCROLL_NONE;
+    }
 
     /**
     * End event context and complete the final simulations.
     **/
     public function end() {
-
+        _mouseIsReleased = -1;
+        _mouseIsScrolling = -1;
     }
 
 }

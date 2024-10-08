@@ -58,6 +58,7 @@ class Application
 
 	private var _graphicsContext:GraphicsContext;
 	private var _updateContext:UpdateContext;
+	private var _isRunning:Bool;
 
 	/**
 	* An update callback for use by this Application instance.
@@ -102,6 +103,28 @@ class Application
 	{
 		initEvents();
 	}
+
+	/**
+	* Initialise the optional update and graphics contexts and let the Application
+	* perform basic logic for you.
+	**/
+	public function initContexts() {
+		if (render == null || update == null || end == null) {
+			throw "One or more of the essential callbacks required has not been assigned.";
+		}
+
+		_graphicsContext = new GraphicsContext();
+		_updateContext = new UpdateContext(_graphicsContext);
+	}
+
+	/**
+	* Check if the application is still running.
+	**/
+	public function running() {
+		return _isRunning;
+	}
+
+	
 
 	// Event Handling routines
 
