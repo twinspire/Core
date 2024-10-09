@@ -167,7 +167,7 @@ class Application
 		g2.clear(backColor);
 
 		render(_graphicsContext);
-		end(_updateContext);
+		end(_updateContext, _graphicsContext);
 
 		g2.end();
 
