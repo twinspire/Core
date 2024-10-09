@@ -38,3 +38,8 @@ It is not recommended to use the new context system until it is ready for produc
 
 ## Support
 If you find a bug or an issue, please use the issue tracker here.
+
+## LICENSE
+This library is licensed under MIT.
+
+However, the use of AI to extract source code from this repository and any related services is strictly prohibited (in addition to typical copyright infringement as defined by international copyright law). If you are a developer and you are concerned that your project may infringe upon the rights of Twinspire and its owners, we respectfully request that you do not use AI for commercial projects where it is possible you are unable to ascertain its original source and license.
