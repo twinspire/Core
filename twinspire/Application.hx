@@ -65,6 +65,12 @@ class Application
 	private var _isRunning:Bool;
 
 	/**
+	* Get the current graphics context.
+	**/
+	public var graphicsCtx(get, default):GraphicsContext;
+	function get_graphicsCtx() return _graphicsContext;
+
+	/**
 	* An initialisation callback for use by Application instance.
 	*
 	* Unlike the other callbacks, this is only called once at startup or between scenes. Use this callback to

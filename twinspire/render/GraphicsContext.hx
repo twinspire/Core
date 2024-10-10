@@ -10,6 +10,7 @@ import twinspire.geom.Dim;
 class GraphicsContext {
 
     private var _dimTemp:Array<Dim>;
+    private var _ended:Bool;
 
     /**
     * A collection of dimensions within this context. Do not write directly.
@@ -33,6 +34,7 @@ class GraphicsContext {
         dimensions = [];
         queries = [];
         activities = [];
+        _ended = false;
     }
 
     /**
@@ -43,6 +45,10 @@ class GraphicsContext {
     * @param renderType An integer used to determine what is rendered.
     **/
     public function addStatic(dim:Dim, renderType:Int) {
+        if (_ended) {
+            throw "Cannot add to context once the current frame has ended.";
+        }
+        
         _dimTemp.push(dim);
 
         var query = new RenderQuery();
@@ -61,6 +67,10 @@ class GraphicsContext {
     * @param renderType An integer used to determine what is rendered.
     **/
     public function addUI(dim:Dim, renderType:Int) {
+        if (_ended) {
+            throw "Cannot add to context once the current frame has ended.";
+        }
+
         _dimTemp.push(dim);
 
         var query = new RenderQuery();
@@ -79,6 +89,10 @@ class GraphicsContext {
     * @param renderType An integer used to determine what is rendered.
     **/
     public function addSprite(dim:Dim, renderType:Int) {
+        if (_ended) {
+            throw "Cannot add to context once the current frame has ended.";
+        }
+
         _dimTemp.push(dim);
 
         var query = new RenderQuery();
@@ -87,6 +101,10 @@ class GraphicsContext {
         queries.push(query);
 
         activities.push(null);
+    }
+
+    public function begin() {
+        _ended = false;
     }
 
     /**
@@ -113,6 +131,8 @@ class GraphicsContext {
         for (i in 0...activities.length) {
             activities[i] = null;
         }
+
+        _ended = false;
     }
 
 }
