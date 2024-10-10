@@ -7,6 +7,7 @@ import twinspire.render.GraphicsContext;
 import twinspire.render.RenderQuery;
 import twinspire.render.QueryType;
 import twinspire.render.MouseScrollValue;
+import twinspire.render.ActivityType;
 import twinspire.geom.Dim;
 
 @:allow(Application)
@@ -95,7 +96,7 @@ class UpdateContext {
             return false;
         }
 
-        var result = _mouseFocusIndexUI == index && _gctx.queries[index] != QUERY_STATIC;
+        var result = _mouseFocusIndexUI == index && _gctx.queries[index].type != QUERY_STATIC;
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_OVER;
@@ -115,7 +116,7 @@ class UpdateContext {
             return false;
         }
 
-        var result = _mouseIsDown == index && _gctx.queries[index] != QUERY_STATIC;
+        var result = _mouseIsDown == index && _gctx.queries[index].type != QUERY_STATIC;
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_DOWN;
@@ -136,7 +137,7 @@ class UpdateContext {
             return false;
         }
 
-        var result = _mouseIsReleased == index && _gctx.queries[index] != QUERY_STATIC;
+        var result = _mouseIsReleased == index && _gctx.queries[index].type != QUERY_STATIC;
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_CLICKED;
@@ -158,7 +159,7 @@ class UpdateContext {
             return false;
         }
 
-        var result = _mouseIsScrolling == index && _gctx.queries[index] != QUERY_STATIC;
+        var result = _mouseIsScrolling == index && _gctx.queries[index].type != QUERY_STATIC;
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_SCROLL;
