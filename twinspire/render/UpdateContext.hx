@@ -87,11 +87,42 @@ class UpdateContext {
 
     /**
     * Checks that the following dimension at the given index is receiving a mouse
+    * over event.
+    * @param index The index of the dimension to check.
+    **/
+    public function isMouseOver(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _mouseFocusIndexUI == index && _gctx.queries[index] != QUERY_STATIC;
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_MOUSE_OVER;
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
+    }
+
+    /**
+    * Checks that the following dimension at the given index is receiving a mouse
     * down event.
     * @param index The index of the dimension to check.
     **/
     public function isMouseDown(index:Int) {
-        return _mouseIsDown == index;
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _mouseIsDown == index && _gctx.queries[index] != QUERY_STATIC;
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_MOUSE_DOWN;
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
     }
 
     /**
@@ -101,7 +132,18 @@ class UpdateContext {
     * @param index The index of the dimension to check.
     **/
     public function isMouseReleased(index:Int) {
-        return _mouseIsReleased == index;
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _mouseIsReleased == index && _gctx.queries[index] != QUERY_STATIC;
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_MOUSE_CLICKED;
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
     }
 
     /**
@@ -111,12 +153,20 @@ class UpdateContext {
     * @param index The index of the dimension to check.
     * @return Returns the value of the scroll. `0` or `MOUSE_SCROLL_NONE` is returned if no scroll event is passed.
     **/
-    public function isMouseScrolling(index:Int):Int {
-        if (_mouseIsScrolling == index) {
-            return _mouseScrollValue;
+    public function isMouseScrolling(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
         }
 
-        return MOUSE_SCROLL_NONE;
+        var result = _mouseIsScrolling == index && _gctx.queries[index] != QUERY_STATIC;
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_MOUSE_SCROLL;
+            activity.data.push(_mouseScrollValue);
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
     }
 
     /**

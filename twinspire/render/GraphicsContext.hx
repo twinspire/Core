@@ -19,6 +19,10 @@ class GraphicsContext {
     * A collection of render queries. Do not write directly.
     **/
     public var queries:Array<RenderQuery>;
+    /**
+    * A collection of activities. Do not write directly.
+    **/
+    public var activities:Array<Activity>;
 
     private var _g2:Graphics;
     public var g2(get, default):Graphics;
@@ -28,6 +32,7 @@ class GraphicsContext {
         _dimTemp = [];
         dimensions = [];
         queries = [];
+        activities = [];
     }
 
     /**
@@ -44,6 +49,8 @@ class GraphicsContext {
         query.type = QUERY_STATIC;
         query.renderType = renderType;
         queries.push(query);
+
+        activities.push(null);
     }
 
     /**
@@ -60,6 +67,8 @@ class GraphicsContext {
         query.type = QUERY_UI;
         query.renderType = renderType;
         queries.push(query);
+
+        activities.push(null);
     }
 
     /**
@@ -76,14 +85,34 @@ class GraphicsContext {
         query.type = QUERY_SPRITE;
         query.renderType = renderType;
         queries.push(query);
+
+        activities.push(null);
     }
 
     /**
-    * Adds any temporary dimensions previously added in the current frame into permanent storage.
+    * Adds any temporary dimensions previously added in the current frame into permanent storage, refreshing
+    * any activities that were also performed on this frame.
+    *
+    * NOTE: Temporary dimensions added are copied directly into dimensions, overriding any existing dimensions.
+    * This happens to mimic scene changes without needing to perform a full re-initialisation. To disable this
+    * behaviour, set `noVirtualSceneChange` param to `true`.
     **/
-    public function end() {
-        dimensions = _dimTemp.copy();
+    public function end(noVirtualSceneChange:Bool = false) {
+        if (!noVirtualSceneChange) {
+            if (_dimTemp.length > 0) {
+                dimensions = _dimTemp.copy();
+            }
+        }
+        else {
+            for (i in 0..._dimTemp.length) {
+                dimensions.push(_dimTemp[i]);
+            }
+        }
         _dimTemp = [];
+
+        for (i in 0...activities.length) {
+            activities[i] = null;
+        }
     }
 
 }
