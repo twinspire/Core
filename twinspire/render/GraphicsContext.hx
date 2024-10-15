@@ -44,7 +44,7 @@ class GraphicsContext {
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     **/
-    public function addStatic(dim:Dim, renderType:Int) {
+    public function addStatic(dim:Dim, renderType:Id) {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -66,7 +66,7 @@ class GraphicsContext {
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     **/
-    public function addUI(dim:Dim, renderType:Int) {
+    public function addUI(dim:Dim, renderType:Id) {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -88,7 +88,7 @@ class GraphicsContext {
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     **/
-    public function addSprite(dim:Dim, renderType:Int) {
+    public function addSprite(dim:Dim, renderType:Id) {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }

@@ -7,9 +7,9 @@ class RenderQuery {
     **/
     public var type:Int;
     /**
-    * A custom integer type used to determine what is rendered.
+    * A unique identifier used to determine what is rendered.
     **/
-    public var renderType:Int;
+    public var renderType:Id;
     
     public function new() {
         

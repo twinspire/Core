@@ -139,18 +139,6 @@ class Application
 	}
 
 	/**
-	* Add a raw dimension to the graphics context for use in event simulation.
-	* This is a convenience function used when not directly working with the `GraphicsContext` or `UpdateContext`.
-	* This should not be used in place of the appropriate function in the `GraphicsContext` if you desire render control
-	* based on the results of user input.
-	**/
-	public function addDim(dim:Dim) {
-		if (_graphicsContext != null) {
-			_graphicsContext.addUI(dim, -1);
-		}
-	}
-
-	/**
 	* Initialise the optional update and graphics contexts and let the Application
 	* perform basic logic for you.
 	**/
