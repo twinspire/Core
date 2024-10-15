@@ -168,6 +168,10 @@ class Application
 	* Starts the running of the application.
 	**/
 	public function start() {
+		if (init != null) {
+			init(_graphicsContext);
+		}
+		
 		System.notifyOnFrames(app_render);
 	}
 
