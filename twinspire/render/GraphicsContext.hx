@@ -132,7 +132,7 @@ class GraphicsContext {
             activities[i] = null;
         }
 
-        _ended = false;
+        _ended = true;
     }
 
 }
