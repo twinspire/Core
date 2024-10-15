@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.ISceneManager;
 import twinspire.geom.Dim;
 import js.lib.webassembly.Global;
 #if js
@@ -69,6 +70,11 @@ class Application
 	**/
 	public var graphicsCtx(get, default):GraphicsContext;
 	function get_graphicsCtx() return _graphicsContext;
+
+	/**
+	* An instance of a scene manager.
+	**/
+	public var sceneManager:ISceneManager;
 
 	/**
 	* An initialisation callback for use by Application instance.
@@ -149,8 +155,8 @@ class Application
 	* perform basic logic for you.
 	**/
 	public function initContexts() {
-		if (render == null || update == null || end == null) {
-			throw "One or more of the essential callbacks required has not been assigned.";
+		if ((sceneManager != null && !(render == null || update == null || end == null)) || (sceneManager == null && (render == null || update == null || end == null)))  {
+			throw "One or more of the essential callbacks required has not been assigned or a scene manager has not been created.";
 		}
 
 		_graphicsContext = new GraphicsContext();
@@ -168,10 +174,13 @@ class Application
 	* Starts the running of the application.
 	**/
 	public function start() {
-		if (init != null) {
+		if (sceneManager != null) {
+			sceneManager.init(_graphicsContext);
+		}
+		else if (init != null) {
 			init(_graphicsContext);
 		}
-		
+
 		System.notifyOnFrames(app_render);
 	}
 
@@ -184,7 +193,12 @@ class Application
 			_updateContext._deltaTime = deltaTime;
 		}
 
-		update(_updateContext);
+		if (sceneManager != null) {
+			sceneManager.update(_updateContext);
+		}
+		else {
+			update(_updateContext);
+		}
 
 		g2.begin();
 		g2.clear(backColor);
@@ -193,8 +207,14 @@ class Application
 			_graphicsContext._g2 = g2;
 		}
 
-		render(_graphicsContext);
-		end(_updateContext, _graphicsContext);
+		if (sceneManager != null) {
+			sceneManager.render(_graphicsContext);
+			sceneManager.end(_updateContext, _graphicsContext);
+		}
+		else {
+			render(_graphicsContext);
+			end(_updateContext, _graphicsContext);
+		}
 
 		g2.end();
 

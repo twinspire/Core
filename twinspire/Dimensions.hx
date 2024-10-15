@@ -8,6 +8,7 @@ import twinspire.Application;
 import kha.graphics2.Graphics;
 import kha.math.FastVector2;
 import kha.System;
+import kha.Font;
 
 #if assertion
 import Assertion.*;
@@ -912,12 +913,13 @@ class Dimensions
     /**
      * Measure the width and height of the given text with font and fontSize parameters provided by
      * the given `g2` instance.
-     * @param g2 The instance of the graphics context from Kha.
+     * @param font The instance of a font to measure against.
+     * @param fontSize The size of the font.
      * @param text The text to measure.
      */
-    public static function getTextDim(g2:Graphics, text:String)
+    public static function getTextDim(font:Font, fontSize:Int, text:String)
 	{
-		return new Dim(0, 0, g2.font.width(g2.fontSize, text), g2.font.height(g2.fontSize));
+		return new Dim(0, 0, font.width(fontSize, text), font.height(fontSize));
 	}
 
 }
