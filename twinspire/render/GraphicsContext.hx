@@ -24,6 +24,10 @@ class GraphicsContext {
     * A collection of activities. Do not write directly.
     **/
     public var activities:Array<Activity>;
+    /**
+    * Defines how the `end()` call works with permanent storage. See `end()` for more info.
+    **/
+    public var noVirtualSceneChange:Bool;
 
     private var _g2:Graphics;
     public var g2(get, default):Graphics;
@@ -44,12 +48,16 @@ class GraphicsContext {
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     **/
-    public function addStatic(dim:Dim, renderType:Id) {
+    public function addStatic(dim:Dim, renderType:Id):Int {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
         
         _dimTemp.push(dim);
+        var index = _dimTemp.length - 1;
+        if (noVirtualSceneChange) {
+            index += dimensions.length;
+        }
 
         var query = new RenderQuery();
         query.type = QUERY_STATIC;
@@ -57,6 +65,8 @@ class GraphicsContext {
         queries.push(query);
 
         activities.push(null);
+
+        return index;
     }
 
     /**
@@ -72,6 +82,10 @@ class GraphicsContext {
         }
 
         _dimTemp.push(dim);
+        var index = _dimTemp.length - 1;
+        if (noVirtualSceneChange) {
+            index += dimensions.length;
+        }
 
         var query = new RenderQuery();
         query.type = QUERY_UI;
@@ -79,6 +93,8 @@ class GraphicsContext {
         queries.push(query);
 
         activities.push(null);
+
+        return index;
     }
 
     /**
@@ -94,6 +110,10 @@ class GraphicsContext {
         }
 
         _dimTemp.push(dim);
+        var index = _dimTemp.length - 1;
+        if (noVirtualSceneChange) {
+            index += dimensions.length;
+        }
 
         var query = new RenderQuery();
         query.type = QUERY_SPRITE;
@@ -101,6 +121,8 @@ class GraphicsContext {
         queries.push(query);
 
         activities.push(null);
+
+        return index;
     }
 
     public function begin() {
@@ -113,9 +135,9 @@ class GraphicsContext {
     *
     * NOTE: Temporary dimensions added are copied directly into dimensions, overriding any existing dimensions.
     * This happens to mimic scene changes without needing to perform a full re-initialisation. To disable this
-    * behaviour, set `noVirtualSceneChange` param to `true`.
+    * behaviour, set `noVirtualSceneChange` field to `true`.
     **/
-    public function end(noVirtualSceneChange:Bool = false) {
+    public function end() {
         if (!noVirtualSceneChange) {
             if (_dimTemp.length > 0) {
                 dimensions = _dimTemp.copy();

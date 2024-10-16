@@ -87,6 +87,13 @@ class UpdateContext {
     }
 
     /**
+    * Get the currently focused index.
+    **/
+    public function getFocusedIndex() {
+        return _mouseFocusIndexUI;
+    }
+    
+    /**
     * Checks that the following dimension at the given index is receiving a mouse
     * over event.
     * @param index The index of the dimension to check.
