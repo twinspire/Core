@@ -1,6 +1,7 @@
 package twinspire.render;
 
 import twinspire.Application;
+import twinspire.events.GameEvent;
 import twinspire.events.Buttons;
 import twinspire.GlobalEvents;
 import twinspire.render.GraphicsContext;
@@ -14,6 +15,7 @@ import twinspire.geom.Dim;
 class UpdateContext {
 
     private var _gctx:GraphicsContext;
+    private var _events:Array<GameEvent>;
 
     // UI stuff
     private var _tempUI:Array<Int>;
@@ -29,6 +31,7 @@ class UpdateContext {
 
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
+        _events = [];
 
         _mouseFocusIndexUI = -1;
     }
@@ -59,8 +62,9 @@ class UpdateContext {
 
         var mouseScrollDelta = 0;
 
-        for (i in _tempUI.length...0) {
-            var index = _tempUI[i];
+        var i = _tempUI.length - 1;
+        while (i > -1) {
+            var index = _tempUI[i--];
             var dim:Dim = _gctx.dimensions[index];
             var query:RenderQuery = _gctx.queries[index];
 
@@ -183,6 +187,29 @@ class UpdateContext {
     public function end() {
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
+    }
+
+    /**
+    * Submit an event of a given type.
+    **/
+    public function submitGameEvent(id:Id, ?data:Array<Dynamic> = null) {
+        var gevent = new GameEvent();
+        gevent.id = id;
+        gevent.data = data;
+        _events.push(gevent);
+    }
+
+    /**
+    * Determines if an exit event was submitted.
+    **/
+    public function isExitEvent():Bool {
+        for (e in _events) {
+            if (e.id == GameEvent.ExitApp) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 }

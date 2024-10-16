@@ -152,6 +152,18 @@ class Application
 	}
 
 	/**
+	* Exits the application.
+	**/
+	public function exit() {
+		if (_isRunning) {
+			_isRunning = false;
+		}
+
+		System.removeFramesListener(app_render);
+		System.stop();
+	}
+
+	/**
 	* Check if the application is still running.
 	**/
 	public function running() {
