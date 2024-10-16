@@ -10,6 +10,9 @@ import twinspire.render.QueryType;
 import twinspire.render.MouseScrollValue;
 import twinspire.render.ActivityType;
 import twinspire.geom.Dim;
+import twinspire.Dimensions.*;
+import twinspire.Dimensions.VerticalAlign;
+import twinspire.Dimensions.HorizontalAlign;
 
 @:allow(Application)
 class UpdateContext {
@@ -24,6 +27,7 @@ class UpdateContext {
     private var _mouseIsScrolling:Int;
     private var _mouseScrollValue:Int;
     private var _mouseIsReleased:Int;
+
     private var _deltaTime:Float;
 
     public var deltaTime(get, default):Float;
@@ -32,6 +36,7 @@ class UpdateContext {
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
         _events = [];
+        _menus = [];
 
         _mouseFocusIndexUI = -1;
     }
@@ -179,6 +184,40 @@ class UpdateContext {
         }
 
         return result;
+    }
+
+    /**
+    * 
+    **/
+    public function navigateMenu(menuId:Id, upOrDown:Int = 0) {
+        @:privateAccess(GraphicsContext) {
+            var menuFound = -1;
+            for (i in 0..._gctx._menus.length) {
+                if (m.menuId == menuId) {
+                    menuFound = i;
+                    break;
+                }
+            }
+
+            if (menuFound == -1) {
+                return;
+            }
+
+            _gctx._activeMenu = menuFound;
+            var menu = _gctx._menus[_gctx._currentMenu];
+            if (menu.cursorIndex + upOrDown > menu.indices.length - 1) {
+                menu.cursorIndex = 0;
+            }
+            
+            if (menu.cursorIndex + upOrDown < 0) {
+                menu.cursorIndex = menu.indices.length - 1;
+            }
+
+            if (_gctx.menuCursorRenderId != null) {
+                var menuItemDim = _gctx.dimensions[menu.indices[menu.cursorIndex]];
+                submitGameEvent(GameEvent.SetDimPosition, [ dimAlign(menuItemDim, _gctx.dimensions[menu.cursorIndex], VALIGN_CENTRE, HALIGN_LEFT) ]);
+            }
+        }
     }
 
     /**

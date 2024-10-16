@@ -12,5 +12,7 @@ class GameEvent {
     }
 
     public static var ExitApp:Id = new Id();
+    public static var MoveDim:Id = new Id();
+    public static var SetDimPosition:Id = new Id();
 
 }

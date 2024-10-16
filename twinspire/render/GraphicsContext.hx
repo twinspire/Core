@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import twinspire.render.UpdateContext;
 import twinspire.Application;
 import kha.graphics2.Graphics;
 import twinspire.render.QueryType;
@@ -7,10 +8,14 @@ import twinspire.render.RenderQuery;
 import twinspire.geom.Dim;
 
 @:allow(Application)
+@:allow(UpdateContext)
 class GraphicsContext {
 
     private var _dimTemp:Array<Dim>;
     private var _ended:Bool;
+    private var _menus:Array<Menu>;
+    private var _currentMenu:Int;
+    private var _activeMenu:Int;
 
     /**
     * A collection of dimensions within this context. Do not write directly.
@@ -28,6 +33,11 @@ class GraphicsContext {
     * Defines how the `end()` call works with permanent storage. See `end()` for more info.
     **/
     public var noVirtualSceneChange:Bool;
+    /**
+    * Supply an Id for defining what should be rendered when a menu is activated and a cursor
+    * should indicate the position in the menu. If `null`, nothing will be rendered.
+    **/
+    public var menuCursorRenderId:Null<Id>;
 
     private var _g2:Graphics;
     public var g2(get, default):Graphics;
@@ -39,6 +49,7 @@ class GraphicsContext {
         queries = [];
         activities = [];
         _ended = false;
+        _currentMenu = -1;
     }
 
     /**
@@ -94,6 +105,10 @@ class GraphicsContext {
 
         activities.push(null);
 
+        if (_currentMenu > -1) {
+            _menus[_currentMenu].indices.push(index);
+        }
+
         return index;
     }
 
@@ -127,6 +142,37 @@ class GraphicsContext {
 
     public function begin() {
         _ended = false;
+    }
+
+    
+    /**
+    * Begin a menu starting from the last dimension added to temporary storage.
+    * The menu automatically receives focus unless specified otherwise.
+    *
+    * @param id The unique id identifying this menu.
+    * @param autoFocus If `false`, does not automatically focus.
+    **/
+    public function beginMenu(id:Id, autoFocus:Bool = true) {
+        var menu = new Menu();
+        menu.menuId = id;
+        menu.indices.push(_tempUI.length - 1);
+        _menus.push(menu);
+        _currentMenu = _menus.length - 1;
+
+        if (autoFocus) {
+            _activeMenu = _currentMenu;
+        }
+    }
+
+    /**
+    * Stop adding dimensions to the current menu.
+    **/
+    public function endMenu() {
+        _currentMenu = -1;
+        if (menuCursorRenderId != null) {
+            var index = addStatic(new Dim(0, 0, 0, 0), menuCursorRenderId);
+            _menus[_currentMenu].dimIndex = index;
+        }
     }
 
     /**
