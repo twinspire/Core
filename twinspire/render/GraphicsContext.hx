@@ -155,7 +155,7 @@ class GraphicsContext {
     public function beginMenu(id:Id, autoFocus:Bool = true) {
         var menu = new Menu();
         menu.menuId = id;
-        menu.indices.push(_tempUI.length - 1);
+        menu.indices.push(_dimTemp.length - 1);
         _menus.push(menu);
         _currentMenu = _menus.length - 1;
 

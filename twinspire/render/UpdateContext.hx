@@ -10,9 +10,11 @@ import twinspire.render.QueryType;
 import twinspire.render.MouseScrollValue;
 import twinspire.render.ActivityType;
 import twinspire.geom.Dim;
-import twinspire.Dimensions.*;
 import twinspire.Dimensions.VerticalAlign;
 import twinspire.Dimensions.HorizontalAlign;
+import twinspire.Dimensions.*;
+
+import kha.input.KeyCode;
 
 @:allow(Application)
 class UpdateContext {
@@ -29,6 +31,7 @@ class UpdateContext {
     private var _mouseIsReleased:Int;
     private var _keysUp:Array<Int>;
     private var _keysDown:Array<Int>;
+    private var _charString:String;
     private var _activatedIndex:Int;
 
     private var _deltaTime:Float;
@@ -39,10 +42,10 @@ class UpdateContext {
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
         _events = [];
-        _menus = [];
 
         _mouseFocusIndexUI = -1;
         _activatedIndex = -1;
+        _charString = "";
     }
 
     /**
@@ -67,8 +70,8 @@ class UpdateContext {
         _mouseIsDown = -1;
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
-        var isMouseOver = -1;
 
+        var isMouseOver = -1;
         var mouseScrollDelta = 0;
 
         var i = _tempUI.length - 1;
@@ -106,11 +109,49 @@ class UpdateContext {
             _activatedIndex = -1;
         }
 
+        var isFocusTextBased = false;
+        if (_activatedIndex > -1) {
+            isFocusTextBased = _gctx.queries[_activatedIndex].acceptsTextInput;
+        }
+
         _keysUp = GlobalEvents.isAnyKeyUp();
         _keysDown = GlobalEvents.isAnyKeyDown();
+        var keyMods = GlobalEvents.getCurrentKeyModifiers();
 
-        if (_mouseFocusIndexUI > -1 && _activatedIndex == _mouseFocusIndexUI) {
+        if (_keysUp.length > 0) {
+            var first = cast (_keysUp.shift(), KeyCode);
+            if (first == KeyCode.Tab) {
+                var increment = 1;
+                if (keyMods.filter((c) -> c == KeyCode.Shift).length == 1 && keyMods.length == 1) {
+                    increment = -1;
+                }
 
+                var index = _activatedIndex;
+                while (true) {
+                    index += increment;
+                    var query = _gctx.queries[index];
+                    if (query.type == QUERY_UI && (query.acceptsTextInput || query.acceptsKeyInput)) {
+                        break;
+                    }
+
+                    if (index == _activatedIndex) {
+                        break; // prevent infinite looping
+                    }
+                }
+
+                _activatedIndex = index;
+            }
+        }
+
+        if (_activatedIndex > -1) {
+            if (isFocusTextBased) {
+                for (c in GlobalEvents.getKeyCharCode()) {
+                    _charString += String.fromCharCode(c);
+                }
+
+                _keysDown = [];
+                _keysUp = [];
+            }
         }
     }
 
@@ -252,10 +293,26 @@ class UpdateContext {
     }
 
     /**
-    * 
+    * Checks that the following dimension at the given index is receiving a key enter
+    * event.
+    *
+    * @param index The index of the dimension to check.
+    * @return Returns a boolean value to determine the key enter event. Get the key string data from `activities` in `GraphicsContext`.
     **/
     public function isKeyEnter(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
 
+        var result = _charString.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_KEY_ENTER;
+            activity.data.push(_charString);
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
     }
 
     /**
@@ -269,6 +326,7 @@ class UpdateContext {
         @:privateAccess(GraphicsContext) {
             var menuFound = -1;
             for (i in 0..._gctx._menus.length) {
+                var m = _gctx._menus[i];
                 if (m.menuId == menuId) {
                     menuFound = i;
                     break;
@@ -291,7 +349,9 @@ class UpdateContext {
 
             if (_gctx.menuCursorRenderId != null) {
                 var menuItemDim = _gctx.dimensions[menu.indices[menu.cursorIndex]];
-                submitGameEvent(GameEvent.SetDimPosition, [ dimAlign(menuItemDim, _gctx.dimensions[menu.cursorIndex], VALIGN_CENTRE, HALIGN_LEFT) ]);
+                var temp = _gctx.dimensions[menu.cursorIndex].clone();
+                dimAlign(menuItemDim, temp, VALIGN_CENTRE, HALIGN_LEFT);
+                submitGameEvent(GameEvent.SetDimPosition, [ temp ]);
             }
         }
     }

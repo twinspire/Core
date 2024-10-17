@@ -178,6 +178,21 @@ class GlobalEvents
 	}
 
 	/**
+	* If any key modifiers are currently being pressed, return them.
+	**/
+	function getCurrentKeyModifiers():Array<KeyCode> {
+		var result = [];
+		var down = isAnyKeyDown();
+		for (i in 0...down.length) {
+			var code = cast (down[i], KeyCode);
+			if (code == KeyCode.Control || code == KeyCode.Shift || code == KeyCode.Alt || code == KeyCode.AltGr) {
+				result.push(code);
+			}
+		}
+		return result;
+	}
+
+	/**
 	 * Gets the recently pressed character(s) as ASCII character(s).
 	 * If the code value of the character being passed is not an ASCII character (0-255),
 	 * the value is ignored.
