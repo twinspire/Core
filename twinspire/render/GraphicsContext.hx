@@ -53,6 +53,17 @@ class GraphicsContext {
     }
 
     /**
+    * Returns the dimension in temporary storage in the current frame at the index
+    * it would be at once added into permanent storage.
+    *
+    * @param index The position of the dimension when it is added into permanent storage.
+    **/
+    public function getTemporaryDimAtNewIndex(index:Int) {
+        var resolvedIndex = index - (dimensions.length - 1);
+        return _dimTemp[resolvedIndex];
+    }
+
+    /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
     *
