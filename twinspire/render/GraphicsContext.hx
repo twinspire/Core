@@ -69,6 +69,8 @@ class GraphicsContext {
     *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
+    *
+    * @return An index value of the position of this dimension as it would be in permanent storage.
     **/
     public function addStatic(dim:Dim, renderType:Id):Int {
         if (_ended) {
@@ -97,6 +99,8 @@ class GraphicsContext {
     *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
+    *
+    * @return An index value of the position of this dimension as it would be in permanent storage.
     **/
     public function addUI(dim:Dim, renderType:Id) {
         if (_ended) {
@@ -129,6 +133,8 @@ class GraphicsContext {
     *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
+    *
+    * @return An index value of the position of this dimension as it would be in permanent storage.
     **/
     public function addSprite(dim:Dim, renderType:Id) {
         if (_ended) {
