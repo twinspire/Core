@@ -27,6 +27,9 @@ class UpdateContext {
     private var _mouseIsScrolling:Int;
     private var _mouseScrollValue:Int;
     private var _mouseIsReleased:Int;
+    private var _keysUp:Array<Int>;
+    private var _keysDown:Array<Int>;
+    private var _activatedIndex:Int;
 
     private var _deltaTime:Float;
 
@@ -39,6 +42,7 @@ class UpdateContext {
         _menus = [];
 
         _mouseFocusIndexUI = -1;
+        _activatedIndex = -1;
     }
 
     /**
@@ -54,7 +58,7 @@ class UpdateContext {
         for (i in 0..._gctx.dimensions.length) {
             var query = _gctx.queries[i];
             if (GlobalEvents.isMouseOverDim(_gctx.dimensions[i]) && _gctx.dimensions[i].order > currentOrder
-                && query.type == QUERY_UI) {
+                && query.type != QUERY_STATIC) {
                 _tempUI.push(i);
                 currentOrder = _gctx.dimensions[i].order;
             }
@@ -72,11 +76,15 @@ class UpdateContext {
             var index = _tempUI[i--];
             var dim:Dim = _gctx.dimensions[index];
             var query:RenderQuery = _gctx.queries[index];
+            // we only allow UI to receive mouse events.
+            if (query.type == QUERY_SPRITE)
+                continue;
 
             isMouseOver = index;
 
             if (GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
                 _mouseIsReleased = index;
+                _activatedIndex = index;
                 break;
             }
 
@@ -93,6 +101,17 @@ class UpdateContext {
         }
 
         _mouseFocusIndexUI = isMouseOver;
+
+        if (_mouseFocusIndexUI == -1 && GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
+            _activatedIndex = -1;
+        }
+
+        _keysUp = GlobalEvents.isAnyKeyUp();
+        _keysDown = GlobalEvents.isAnyKeyDown();
+
+        if (_mouseFocusIndexUI > -1 && _activatedIndex == _mouseFocusIndexUI) {
+
+        }
     }
 
     /**
@@ -168,7 +187,7 @@ class UpdateContext {
     * scroll event.
     *
     * @param index The index of the dimension to check.
-    * @return Returns the value of the scroll. `0` or `MOUSE_SCROLL_NONE` is returned if no scroll event is passed.
+    * @return Returns a boolean value to determine its scroll state. Get the scroll state data from `activities` in `GraphicsContext`.
     **/
     public function isMouseScrolling(index:Int) {
         if (index < 0 || index > _gctx.dimensions.length - 1) {
@@ -187,7 +206,64 @@ class UpdateContext {
     }
 
     /**
+    * Checks that the following dimension at the given index is receiving a key up
+    * event.
+    *
+    * @param index The index of the dimension to check.
+    * @return Returns a boolean value to determine the key up event. Get the key code data from `activities` in `GraphicsContext`.
+    **/
+    public function isKeyUp(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _keysUp.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_KEY_UP;
+            activity.data.push(_keysUp);
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
+    }
+
+    /**
+    * Checks that the following dimension at the given index is receiving a key down
+    * event.
+    *
+    * @param index The index of the dimension to check.
+    * @return Returns a boolean value to determine the key down event. Get the key code data from `activities` in `GraphicsContext`.
+    **/
+    public function isKeyDown(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _keysDown.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_KEY_DOWN;
+            activity.data.push(_keysDown);
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
+    }
+
+    /**
     * 
+    **/
+    public function isKeyEnter(index:Int) {
+
+    }
+
+    /**
+    * Attempt to navigate a menu with the given id. Set `upOrDown` or `1` for up, or `-1` for down.
+    * This function does not cater for values greater than 1.
+    *
+    * @param menuId The unique ID of the menu to affect.
+    * @param upOrDown A value determining where the new cursor should appear.
     **/
     public function navigateMenu(menuId:Id, upOrDown:Int = 0) {
         @:privateAccess(GraphicsContext) {
@@ -226,6 +302,8 @@ class UpdateContext {
     public function end() {
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
+        _keysDown = [];
+        _keysUp = [];
     }
 
     /**
