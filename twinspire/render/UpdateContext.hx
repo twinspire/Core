@@ -24,6 +24,8 @@ class UpdateContext {
 
     // UI stuff
     private var _tempUI:Array<Int>;
+    private var _retainedMouseDown:Array<Int>;
+
     private var _mouseFocusIndexUI:Int;
     private var _mouseIsDown:Int;
     private var _mouseIsScrolling:Int;
@@ -42,6 +44,7 @@ class UpdateContext {
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
         _events = [];
+        _retainedMouseDown = [];
 
         _mouseFocusIndexUI = -1;
         _activatedIndex = -1;
@@ -156,6 +159,14 @@ class UpdateContext {
     }
 
     /**
+    * Gets the activated index, normally from a user clicking a UI dimension or
+    * pressing the tab key between UI elements.
+    **/
+    public function getActivatedIndex() {
+        return _activatedIndex;
+    }
+
+    /**
     * Get the currently focused index.
     **/
     public function getFocusedIndex() {
@@ -184,7 +195,9 @@ class UpdateContext {
 
     /**
     * Checks that the following dimension at the given index is receiving a mouse
-    * down event.
+    * down event. If a mouse down effect is forcibly preserved with the `retainMouseDownEffect`
+    * function, this function will always return `true`.
+    *
     * @param index The index of the dimension to check.
     **/
     public function isMouseDown(index:Int) {
@@ -193,6 +206,10 @@ class UpdateContext {
         }
 
         var result = _mouseIsDown == index && _gctx.queries[index].type != QUERY_STATIC;
+        if (_retainedMouseDown.indexOf(index) > -1) {
+            result = true;
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_DOWN;
@@ -313,6 +330,26 @@ class UpdateContext {
         }
 
         return result;
+    }
+
+    /**
+    * Retains a mouse-down effect for the given index, allowing for preserving a visual state
+    * between frames.
+    **/
+    public function retainMouseDownEffect(index:Int) {
+        if (_retainedMouseDown.filter((i) -> i == index).length == 0) {
+            _retainedMouseDown.push(index);
+        }
+    }
+
+    /**
+    * Clears a previously permanent mouse-down effect for the given index, if it exists.
+    **/
+    public function clearMouseDownEffect(index:Int) {
+        var indexInArray = _retainedMouseDown.indexOf(index);
+        if (indexInArray > -1) {
+            _retainedMouseDown.splice(indexInArray, 1);
+        }
     }
 
     /**
