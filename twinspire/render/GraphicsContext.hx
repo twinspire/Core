@@ -12,6 +12,7 @@ import twinspire.geom.Dim;
 class GraphicsContext {
 
     private var _dimTemp:Array<Dim>;
+    private var _dimTempLinkTo:Array<Int>;
     private var _ended:Bool;
     private var _menus:Array<Menu>;
     private var _currentMenu:Int;
@@ -21,6 +22,10 @@ class GraphicsContext {
     * A collection of dimensions within this context. Do not write directly.
     **/
     public var dimensions:Array<Dim>;
+    /**
+    * A collection of dimension links within this context. Do not write directly.
+    **/
+    public var dimensionLinks:Array<Int>;
     /**
     * A collection of render queries. Do not write directly.
     **/
@@ -45,6 +50,7 @@ class GraphicsContext {
 
     public function new() {
         _dimTemp = [];
+        _dimTempLinkTo = [];
         dimensions = [];
         queries = [];
         activities = [];
@@ -69,10 +75,11 @@ class GraphicsContext {
     *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
+    * @param linkTo An optional index specifying that this dimension should be linked to another index.
     *
     * @return An index value of the position of this dimension as it would be in permanent storage.
     **/
-    public function addStatic(dim:Dim, renderType:Id):Int {
+    public function addStatic(dim:Dim, renderType:Id, ?linkTo:Int = -1):Int {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -81,6 +88,10 @@ class GraphicsContext {
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
+        }
+
+        if (linkTo > -1) {
+            _dimTempLinkTo.push(linkTo);
         }
 
         var query = new RenderQuery();
@@ -99,10 +110,11 @@ class GraphicsContext {
     *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
+    * @param linkTo An optional index specifying that this dimension should be linked to another index.
     *
     * @return An index value of the position of this dimension as it would be in permanent storage.
     **/
-    public function addUI(dim:Dim, renderType:Id) {
+    public function addUI(dim:Dim, renderType:Id, ?linkTo:Int = -1) {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -111,6 +123,10 @@ class GraphicsContext {
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
+        }
+
+        if (linkTo > -1) {
+            _dimTempLinkTo.push(linkTo);
         }
 
         var query = new RenderQuery();
@@ -133,10 +149,11 @@ class GraphicsContext {
     *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
+    * @param linkTo An optional index specifying that this dimension should be linked to another index.
     *
     * @return An index value of the position of this dimension as it would be in permanent storage.
     **/
-    public function addSprite(dim:Dim, renderType:Id) {
+    public function addSprite(dim:Dim, renderType:Id, ?linkTo:Int = -1) {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -145,6 +162,10 @@ class GraphicsContext {
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
+        }
+
+        if (linkTo > -1) {
+            _dimTempLinkTo.push(linkTo);
         }
 
         var query = new RenderQuery();
@@ -211,7 +232,13 @@ class GraphicsContext {
                 dimensions.push(_dimTemp[i]);
             }
         }
+
+        for (link in _dimTempLinkTo) {
+            dimensionLinks.push(link);
+        }
+
         _dimTemp = [];
+        _dimTempLinkTo = [];
 
         for (i in 0...activities.length) {
             activities[i] = null;

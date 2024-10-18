@@ -184,6 +184,21 @@ class UpdateContext {
         }
 
         var result = _mouseFocusIndexUI == index && _gctx.queries[index].type != QUERY_STATIC;
+        if (!result) {
+            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
+            if (linked.length > 0) {
+                var anyInteracted = false;
+                for (l in linked) {
+                    if (l == index) {
+                        anyInteracted = true;
+                        break;
+                    }
+                }
+
+                result = anyInteracted;
+            }
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_OVER;
@@ -210,6 +225,21 @@ class UpdateContext {
             result = true;
         }
 
+        if (!result) {
+            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
+            if (linked.length > 0) {
+                var anyInteracted = false;
+                for (l in linked) {
+                    if (l == index) {
+                        anyInteracted = true;
+                        break;
+                    }
+                }
+
+                result = anyInteracted;
+            }
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_DOWN;
@@ -231,6 +261,21 @@ class UpdateContext {
         }
 
         var result = _mouseIsReleased == index && _gctx.queries[index].type != QUERY_STATIC;
+        if (!result) {
+            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
+            if (linked.length > 0) {
+                var anyInteracted = false;
+                for (l in linked) {
+                    if (l == index) {
+                        anyInteracted = true;
+                        break;
+                    }
+                }
+
+                result = anyInteracted;
+            }
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_CLICKED;
@@ -253,6 +298,21 @@ class UpdateContext {
         }
 
         var result = _mouseIsScrolling == index && _gctx.queries[index].type != QUERY_STATIC;
+        if (!result) {
+            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
+            if (linked.length > 0) {
+                var anyInteracted = false;
+                for (l in linked) {
+                    if (l == index) {
+                        anyInteracted = true;
+                        break;
+                    }
+                }
+
+                result = anyInteracted;
+            }
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_SCROLL;
@@ -276,6 +336,22 @@ class UpdateContext {
         }
 
         var result = _keysUp.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+
+        if (!result) {
+            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
+            if (linked.length > 0) {
+                var anyInteracted = false;
+                for (l in linked) {
+                    if (l == index) {
+                        anyInteracted = true;
+                        break;
+                    }
+                }
+
+                result = anyInteracted;
+            }
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_UP;
@@ -299,6 +375,22 @@ class UpdateContext {
         }
 
         var result = _keysDown.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+
+        if (!result) {
+            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
+            if (linked.length > 0) {
+                var anyInteracted = false;
+                for (l in linked) {
+                    if (l == index) {
+                        anyInteracted = true;
+                        break;
+                    }
+                }
+
+                result = anyInteracted;
+            }
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_DOWN;
@@ -322,6 +414,22 @@ class UpdateContext {
         }
 
         var result = _charString.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+
+        if (!result) {
+            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
+            if (linked.length > 0) {
+                var anyInteracted = false;
+                for (l in linked) {
+                    if (l == index) {
+                        anyInteracted = true;
+                        break;
+                    }
+                }
+
+                result = anyInteracted;
+            }
+        }
+
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_ENTER;
@@ -331,6 +439,8 @@ class UpdateContext {
 
         return result;
     }
+
+
 
     /**
     * Retains a mouse-down effect for the given index, allowing for preserving a visual state
