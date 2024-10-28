@@ -52,6 +52,7 @@ class GraphicsContext {
         _dimTemp = [];
         _dimTempLinkTo = [];
         dimensions = [];
+        dimensionLinks = [];
         queries = [];
         activities = [];
         _ended = false;

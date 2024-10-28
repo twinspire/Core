@@ -8,6 +8,7 @@ class Dim
     public var order:Int;
 	public var width:Float;
 	public var height:Float;
+	public var visible:Bool;
 
 	public inline function new(x:Float, y:Float, width:Float, height:Float, order:Int = 0)
 	{
@@ -16,6 +17,7 @@ class Dim
 		this.width = width;
 		this.height = height;
         this.order = order;
+		this.visible = true;
 	}
 
 	public function getX()

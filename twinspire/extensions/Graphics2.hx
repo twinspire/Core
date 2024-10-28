@@ -223,64 +223,80 @@ class Graphics2
 		g2.drawVideo(video, destination.x, destination.y, destination.width, destination.height);
 	}
 
-	// Complete this function
-	// Probably should be refactored
-	public static function fillTriangle(g2:Graphics, destination:Dim, direction:Int)
+	public static function fillTriangleDim(g2:Graphics, destination:Dim, direction:Int)
 	{
-		var anchorX = 0.0;
-		var anchorY = 0.0;
-		if ((direction & TRIANGLE_UP) != 0)
-		{
-			if ((direction & TRIANGLE_LEFT) != 0)
-			{
-				anchorX = destination.x;
-				anchorY = destination.y;
+		var x1 = 0.0, x2 = 0.0, x3 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
+
+		if ((direction & TRIANGLE_UP) != 0) {
+			if ((direction & TRIANGLE_LEFT) != 0) {
+				x1 = destination.x;
+				y1 = destination.y;
+				x2 = destination.x + (destination.width * .75);
+				y2 = destination.y;
+				x3 = destination.x;
+				y3 = destination.y + (destination.height * .75);
 			}
-			else if ((direction & TRIANGLE_RIGHT) != 0)
-			{
-				anchorX = destination.x + destination.width;
-				anchorY = destination.y;
+			else if ((direction & TRIANGLE_RIGHT) != 0) {
+				x1 = destination.x + (destination.width * .25);
+				y1 = destination.y;
+				x2 = destination.x + destination.width;
+				y2 = destination.y + (destination.height * .75);
+				x3 = destination.x + destination.width;
+				y3 = destination.y;
 			}
-			else
-			{
-				anchorX = destination.x + (destination.width / 2);
-				anchorY = destination.y;
-			}
-		}
-		else if ((direction & TRIANGLE_DOWN) != 0)
-		{
-			if ((direction & TRIANGLE_LEFT) != 0)
-			{
-				anchorX = destination.x;
-				anchorY = destination.y + destination.height;
-			}
-			else if ((direction & TRIANGLE_RIGHT) != 0)
-			{
-				anchorX = destination.x + destination.width;
-				anchorY = destination.y + destination.height;
-			}
-			else
-			{
-				anchorX = destination.x + (destination.width / 2);
-				anchorY = destination.y + destination.height;
+			else {
+				x1 = destination.x + (destination.width * .5);
+				y1 = destination.y;
+				x2 = destination.x;
+				y2 = destination.y + (destination.height * .75);
+				x3 = destination.x + destination.width;
+				y3 = destination.y + (destination.height * .75);
 			}
 		}
-		else if ((direction & TRIANGLE_LEFT) != 0)
-		{
-			anchorX = destination.x;
-			anchorY = destination.y + (destination.height / 2);
+		else if ((direction & TRIANGLE_DOWN) != 0) {
+			if ((direction & TRIANGLE_LEFT) != 0) {
+				x1 = destination.x;
+				y1 = destination.y + (destination.height * .25);
+				x2 = destination.x;
+				y2 = destination.y + destination.height;
+				x3 = destination.x + (destination.width * .75);
+				x3 = destination.y + destination.height;
+			}
+			else if ((direction & TRIANGLE_RIGHT) != 0) {
+				x1 = destination.x + destination.width;
+				y1 = destination.y + (destination.height * .25);
+				x2 = destination.x + (destination.width * .25);
+				y2 = destination.y + destination.height;
+				x3 = destination.x + destination.width;
+				y3 = destination.y + destination.height;
+			}
+			else {
+				x1 = destination.x;
+				y1 = destination.y + (destination.height * .25);
+				x2 = destination.x + (destination.width * .5);
+				y2 = destination.y + destination.height;
+				x3 = destination.x + destination.width;
+				y3 = destination.y + (destination.height * .25);
+			}
 		}
-		else if ((direction & TRIANGLE_RIGHT) != 0)
-		{
-			anchorX = destination.x + destination.width;
-			anchorY = destination.y + (destination.height / 2);
+		else if ((direction & TRIANGLE_LEFT) != 0) {
+			x1 = destination.x;
+			y1 = destination.y + (destination.height * .5);
+			x2 = destination.x + (destination.width * .75);
+			y2 = destination.y + destination.height;
+			x3 = destination.x + (destination.width * .75);
+			y3 = destination.y;
+		}
+		else if ((direction & TRIANGLE_RIGHT) != 0) {
+			x1 = destination.x + (destination.width * .25);
+			y1 = destination.y;
+			x2 = destination.x + (destination.width * .25);
+			y2 = destination.y + destination.height;
+			x3 = destination.x + destination.width;
+			y3 = destination.y + (destination.height * .5);
 		}
 
-		var x2 = 0.0;
-		var y2 = 0.0;
-		var x3 = 0.0;
-		var y3 = 0.0;
-
+		g2.fillTriangle(x1, y1, x2, y2, x3, y3);
 	}
 
 	public static function scissorDim(g2:Graphics, dim:Dim)
