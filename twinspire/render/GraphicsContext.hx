@@ -86,13 +86,10 @@ class GraphicsContext {
         }
         
         _dimTemp.push(dim);
+        _dimTempLinkTo.push(linkTo);
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
-        }
-
-        if (linkTo > -1) {
-            _dimTempLinkTo.push(linkTo);
         }
 
         var query = new RenderQuery();
@@ -121,13 +118,10 @@ class GraphicsContext {
         }
 
         _dimTemp.push(dim);
+        _dimTempLinkTo.push(linkTo);
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
-        }
-
-        if (linkTo > -1) {
-            _dimTempLinkTo.push(linkTo);
         }
 
         var query = new RenderQuery();
@@ -160,13 +154,11 @@ class GraphicsContext {
         }
 
         _dimTemp.push(dim);
+        _dimTempLinkTo.push(linkTo);
+
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
-        }
-
-        if (linkTo > -1) {
-            _dimTempLinkTo.push(linkTo);
         }
 
         var query = new RenderQuery();
@@ -226,16 +218,14 @@ class GraphicsContext {
         if (!noVirtualSceneChange) {
             if (_dimTemp.length > 0) {
                 dimensions = _dimTemp.copy();
+                dimensionLinks = _dimTempLinkTo.copy();
             }
         }
         else {
             for (i in 0..._dimTemp.length) {
                 dimensions.push(_dimTemp[i]);
+                dimensionLinks.push(_dimTempLinkTo[i]);
             }
-        }
-
-        for (link in _dimTempLinkTo) {
-            dimensionLinks.push(link);
         }
 
         _dimTemp = [];

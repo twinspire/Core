@@ -184,22 +184,16 @@ class UpdateContext {
         }
 
         var result = _mouseFocusIndexUI == index && _gctx.queries[index].type != QUERY_STATIC;
-        if (!result) {
-            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
-            if (linked.length > 0) {
-                var anyInteracted = false;
-                for (l in linked) {
-                    if (l == index) {
-                        anyInteracted = true;
-                        break;
-                    }
-                }
-
-                result = anyInteracted;
-            }
-        }
-
         if (result) {
+            var parentIndex = _gctx.dimensionLinks[index];
+            if (parentIndex > -1) {
+                if (_mouseFocusIndexUI == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_OVER;
+                    _gctx.activities[parentIndex] = activity;
+                }
+            }
+
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_OVER;
             _gctx.activities[index] = activity;
@@ -225,22 +219,16 @@ class UpdateContext {
             result = true;
         }
 
-        if (!result) {
-            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
-            if (linked.length > 0) {
-                var anyInteracted = false;
-                for (l in linked) {
-                    if (l == index) {
-                        anyInteracted = true;
-                        break;
-                    }
-                }
-
-                result = anyInteracted;
-            }
-        }
-
         if (result) {
+            var parentIndex = _gctx.dimensionLinks[index];
+            if (parentIndex > -1) {
+                if (_mouseIsDown == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_DOWN;
+                    _gctx.activities[parentIndex] = activity;
+                }
+            }
+
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_DOWN;
             _gctx.activities[index] = activity;
@@ -261,22 +249,16 @@ class UpdateContext {
         }
 
         var result = _mouseIsReleased == index && _gctx.queries[index].type != QUERY_STATIC;
-        if (!result) {
-            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
-            if (linked.length > 0) {
-                var anyInteracted = false;
-                for (l in linked) {
-                    if (l == index) {
-                        anyInteracted = true;
-                        break;
-                    }
-                }
-
-                result = anyInteracted;
-            }
-        }
-
         if (result) {
+            var parentIndex = _gctx.dimensionLinks[index];
+            if (parentIndex > -1) {
+                if (_mouseIsReleased == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_CLICKED;
+                    _gctx.activities[parentIndex] = activity;
+                }
+            }
+
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_CLICKED;
             _gctx.activities[index] = activity;
@@ -298,22 +280,17 @@ class UpdateContext {
         }
 
         var result = _mouseIsScrolling == index && _gctx.queries[index].type != QUERY_STATIC;
-        if (!result) {
-            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
-            if (linked.length > 0) {
-                var anyInteracted = false;
-                for (l in linked) {
-                    if (l == index) {
-                        anyInteracted = true;
-                        break;
-                    }
-                }
-
-                result = anyInteracted;
-            }
-        }
-
         if (result) {
+            var parentIndex = _gctx.dimensionLinks[index];
+            if (parentIndex > -1) {
+                if (_mouseIsScrolling == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_SCROLL;
+                    activity.data.push(_mouseScrollValue);
+                    _gctx.activities[parentIndex] = activity;
+                }
+            }
+
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_SCROLL;
             activity.data.push(_mouseScrollValue);
@@ -337,22 +314,17 @@ class UpdateContext {
 
         var result = _keysUp.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
 
-        if (!result) {
-            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
-            if (linked.length > 0) {
-                var anyInteracted = false;
-                for (l in linked) {
-                    if (l == index) {
-                        anyInteracted = true;
-                        break;
-                    }
-                }
-
-                result = anyInteracted;
-            }
-        }
-
         if (result) {
+            var parentIndex = _gctx.dimensionLinks[index];
+            if (parentIndex > -1) {
+                if (_gctx.queries[parentIndex].type != QUERY_STATIC) {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_KEY_UP;
+                    activity.data.push(_keysUp);
+                    _gctx.activities[parentIndex] = activity;
+                }
+            }
+
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_UP;
             activity.data.push(_keysUp);
@@ -376,22 +348,17 @@ class UpdateContext {
 
         var result = _keysDown.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
 
-        if (!result) {
-            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
-            if (linked.length > 0) {
-                var anyInteracted = false;
-                for (l in linked) {
-                    if (l == index) {
-                        anyInteracted = true;
-                        break;
-                    }
-                }
-
-                result = anyInteracted;
-            }
-        }
-
         if (result) {
+            var parentIndex = _gctx.dimensionLinks[index];
+            if (parentIndex > -1) {
+                if (_gctx.queries[parentIndex].type != QUERY_STATIC) {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_KEY_DOWN;
+                    activity.data.push(_keysDown);
+                    _gctx.activities[parentIndex] = activity;
+                }
+            }
+
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_DOWN;
             activity.data.push(_keysDown);
@@ -415,22 +382,17 @@ class UpdateContext {
 
         var result = _charString.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
 
-        if (!result) {
-            var linked = _gctx.dimensionLinks.filter((i) -> i == index);
-            if (linked.length > 0) {
-                var anyInteracted = false;
-                for (l in linked) {
-                    if (l == index) {
-                        anyInteracted = true;
-                        break;
-                    }
-                }
-
-                result = anyInteracted;
-            }
-        }
-
         if (result) {
+            var parentIndex = _gctx.dimensionLinks[index];
+            if (parentIndex > -1) {
+                if (_gctx.queries[parentIndex].type != QUERY_STATIC) {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_KEY_ENTER;
+                    activity.data.push(_charString);
+                    _gctx.activities[parentIndex] = activity;
+                }
+            }
+
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_ENTER;
             activity.data.push(_charString);
