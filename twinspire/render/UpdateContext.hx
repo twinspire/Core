@@ -1,5 +1,7 @@
 package twinspire.render;
 
+import js.lib.webassembly.Global;
+import kha.math.FastVector2;
 import twinspire.Application;
 import twinspire.events.GameEvent;
 import twinspire.events.Buttons;
@@ -36,6 +38,11 @@ class UpdateContext {
     private var _charString:String;
     private var _activatedIndex:Int;
 
+    private var _mouseDownPosFirst:FastVector2;
+    private var _mouseDragTolerance:Float = 3.0;
+
+    private var _drag:DragObject;
+
     private var _deltaTime:Float;
 
     public var deltaTime(get, default):Float;
@@ -49,6 +56,10 @@ class UpdateContext {
         _mouseFocusIndexUI = -1;
         _activatedIndex = -1;
         _charString = "";
+
+        _drag = new DragObject();
+        _drag.dragIndex = -1;
+        _mouseDownPosFirst = new FastVector2(-1, -1);
     }
 
     /**
@@ -61,9 +72,19 @@ class UpdateContext {
         var mousePos = GlobalEvents.getMousePosition();
         var currentOrder = -1;
 
+        var remainActive = false;
+        if (_mouseDownPosFirst.x > -1 && _mouseDownPosFirst.y > -1) {
+            remainActive = true;
+        }
+
         for (i in 0..._gctx.dimensions.length) {
             var query = _gctx.queries[i];
-            if (GlobalEvents.isMouseOverDim(_gctx.dimensions[i]) && _gctx.dimensions[i].order > currentOrder
+            var active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i]);
+            if (remainActive && _drag.dragIndex == -1) { // ensure nothing is dragging
+                active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i], _mouseDownPosFirst);
+            }
+
+            if (active && _gctx.dimensions[i].order > currentOrder
                 && query.type != QUERY_STATIC) {
                 _tempUI.push(i);
                 currentOrder = _gctx.dimensions[i].order;
@@ -83,14 +104,20 @@ class UpdateContext {
             var dim:Dim = _gctx.dimensions[index];
             var query:RenderQuery = _gctx.queries[index];
             // we only allow UI to receive mouse events.
-            if (query.type == QUERY_SPRITE)
+            if (query.type != QUERY_UI)
                 continue;
 
             isMouseOver = index;
 
             if (GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
-                _mouseIsReleased = index;
-                _activatedIndex = index;
+                // check that the mouse is actually within the active component
+                // when the mouse button is released.
+                if (GlobalEvents.isMouseOverDim(dim)) {
+                    _mouseIsReleased = index;
+                    _activatedIndex = index;
+                }
+                
+                _mouseDownPosFirst = new FastVector2(-1, -1);
                 break;
             }
 
@@ -110,6 +137,45 @@ class UpdateContext {
 
         if (_mouseFocusIndexUI == -1 && GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
             _activatedIndex = -1;
+            _mouseDownPosFirst = new FastVector2(-1, -1);
+            _drag.dragIndex = -1;
+            _drag.firstMousePosition = new FastVector2(-1, -1);
+        }
+
+        if (_mouseFocusIndexUI > -1) {
+            if (_mouseIsDown > -1 && _mouseDownPosFirst.x == -1) {
+                _mouseDownPosFirst = FastVector2.fromVector2(GlobalEvents.getMousePosition());
+            }
+
+            var parentIndex = _gctx.dimensionLinks[_mouseFocusIndexUI];
+            if (parentIndex > -1) {
+                // if the parent is draggable and we mouse down and move,
+                // drag the parent and prevent mouse release on the focused index.
+
+                if (_gctx.queries[parentIndex].allowDragging) {
+                    if (_mouseIsDown > -1) {
+                        var mousePos = GlobalEvents.getMousePosition();
+                        if ((mousePos.x < _mouseDownPosFirst.x - _mouseDragTolerance || mousePos.x > _mouseDownPosFirst.x + _mouseDragTolerance)
+                            && (mousePos.y < _mouseDownPosFirst.y - _mouseDragTolerance || mousePos.y > _mouseDownPosFirst.y + _mouseDragTolerance)) {
+                            _drag.firstMousePosition = new FastVector2(_mouseDownPosFirst.x, _mouseDownPosFirst.y);
+                            _drag.dragIndex = parentIndex;
+
+                            // mouse down query moves to parent once dragging is within the drag tolerance
+                            _mouseIsDown = parentIndex;
+                        }
+                    }
+                }
+            }
+            else {
+                if (_mouseIsDown > -1 && _gctx.queries[_mouseIsDown].allowDragging) {
+                    var mousePos = GlobalEvents.getMousePosition();
+                    if ((mousePos.x < _mouseDownPosFirst.x - _mouseDragTolerance || mousePos.x > _mouseDownPosFirst.x + _mouseDragTolerance)
+                        && (mousePos.y < _mouseDownPosFirst.y - _mouseDragTolerance || mousePos.y > _mouseDownPosFirst.y + _mouseDragTolerance)) {
+                        _drag.firstMousePosition = new FastVector2(_mouseDownPosFirst.x, _mouseDownPosFirst.y);
+                        _drag.dragIndex = _mouseIsDown;
+                    }
+                }
+            }
         }
 
         var isFocusTextBased = false;
@@ -402,7 +468,23 @@ class UpdateContext {
         return result;
     }
 
+    /**
+    * Detects if the dimension at the given index is possibly being dragged by the user.
+    * If the dimension has a parent who also accepts dragging, the parent is dragged before the child.
+    * To disable this behaviour, ensure `allowDragging` in the parent's index is `false`, i.e. `gtx.queries[index].allowDragging = false`.
+    **/
+    public function isDragging(index:Int) {
+        return _drag.dragIndex == index;
+    }
 
+    /**
+    * Gets the offset of the drag between the initial drag point and the current mouse position.
+    **/
+    public function getDragOffset():FastVector2 {
+        var offset = new FastVector2(_drag.firstMousePosition.x - GlobalEvents.getMousePosition().x, 
+            _drag.firstMousePosition.y - GlobalEvents.getMousePosition().y);
+        return offset;
+    }
 
     /**
     * Retains a mouse-down effect for the given index, allowing for preserving a visual state

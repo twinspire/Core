@@ -1,5 +1,6 @@
 package twinspire;
 
+import kha.math.FastVector2;
 import twinspire.geom.Dim;
 import kha.math.Vector3;
 import kha.math.Vector2;
@@ -639,9 +640,16 @@ class GlobalEvents
 	 * @param dim The dim instance to check against.
 	 */
 	@:global
-	function isMouseOverDim(dim:Dim)
+	function isMouseOverDim(dim:Dim, ?diffPos:FastVector2 = null)
 	{
-		var result = (mouseX > dim.x && mouseX < dim.x + dim.width && mouseY > dim.y && mouseY < dim.y + dim.height);
+		var actualX = mouseX;
+		var actualY = mouseY;
+		if (diffPos != null) {
+			actualX = cast diffPos.x;
+			actualY = cast diffPos.y;
+		}
+
+		var result = (actualX > dim.x && actualX < dim.x + dim.width && actualY > dim.y && actualY < dim.y + dim.height);
 		return result;
 	}
 

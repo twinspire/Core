@@ -18,6 +18,10 @@ class RenderQuery {
     * A value defining that the dimension this query relates to accepts key input.
     **/
     public var acceptsKeyInput:Bool;
+    /**
+    * Allows this dimension to be dragged with the mouse.
+    **/
+    public var allowDragging:Bool;
     
     public function new() {
         acceptsKeyInput = false;
