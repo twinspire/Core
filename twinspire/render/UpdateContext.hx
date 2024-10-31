@@ -149,7 +149,7 @@ class UpdateContext {
         for (i in 0..._gctx.dimensions.length) {
             var query = _gctx.queries[i];
             var active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i]);
-            if (remainActive && _drag.dragIndex == -1) { // ensure nothing is dragging
+            if (remainActive) {
                 active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i], _mouseDownPosFirst);
             }
 
@@ -187,32 +187,31 @@ class UpdateContext {
                 }
                 
                 _mouseDownPosFirst = new FastVector2(-1, -1);
-                break;
             }
 
             if (GlobalEvents.isMouseButtonDown(BUTTON_LEFT)) {
                 _mouseIsDown = index;
-                break;
             }
 
             if (GlobalEvents.getMouseDelta() != 0) {
                 mouseScrollDelta = GlobalEvents.getMouseDelta();
                 _mouseIsScrolling = index;
-                break;
             }
+
+            break;
         }
 
         _mouseFocusIndexUI = isMouseOver;
 
-        if (_mouseFocusIndexUI == -1 && GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
+        if (_mouseIsDown == -1 && GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
             _activatedIndex = -1;
             _mouseDownPosFirst = new FastVector2(-1, -1);
             _drag.dragIndex = -1;
             _drag.firstMousePosition = new FastVector2(-1, -1);
         }
 
-        if (_mouseFocusIndexUI > -1) {
-            if (_mouseIsDown > -1 && _mouseDownPosFirst.x == -1) {
+        if (_mouseIsDown > -1) {
+            if (_mouseDownPosFirst.x == -1) {
                 _mouseDownPosFirst = FastVector2.fromVector2(GlobalEvents.getMousePosition());
             }
 
@@ -222,28 +221,27 @@ class UpdateContext {
                 // drag the parent and prevent mouse release on the focused index.
 
                 if (_gctx.queries[parentIndex].allowDragging) {
-                    if (_mouseIsDown > -1) {
-                        var mousePos = GlobalEvents.getMousePosition();
-                        if ((mousePos.x < _mouseDownPosFirst.x - _mouseDragTolerance || mousePos.x > _mouseDownPosFirst.x + _mouseDragTolerance)
-                            && (mousePos.y < _mouseDownPosFirst.y - _mouseDragTolerance || mousePos.y > _mouseDownPosFirst.y + _mouseDragTolerance)) {
-                            _drag.firstMousePosition = new FastVector2(_mouseDownPosFirst.x, _mouseDownPosFirst.y);
-                            _drag.dragIndex = parentIndex;
+                    _drag.dragIndex = parentIndex;
 
-                            // mouse down query moves to parent once dragging is within the drag tolerance
-                            _mouseIsDown = parentIndex;
-                        }
-                    }
+                    // mouse down query moves to parent once dragging is within the drag tolerance
+                    _mouseIsDown = parentIndex;
+                }
+                else if (_gctx.queries[_mouseIsDown].allowDragging) {
+                    _drag.dragIndex = _mouseIsDown;
                 }
             }
             else {
-                if (_mouseIsDown > -1 && _gctx.queries[_mouseIsDown].allowDragging) {
-                    var mousePos = GlobalEvents.getMousePosition();
-                    if ((mousePos.x < _mouseDownPosFirst.x - _mouseDragTolerance || mousePos.x > _mouseDownPosFirst.x + _mouseDragTolerance)
-                        && (mousePos.y < _mouseDownPosFirst.y - _mouseDragTolerance || mousePos.y > _mouseDownPosFirst.y + _mouseDragTolerance)) {
-                        _drag.firstMousePosition = new FastVector2(_mouseDownPosFirst.x, _mouseDownPosFirst.y);
-                        _drag.dragIndex = _mouseIsDown;
-                    }
+                if (_gctx.queries[_mouseIsDown].allowDragging) {
+                    _drag.dragIndex = _mouseIsDown;
                 }
+            }
+
+            if (_drag.dragIndex > -1) {
+                var mousePos = GlobalEvents.getMousePosition();
+                var offset = new FastVector2(mousePos.x - _mouseDownPosFirst.x, mousePos.y - _mouseDownPosFirst.y);
+                _gctx.dimensions[_drag.dragIndex].x += offset.x;
+                _gctx.dimensions[_drag.dragIndex].y += offset.y;
+                _mouseDownPosFirst = new FastVector2(mousePos.x, mousePos.y);
             }
         }
 
@@ -550,8 +548,9 @@ class UpdateContext {
     * Gets the offset of the drag between the initial drag point and the current mouse position.
     **/
     public function getDragOffset():FastVector2 {
-        var offset = new FastVector2(_drag.firstMousePosition.x - GlobalEvents.getMousePosition().x, 
-            _drag.firstMousePosition.y - GlobalEvents.getMousePosition().y);
+        trace(_drag.firstMousePosition);
+        var offset = new FastVector2(GlobalEvents.getMousePosition().x - _drag.firstMousePosition.x, 
+            GlobalEvents.getMousePosition().y - _drag.firstMousePosition.y);
         return offset;
     }
 
@@ -682,7 +681,8 @@ class UpdateContext {
 
                     var index = cast(e.data[0], Int);
                     var dim = cast(e.data[1], Dim);
-                    _gctx.dimensions[index] = dim;
+                    trace(index);
+                    _gctx.dimensions[index] = dim.clone();
                 }
                 else if (e.id == GameEvent.MoveDim) {
                     if (e.data.length != 4) {

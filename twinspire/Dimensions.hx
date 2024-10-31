@@ -376,6 +376,16 @@ class Dimensions
     }
 
     /**
+    * Create a new dimension offset from an existing dimension.
+    *
+    * @param from The dim to reference.
+    * @param offset The offset value from the given dimension.
+    **/
+    public static function createFromOffset(from:Dim, offset:FastVector2) {
+        return new Dim(from.x + offset.x, from.y + offset.y, from.width, from.height, from.order);
+    }
+
+    /**
      * Create a dimension block from the given width and given offset on the Y-axis.
      * @param width The width of the object.
      * @param height The height of the object.
