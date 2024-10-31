@@ -216,15 +216,14 @@ class UpdateContext {
             }
 
             var parentIndex = _gctx.dimensionLinks[_mouseFocusIndexUI];
+            var theChild = _mouseIsDown;
             if (parentIndex > -1) {
                 // if the parent is draggable and we mouse down and move,
                 // drag the parent and prevent mouse release on the focused index.
 
-                if (_gctx.queries[parentIndex].allowDragging) {
+                if (_gctx.queries[parentIndex].allowDragging && _gctx.queries[parentIndex].dragOptions.allowParentDrag) {
                     _drag.dragIndex = parentIndex;
-
-                    // mouse down query moves to parent once dragging is within the drag tolerance
-                    _mouseIsDown = parentIndex;
+                    _mouseIsDown = parentIndex; // move mouse down event to parent when dragging
                 }
                 else if (_gctx.queries[_mouseIsDown].allowDragging) {
                     _drag.dragIndex = _mouseIsDown;
@@ -237,10 +236,43 @@ class UpdateContext {
             }
 
             if (_drag.dragIndex > -1) {
+                var query = _gctx.queries[theChild];
                 var mousePos = GlobalEvents.getMousePosition();
                 var offset = new FastVector2(mousePos.x - _mouseDownPosFirst.x, mousePos.y - _mouseDownPosFirst.y);
-                _gctx.dimensions[_drag.dragIndex].x += offset.x;
-                _gctx.dimensions[_drag.dragIndex].y += offset.y;
+
+                if (theChild != _drag.dragIndex) { // ignore drag options 
+                    _gctx.dimensions[_drag.dragIndex].x += offset.x;
+                    _gctx.dimensions[_drag.dragIndex].y += offset.y;
+                }
+                else if (query.dragOptions.constrained && parentIndex > -1) {
+                    // our child is constrained, but the parent is not draggable
+                    // constrain child movement to parent dimensions.
+                    switch (query.dragOptions.orientation) {
+                        case ORIENTATION_HORIZONTAL: {
+                            _gctx.dimensions[theChild].x += offset.x;
+
+                            if (_gctx.dimensions[theChild].x < _gctx.dimensions[_drag.dragIndex].x) {
+                                _gctx.dimensions[theChild].x = _gctx.dimensions[_drag.dragIndex].x;
+                            }
+                            else if (_gctx.dimensions[theChild].x + _gctx.dimensions[theChild].width >
+                                _gctx.dimensions[_drag.dragIndex].x + _gctx.dimensions[_drag.dragIndex].width) {
+                                _gctx.dimensions[theChild].x = (_gctx.dimensions[_drag.dragIndex].x + _gctx.dimensions[_drag.dragIndex].width) - _gctx.dimensions[theChild].width;
+                            }
+                        }
+                        case ORIENTATION_VERTICAL: {
+                            _gctx.dimensions[theChild].y += offset.y;
+
+                            if (_gctx.dimensions[theChild].y < _gctx.dimensions[_drag.dragIndex].y) {
+                                _gctx.dimensions[theChild].y = _gctx.dimensions[_drag.dragIndex].y;
+                            }
+                            else if (_gctx.dimensions[theChild].y + _gctx.dimensions[theChild].height >
+                                _gctx.dimensions[_drag.dragIndex].y + _gctx.dimensions[_drag.dragIndex].height) {
+                                _gctx.dimensions[theChild].y = (_gctx.dimensions[_drag.dragIndex].y + _gctx.dimensions[_drag.dragIndex].height) - _gctx.dimensions[theChild].height;
+                            }
+                        }
+                    }
+                }
+
                 _mouseDownPosFirst = new FastVector2(mousePos.x, mousePos.y);
             }
         }

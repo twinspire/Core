@@ -1,5 +1,7 @@
 package twinspire.render;
 
+import twinspire.render.DragOptions;
+
 class RenderQuery {
 
     /**
@@ -22,11 +24,17 @@ class RenderQuery {
     * Allows this dimension to be dragged with the mouse.
     **/
     public var allowDragging:Bool;
+    /**
+    * Add options for dragging this query.
+    **/
+    public var dragOptions:DragOptions;
     
     public function new() {
         acceptsKeyInput = false;
         acceptsTextInput = false;
+        allowDragging = false;
         
+        dragOptions = new DragOptions();
     }
 
 }
