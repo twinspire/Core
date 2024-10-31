@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import kha.System;
 import js.lib.webassembly.Global;
 import kha.math.FastVector2;
 import twinspire.Application;
@@ -45,6 +46,10 @@ class UpdateContext {
 
     private var _deltaTime:Float;
 
+    // animations
+    private var _moveToAnimations:Array<MoveToAnimation>;
+
+
     public var deltaTime(get, default):Float;
     function get_deltaTime() return _deltaTime;
 
@@ -52,6 +57,7 @@ class UpdateContext {
         _gctx = gctx;
         _events = [];
         _retainedMouseDown = [];
+        _moveToAnimations = [];
 
         _mouseFocusIndexUI = -1;
         _activatedIndex = -1;
@@ -66,6 +72,48 @@ class UpdateContext {
     * Begin update context and start performing event simulations.
     **/
     public function begin() {
+        // simulate animations first, then check user input
+        var finished = [];
+        for (i in 0..._moveToAnimations.length) {
+            var moveTo = _moveToAnimations[i];
+            if (Animate.animateTick(moveTo.animIndex, moveTo.duration)) {
+                finished.push(i);
+            }
+
+            var ratio = Animate.animateGetRatio(moveTo.animIndex);
+            var startX = moveTo.start.x;
+            var endX = moveTo.end.x;
+            if (moveTo.end.x < moveTo.start.x) {
+                startX = moveTo.end.x;
+                endX = moveTo.start.x;
+            }
+
+            var startY = moveTo.start.y;
+            var endY = moveTo.end.y;
+            if (moveTo.end.y < moveTo.start.y) {
+                startY = moveTo.end.y;
+                endY = moveTo.start.y;
+            }
+
+            var startW = moveTo.start.width;
+            var endW = moveTo.end.width;
+            if (moveTo.end.width < moveTo.start.width) {
+                startW = moveTo.end.width;
+                endW = moveTo.start.width;
+            }
+
+            var startH = moveTo.start.height;
+            var endH = moveTo.end.height;
+            if (moveTo.end.height < moveTo.start.height) {
+                startH = moveTo.end.height;
+                endH = moveTo.start.height;
+            }
+
+            
+
+        }
+
+        // check user input
         _tempUI = [];
         _mouseFocusIndexUI = -1;
 
@@ -567,17 +615,88 @@ class UpdateContext {
         _events.push(gevent);
     }
 
+
     /**
-    * Determines if an exit event was submitted.
+    * Allow for checking game events, iterating over each and filtering on the ones
+    * cared about, automating the ones that are used by Twinspire.
+    *
+    * This function is typically used at the end of the loop.
+    *
+    * @param callback The callback function to execute for any custom game events.
+    * @param exitCallback The callback function to execute when an exit event is triggered.
     **/
-    public function isExitEvent():Bool {
+    public function onEvent(callback:(GameEvent) -> Void, exitCallback:Void -> Void) {
+        if (callback == null)
+            return;
+
         for (e in _events) {
             if (e.id == GameEvent.ExitApp) {
-                return true;
+                if (exitCallback != null) {
+                    exitCallback();
+                }
+            }
+
+            if (cast(e.id, Int) > GameEvent.maximum) {
+                callback(e);
+            }
+            else {
+                if (e.id == GameEvent.SetDimPosition) {
+                    if (e.data.length != 2) {
+                        // TODO: Log error
+                        continue;
+                    }
+
+                    var firstArgIndex = Std.isOfType(e.data[0], Int);
+                    if (!firstArgIndex) {
+                        // TODO: Log error
+                        continue;
+                    }
+
+                    var secondArgDim = Std.isOfType(e.data[1], Dim);
+                    if (!secondArgDim) {
+                        // TODO: Log error
+                        continue;
+                    }
+
+                    var index = cast(e.data[0], Int);
+                    var dim = cast(e.data[1], Dim);
+                    _gctx.dimensions[index] = dim;
+                }
+                else if (e.id == GameEvent.MoveDim) {
+                    if (e.data.length != 3) {
+                        // TODO: Log error
+                        continue;
+                    }
+
+                    var firstArgDim = Std.isOfType(e.data[0], Dim);
+                    if (!firstArgDim) {
+                        // TODO: Log error
+                        continue;
+                    }
+
+                    var secondArgDim = Std.isOfType(e.data[1], Dim);
+                    if (!secondArgDim) {
+                        // TODO: Log error
+                        continue;
+                    }
+
+                    var thirdArgSeconds = Std.isOfType(e.data[2], Float);
+                    if (!thirdArgSeconds) {
+                        // TODO: Log error
+                        continue;
+                    }
+
+                    var moveTo = new MoveToAnimation();
+                    moveTo.start = cast (firstArgDim, Dim);
+                    moveTo.end = cast (secondArgDim, Dim);
+                    moveTo.duration = cast (thirdArgSeconds, Float);
+                    moveTo.animIndex = Animate.animateCreateTick();
+                }
             }
         }
-
-        return false;
     }
+
+    
+
 
 }
