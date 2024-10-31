@@ -16,6 +16,7 @@ import twinspire.geom.Dim;
 import twinspire.Dimensions.VerticalAlign;
 import twinspire.Dimensions.HorizontalAlign;
 import twinspire.Dimensions.*;
+using twinspire.utils.ArrayUtils;
 
 import kha.input.KeyCode;
 
@@ -69,6 +70,17 @@ class UpdateContext {
     }
 
     /**
+    * Gets a copy of a dimension at the given index.
+    **/
+    public function getDimensionAt(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            throw "Index of out range.";
+        }
+
+        return _gctx.dimensions[index].clone();
+    }
+
+    /**
     * Begin update context and start performing event simulations.
     **/
     public function begin() {
@@ -109,9 +121,18 @@ class UpdateContext {
                 endH = moveTo.start.height;
             }
 
-            
+            var x = ((endX - startX) * ratio) + startX;
+            var y = ((endY - startY) * ratio) + startY;
+            var width = ((endW - startW) * ratio) + startW;
+            var height = ((endH - startH) * ratio) + startH;
 
+            _gctx.dimensions[moveTo.contextIndex].x = x;
+            _gctx.dimensions[moveTo.contextIndex].y = y;
+            _gctx.dimensions[moveTo.contextIndex].width = width;
+            _gctx.dimensions[moveTo.contextIndex].height = height;
         }
+
+        _moveToAnimations.clearFromTemp(finished);
 
         // check user input
         _tempUI = [];
@@ -629,7 +650,8 @@ class UpdateContext {
         if (callback == null)
             return;
 
-        for (e in _events) {
+        for (i in 0..._events.length) {
+            var e = _events.pop();
             if (e.id == GameEvent.ExitApp) {
                 if (exitCallback != null) {
                     exitCallback();
@@ -663,7 +685,7 @@ class UpdateContext {
                     _gctx.dimensions[index] = dim;
                 }
                 else if (e.id == GameEvent.MoveDim) {
-                    if (e.data.length != 3) {
+                    if (e.data.length != 4) {
                         // TODO: Log error
                         continue;
                     }
@@ -686,11 +708,20 @@ class UpdateContext {
                         continue;
                     }
 
+                    var fourthArgContextIndex = Std.isOfType(e.data[3], Int);
+                    if (!fourthArgContextIndex) {
+                        // TODO: Log error
+                        continue;
+                    }
+
                     var moveTo = new MoveToAnimation();
-                    moveTo.start = cast (firstArgDim, Dim);
-                    moveTo.end = cast (secondArgDim, Dim);
-                    moveTo.duration = cast (thirdArgSeconds, Float);
+                    moveTo.start = cast (e.data[0], Dim);
+                    moveTo.end = cast (e.data[1], Dim);
+                    moveTo.duration = cast (e.data[2], Float);
                     moveTo.animIndex = Animate.animateCreateTick();
+                    moveTo.contextIndex = cast (e.data[3], Int);
+
+                    _moveToAnimations.push(moveTo);
                 }
             }
         }

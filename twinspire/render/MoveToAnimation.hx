@@ -8,6 +8,7 @@ class MoveToAnimation {
     public var end:Dim;
     public var animIndex:Int;
     public var duration:Float;
+    public var contextIndex:Int;
 
     public function new() {
 
