@@ -141,23 +141,28 @@ class UpdateContext {
         var mousePos = GlobalEvents.getMousePosition();
         var currentOrder = -1;
 
-        var remainActive = false;
-        if (_mouseDownPosFirst.x > -1 && _mouseDownPosFirst.y > -1) {
-            remainActive = true;
+        if (_drag.dragIndex == -1) {
+            var remainActive = false;
+            if (_mouseDownPosFirst.x > -1 && _mouseDownPosFirst.y > -1) {
+                remainActive = true;
+            }
+
+            for (i in 0..._gctx.dimensions.length) {
+                var query = _gctx.queries[i];
+                var active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i]);
+                if (remainActive) {
+                    active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i], _mouseDownPosFirst);
+                }
+
+                if (active && _gctx.dimensions[i].order > currentOrder
+                    && query.type != QUERY_STATIC) {
+                    _tempUI.push(i);
+                    currentOrder = _gctx.dimensions[i].order;
+                }
+            }
         }
-
-        for (i in 0..._gctx.dimensions.length) {
-            var query = _gctx.queries[i];
-            var active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i]);
-            if (remainActive) {
-                active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i], _mouseDownPosFirst);
-            }
-
-            if (active && _gctx.dimensions[i].order > currentOrder
-                && query.type != QUERY_STATIC) {
-                _tempUI.push(i);
-                currentOrder = _gctx.dimensions[i].order;
-            }
+        else {
+            _tempUI.push(_drag.dragIndex);
         }
 
         _mouseIsDown = -1;
@@ -251,23 +256,23 @@ class UpdateContext {
                         case ORIENTATION_HORIZONTAL: {
                             _gctx.dimensions[theChild].x += offset.x;
 
-                            if (_gctx.dimensions[theChild].x < _gctx.dimensions[_drag.dragIndex].x) {
-                                _gctx.dimensions[theChild].x = _gctx.dimensions[_drag.dragIndex].x;
+                            if (_gctx.dimensions[theChild].x < _gctx.dimensions[parentIndex].x) {
+                                _gctx.dimensions[theChild].x = _gctx.dimensions[parentIndex].x;
                             }
                             else if (_gctx.dimensions[theChild].x + _gctx.dimensions[theChild].width >
-                                _gctx.dimensions[_drag.dragIndex].x + _gctx.dimensions[_drag.dragIndex].width) {
-                                _gctx.dimensions[theChild].x = (_gctx.dimensions[_drag.dragIndex].x + _gctx.dimensions[_drag.dragIndex].width) - _gctx.dimensions[theChild].width;
+                                _gctx.dimensions[parentIndex].x + _gctx.dimensions[parentIndex].width) {
+                                _gctx.dimensions[theChild].x = (_gctx.dimensions[parentIndex].x + _gctx.dimensions[parentIndex].width) - _gctx.dimensions[theChild].width;
                             }
                         }
                         case ORIENTATION_VERTICAL: {
                             _gctx.dimensions[theChild].y += offset.y;
 
-                            if (_gctx.dimensions[theChild].y < _gctx.dimensions[_drag.dragIndex].y) {
-                                _gctx.dimensions[theChild].y = _gctx.dimensions[_drag.dragIndex].y;
+                            if (_gctx.dimensions[theChild].y < _gctx.dimensions[parentIndex].y) {
+                                _gctx.dimensions[theChild].y = _gctx.dimensions[parentIndex].y;
                             }
                             else if (_gctx.dimensions[theChild].y + _gctx.dimensions[theChild].height >
-                                _gctx.dimensions[_drag.dragIndex].y + _gctx.dimensions[_drag.dragIndex].height) {
-                                _gctx.dimensions[theChild].y = (_gctx.dimensions[_drag.dragIndex].y + _gctx.dimensions[_drag.dragIndex].height) - _gctx.dimensions[theChild].height;
+                                _gctx.dimensions[parentIndex].y + _gctx.dimensions[parentIndex].height) {
+                                _gctx.dimensions[theChild].y = (_gctx.dimensions[parentIndex].y + _gctx.dimensions[parentIndex].height) - _gctx.dimensions[theChild].height;
                             }
                         }
                     }
