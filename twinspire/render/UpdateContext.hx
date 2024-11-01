@@ -44,6 +44,8 @@ class UpdateContext {
     private var _mouseDragTolerance:Float = 3.0;
 
     private var _drag:DragObject;
+    private var _isDragStart:Int;
+    private var _isDragEnd:Int;
 
     private var _deltaTime:Float;
 
@@ -67,6 +69,9 @@ class UpdateContext {
         _drag = new DragObject();
         _drag.dragIndex = -1;
         _mouseDownPosFirst = new FastVector2(-1, -1);
+
+        _isDragStart = -1;
+        _isDragEnd = -1;
     }
 
     /**
@@ -211,6 +216,10 @@ class UpdateContext {
         if (_mouseIsDown == -1 && GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
             _activatedIndex = -1;
             _mouseDownPosFirst = new FastVector2(-1, -1);
+            if (_drag.dragIndex > -1) {
+                _isDragEnd = _drag.dragIndex;
+            }
+
             _drag.dragIndex = -1;
             _drag.firstMousePosition = new FastVector2(-1, -1);
         }
@@ -222,6 +231,11 @@ class UpdateContext {
 
             var parentIndex = _gctx.dimensionLinks[_mouseFocusIndexUI];
             var theChild = _mouseIsDown;
+            var dragStarted = false;
+            if (_drag.dragIndex == -1) {
+                dragStarted = true;
+            }
+
             if (parentIndex > -1) {
                 // if the parent is draggable and we mouse down and move,
                 // drag the parent and prevent mouse release on the focused index.
@@ -241,6 +255,10 @@ class UpdateContext {
             }
 
             if (_drag.dragIndex > -1) {
+                if (dragStarted && _isDragStart == -1) {
+                    _isDragStart = _drag.dragIndex;
+                }
+
                 var query = _gctx.queries[theChild];
                 var mousePos = GlobalEvents.getMousePosition();
                 var offset = new FastVector2(mousePos.x - _mouseDownPosFirst.x, mousePos.y - _mouseDownPosFirst.y);
@@ -573,22 +591,73 @@ class UpdateContext {
     }
 
     /**
-    * Detects if the dimension at the given index is possibly being dragged by the user.
-    * If the dimension has a parent who also accepts dragging, the parent is dragged before the child.
-    * To disable this behaviour, ensure `allowDragging` in the parent's index is `false`, i.e. `gtx.queries[index].allowDragging = false`.
+    * Checks that the following dimension at the given index is receiving a drag start
+    * event.
+    *
+    * @param index The index of the dimension to check.
+    * @return Returns a boolean value to determine the drag start event.
     **/
-    public function isDragging(index:Int) {
-        return _drag.dragIndex == index;
+    public function isDragStart(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _isDragStart == index && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_DRAG_START;
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
     }
 
     /**
-    * Gets the offset of the drag between the initial drag point and the current mouse position.
+    * Checks that the following dimension at the given index is receiving a drag
+    * event.
+    *
+    * @param index The index of the dimension to check.
+    * @return Returns a boolean value to determine the drag event.
     **/
-    public function getDragOffset():FastVector2 {
-        trace(_drag.firstMousePosition);
-        var offset = new FastVector2(GlobalEvents.getMousePosition().x - _drag.firstMousePosition.x, 
-            GlobalEvents.getMousePosition().y - _drag.firstMousePosition.y);
-        return offset;
+    public function isDragging(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _drag.dragIndex == index && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_DRAGGING;
+            activity.data.push();
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
+    }
+
+    /**
+    * Checks that the following dimension at the given index is receiving a drag end
+    * event.
+    *
+    * @param index The index of the dimension to check.
+    * @return Returns a boolean value to determine the drag end event.
+    **/
+    public function isDragEnd(index:Int) {
+        if (index < 0 || index > _gctx.dimensions.length - 1) {
+            return false;
+        }
+
+        var result = _isDragEnd == index && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+
+        if (result) {
+            var activity = new Activity();
+            activity.type = ACTIVITY_DRAG_END;
+            _gctx.activities[index] = activity;
+        }
+
+        return result;
     }
 
     /**
@@ -660,6 +729,8 @@ class UpdateContext {
         _mouseIsScrolling = -1;
         _keysDown = [];
         _keysUp = [];
+        _isDragStart = -1;
+        _isDragEnd = -1;
     }
 
     /**

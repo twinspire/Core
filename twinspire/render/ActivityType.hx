@@ -9,6 +9,9 @@ enum abstract ActivityType(Int) from Int to Int {
     var ACTIVITY_KEY_UP             =   5;
     var ACTIVITY_KEY_DOWN           =   6;
     var ACTIVITY_KEY_ENTER          =   7;
+    var ACTIVITY_DRAG_START         =   8;
+    var ACTIVITY_DRAG_END           =   9;
+    var ACTIVITY_DRAGGING           =   10;
 
-    var ACTIVITY_MAX                =   8;
+    var ACTIVITY_MAX                =   11;
 }
