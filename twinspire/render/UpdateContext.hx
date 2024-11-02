@@ -630,7 +630,6 @@ class UpdateContext {
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_DRAGGING;
-            activity.data.push();
             _gctx.activities[index] = activity;
         }
 
