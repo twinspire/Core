@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import kha.math.FastVector2;
 import twinspire.render.UpdateContext;
 import twinspire.Application;
 import kha.graphics2.Graphics;
@@ -7,12 +8,18 @@ import twinspire.render.QueryType;
 import twinspire.render.RenderQuery;
 import twinspire.geom.Dim;
 
+typedef ContainerResult = {
+    var dimIndex:Int;
+    var containerIndex:Int;
+}
+
 @:allow(Application)
 @:allow(UpdateContext)
 class GraphicsContext {
 
     private var _dimTemp:Array<Dim>;
     private var _dimTempLinkTo:Array<Int>;
+    private var _containerTemp:Array<Container>;
     private var _ended:Bool;
     private var _menus:Array<Menu>;
     private var _currentMenu:Int;
@@ -26,6 +33,10 @@ class GraphicsContext {
     * A collection of dimension links within this context. Do not write directly.
     **/
     public var dimensionLinks:Array<Int>;
+    /**
+    * A collection of containers referring to the grouping of dimensions within this context. Do not write directly.
+    **/
+    public var containers:Array<Container>;
     /**
     * A collection of render queries. Do not write directly.
     **/
@@ -51,6 +62,7 @@ class GraphicsContext {
     public function new() {
         _dimTemp = [];
         _dimTempLinkTo = [];
+        _containerTemp = [];
         dimensions = [];
         dimensionLinks = [];
         queries = [];
@@ -171,6 +183,33 @@ class GraphicsContext {
         return index;
     }
 
+    /**
+    * Adds a container at the given dimension and then supplies the index of the container
+    * as it would be in permanent storage. Containers are UI elements, but have special properties
+    * that enables scroll and other like events to occur automatically.
+    *
+    * @param dim The dimension of this container.
+    *
+    * @return An index value of the position of this container as it would be in permanent storage.
+    **/
+    public function addContainer(dim:Dim, renderType:Id, linkTo:Int = -1):ContainerResult {
+        var container = new Container();
+        container.dimIndex = addUI(dim, renderType, linkTo);
+        container.scrollOffset = new FastVector2(0, 0);
+
+        _containerTemp.push(container);
+        var result = _containerTemp.length - 1;
+        if (noVirtualSceneChange) {
+            result += containers.length;
+        }
+
+        return {
+            dimIndex: container.dimIndex,
+            containerIndex: result
+        };
+    }
+
+
     public function begin() {
         _ended = false;
     }
@@ -220,16 +259,25 @@ class GraphicsContext {
                 dimensions = _dimTemp.copy();
                 dimensionLinks = _dimTempLinkTo.copy();
             }
+
+            if (_containerTemp.length > 0) {
+                containers = _containerTemp.copy();
+            }
         }
         else {
             for (i in 0..._dimTemp.length) {
                 dimensions.push(_dimTemp[i]);
                 dimensionLinks.push(_dimTempLinkTo[i]);
             }
+
+            for (i in 0..._containerTemp.length) {
+                containers.push(_containerTemp[i]);
+            }
         }
 
         _dimTemp = [];
         _dimTempLinkTo = [];
+        _containerTemp = [];
 
         for (i in 0...activities.length) {
             activities[i] = null;

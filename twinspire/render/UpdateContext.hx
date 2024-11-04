@@ -16,6 +16,7 @@ import twinspire.geom.Dim;
 import twinspire.Dimensions.VerticalAlign;
 import twinspire.Dimensions.HorizontalAlign;
 import twinspire.Dimensions.*;
+using twinspire.extensions.ArrayExtensions;
 using twinspire.utils.ArrayUtils;
 
 import kha.input.KeyCode;
@@ -173,7 +174,64 @@ class UpdateContext {
         _mouseIsDown = -1;
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
+        
+        if (!handleKeyEvents()) {
+            return;
+        }
 
+        handleMouseEvents();
+    }
+
+    private function handleKeyEvents() {
+        var acceptNewEvents = true;
+        var isFocusTextBased = false;
+        if (_activatedIndex > -1) {
+            isFocusTextBased = _gctx.queries[_activatedIndex].acceptsTextInput;
+        }
+
+        _keysUp = GlobalEvents.isAnyKeyUp();
+        _keysDown = GlobalEvents.isAnyKeyDown();
+        var keyMods = GlobalEvents.getCurrentKeyModifiers();
+
+        if (_keysUp.length > 0) {
+            var first = cast (_keysUp.shift(), KeyCode);
+            if (first == KeyCode.Tab) {
+                var increment = 1;
+                if (keyMods.filter((c) -> c == KeyCode.Shift).length == 1 && keyMods.length == 1) {
+                    increment = -1;
+                }
+
+                var index = _activatedIndex;
+                while (true) {
+                    index += increment;
+                    var query = _gctx.queries[index];
+                    if (query.type == QUERY_UI && (query.acceptsTextInput || query.acceptsKeyInput)) {
+                        break;
+                    }
+
+                    if (index == _activatedIndex) {
+                        break; // prevent infinite looping
+                    }
+                }
+
+                _activatedIndex = index;
+            }
+        }
+
+        if (_activatedIndex > -1) {
+            if (isFocusTextBased) {
+                for (c in GlobalEvents.getKeyCharCode()) {
+                    _charString += String.fromCharCode(c);
+                }
+                
+                acceptNewEvents = false;
+            }
+        }
+
+        return acceptNewEvents;
+    }
+
+    private function handleMouseEvents() {
         var isMouseOver = -1;
         var mouseScrollDelta = 0;
 
@@ -205,6 +263,32 @@ class UpdateContext {
 
             if (GlobalEvents.getMouseDelta() != 0) {
                 mouseScrollDelta = GlobalEvents.getMouseDelta();
+
+                var containerIndex = _gctx.containers.findIndex((a) -> a.dimIndex == isMouseOver);
+                if (containerIndex > -1) {
+                    var container = _gctx.containers[containerIndex];
+                    var dim = _gctx.dimensions[container.dimIndex];
+                    if (_keysDown[KeyCode.Shift]) {
+                        // TODO: We are doing things in pixels for now as we do not have a way
+                        // to measure buffer or screen space.
+
+                        if (mouseScrollDelta < 0 && container.offset.x > 0) {
+                            container.offset.x -= container.increment;
+                        }
+                        else if (mouseScrollDelta > 0 && container.offset.x < container.content.x - dim.width) {
+                            container.offset.x += container.increment;
+                        }
+                    }
+                    else {
+                        if (mouseScrollDelta < 0 && container.offset.y > 0) {
+                            container.offset.y -= container.increment;
+                        }
+                        else if (mouseScrollDelta > 0 && container.offset.y < container.content.y - dim.height) {
+                            container.offset.y += container.increment;
+                        }
+                    }
+                }
+
                 _mouseIsScrolling = index;
             }
 
@@ -297,51 +381,6 @@ class UpdateContext {
                 }
 
                 _mouseDownPosFirst = new FastVector2(mousePos.x, mousePos.y);
-            }
-        }
-
-        var isFocusTextBased = false;
-        if (_activatedIndex > -1) {
-            isFocusTextBased = _gctx.queries[_activatedIndex].acceptsTextInput;
-        }
-
-        _keysUp = GlobalEvents.isAnyKeyUp();
-        _keysDown = GlobalEvents.isAnyKeyDown();
-        var keyMods = GlobalEvents.getCurrentKeyModifiers();
-
-        if (_keysUp.length > 0) {
-            var first = cast (_keysUp.shift(), KeyCode);
-            if (first == KeyCode.Tab) {
-                var increment = 1;
-                if (keyMods.filter((c) -> c == KeyCode.Shift).length == 1 && keyMods.length == 1) {
-                    increment = -1;
-                }
-
-                var index = _activatedIndex;
-                while (true) {
-                    index += increment;
-                    var query = _gctx.queries[index];
-                    if (query.type == QUERY_UI && (query.acceptsTextInput || query.acceptsKeyInput)) {
-                        break;
-                    }
-
-                    if (index == _activatedIndex) {
-                        break; // prevent infinite looping
-                    }
-                }
-
-                _activatedIndex = index;
-            }
-        }
-
-        if (_activatedIndex > -1) {
-            if (isFocusTextBased) {
-                for (c in GlobalEvents.getKeyCharCode()) {
-                    _charString += String.fromCharCode(c);
-                }
-
-                _keysDown = [];
-                _keysUp = [];
             }
         }
     }
@@ -730,6 +769,28 @@ class UpdateContext {
         _keysUp = [];
         _isDragStart = -1;
         _isDragEnd = -1;
+
+        // do container checks here.
+        for (i in 0..._gctx.containers.length) {
+            var container = _gctx.containers[i];
+            var dim = _gctx.dimensions[container.dimIndex];
+
+            if (container.offset.x < 0) {
+                container.offset.x = 0;
+            }
+
+            if (container.offset.x > container.content.x - dim.width) {
+                container.offset.x = container.content.x - dim.width;
+            }
+
+            if (container.offset.y < 0) {
+                container.offset.y = 0;
+            }
+
+            if (container.offset.y > container.content.y - dim.height) {
+                container.offset.y = container.content.y - dim.height;
+            }
+        }
     }
 
     /**
