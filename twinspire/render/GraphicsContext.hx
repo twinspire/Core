@@ -63,6 +63,7 @@ class GraphicsContext {
         _dimTemp = [];
         _dimTempLinkTo = [];
         _containerTemp = [];
+        containers = [];
         dimensions = [];
         dimensionLinks = [];
         queries = [];
@@ -196,6 +197,7 @@ class GraphicsContext {
         var container = new Container();
         container.dimIndex = addUI(dim, renderType, linkTo);
         container.offset = new FastVector2(0, 0);
+        container.content = new FastVector2(0, 0);
 
         _containerTemp.push(container);
         var result = _containerTemp.length - 1;
