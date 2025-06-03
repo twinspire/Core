@@ -1,7 +1,6 @@
 package twinspire.events;
 
-@:enum
-abstract EventType(Int) from Int to Int
+enum abstract EventType(Int) from Int to Int
 {
 	/**
 	* A mouse button is down.

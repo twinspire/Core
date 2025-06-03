@@ -6,8 +6,7 @@ import kha.System;
 import kha.Assets;
 import kha.Framebuffer;
 
-@:enum
-abstract PreloaderStyle(Int) from Int to Int
+enum abstract PreloaderStyle(Int) from Int to Int
 {
 	var PRELOADER_BASIC			=	1;
 	var PRELOADER_STYLISH		=	2;

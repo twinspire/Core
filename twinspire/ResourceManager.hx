@@ -72,6 +72,9 @@ class ResourceManager
 		loadedImages = [];
 		loadedSounds = [];
 		loadedVideos = [];
+
+		assetLoadCount = 0;
+		assetsLoaded = 0;
 	}
 
 	/**

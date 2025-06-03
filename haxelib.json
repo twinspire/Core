@@ -1,6 +1,5 @@
 {
     "name": "Twinspire",
-    "classPath": "twinspire",
     "description": "A utility framework to build Kha applications quicker and easier",
     "license": "MIT",
     "tags": ["utility", "kha"],

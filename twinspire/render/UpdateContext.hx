@@ -268,7 +268,7 @@ class UpdateContext {
                 if (containerIndex > -1) {
                     var container = _gctx.containers[containerIndex];
                     var dim = _gctx.dimensions[container.dimIndex];
-                    if (_keysDown[KeyCode.Shift]) {
+                    if (_keysDown.contains(cast KeyCode.Shift)) {
                         // TODO: We are doing things in pixels for now as we do not have a way
                         // to measure buffer or screen space.
 

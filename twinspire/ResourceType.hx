@@ -1,7 +1,6 @@
 package twinspire;
 
-@:enum
-abstract ResourceType(Int) from Int to Int
+enum abstract ResourceType(Int) from Int to Int
 {
 	var RESOURCE_ART		=	0;
 	var RESOURCE_FONT		=	1;

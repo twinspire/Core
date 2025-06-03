@@ -195,7 +195,7 @@ class GraphicsContext {
     public function addContainer(dim:Dim, renderType:Id, linkTo:Int = -1):ContainerResult {
         var container = new Container();
         container.dimIndex = addUI(dim, renderType, linkTo);
-        container.scrollOffset = new FastVector2(0, 0);
+        container.offset = new FastVector2(0, 0);
 
         _containerTemp.push(container);
         var result = _containerTemp.length - 1;
