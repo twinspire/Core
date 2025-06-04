@@ -1,6 +1,7 @@
 package twinspire.extensions;
 
 import twinspire.geom.Dim;
+import twinspire.render.Patch;
 
 import kha.math.FastVector2;
 import kha.math.Vector2;
@@ -50,6 +51,18 @@ class Graphics2
 	public static function drawScaledSubImageDim(g2:Graphics, img:Image, source:Dim, destination:Dim)
 	{
 		g2.drawScaledSubImage(img, source.x, source.y, source.width, source.height, destination.x, destination.y, destination.width, destination.height);
+	}
+
+	public static function drawPatchedImage(g2:Graphics, img:Image, patch:Patch, destination:Dim) {
+		var segments = patch.getSegments();
+		var tl = new Dim(destination.x, destination.y, segments[TopLeft].width, segments[TopLeft].height);
+		var tr = new Dim(destination.width - segments[TopRight].width + destination.x, destination.y, segments[TopRight].width, segments[TopRight].height);
+		var tm = new Dim(destination.x + segments[TopLeft].width, destination.y, destination.width - tl.width - tr.width, tl.height);
+		var bl = new Dim(destination.x, destination.height - segments[BottomLeft].height + destination.y, segments[BottomLeft].width, segments[BottomLeft].height);
+		var br = new Dim(destination.width - segments[BottomRight].width + destination.x, destination.height - segments[BottomRight].height + destination.y, segments[BottomRight].width, segments[BottomRight].height);
+		var bm = new Dim(destination.x + bl.width, bl.y, destination.width - bl.width - br.width, bl.height);
+		
+
 	}
 
 	public static function drawRectDim(g2:Graphics, destination:Dim, lineThickness:Float = 1.0)
