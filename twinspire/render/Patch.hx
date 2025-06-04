@@ -47,7 +47,7 @@ class Patch {
         var tm = new Dim(tl.width, source.y, source.width - tl.width - tr.width, top);
         var bl = new Dim(source.x, source.y + source.height - bottom, left, bottom);
         var br = new Dim(source.x + source.width - right, source.y + source.height - bottom, right, bottom);
-        var bm = new Dim(bl.width, source.y + source.height - bottom, source.width - bl.width - br.width);
+        var bm = new Dim(bl.width, source.y + source.height - bottom, source.width - bl.width - br.width, bottom);
         var cl = new Dim(source.x, source.y + tl.height, left, source.height - bl.height - tl.height);
         var cr = new Dim(source.x + source.width - right, source.y + tr.height, right, source.height - br.height - tr.height);
         var cm = new Dim(source.x + tl.width, source.y + tl.height, source.width - cl.width - cr.width, source.height - tm.height - bm.height);

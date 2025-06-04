@@ -38,7 +38,7 @@ class Graphics2
 		g2.drawImage(img, dim.x, dim.y);
 	}
 
-	public static function drawSubImageDim(g2:Graphics, img:Image, destination:Dim, source:Dim)
+	public static function drawSubImageDim(g2:Graphics, img:Image, source:Dim, destination:Dim)
 	{
 		g2.drawSubImage(img, destination.x, destination.y, source.x, source.y, source.width, source.height);
 	}
@@ -61,8 +61,19 @@ class Graphics2
 		var bl = new Dim(destination.x, destination.height - segments[BottomLeft].height + destination.y, segments[BottomLeft].width, segments[BottomLeft].height);
 		var br = new Dim(destination.width - segments[BottomRight].width + destination.x, destination.height - segments[BottomRight].height + destination.y, segments[BottomRight].width, segments[BottomRight].height);
 		var bm = new Dim(destination.x + bl.width, bl.y, destination.width - bl.width - br.width, bl.height);
-		
+		var cl = new Dim(destination.x, destination.y + tl.height, segments[CentreLeft].width, destination.height - tl.height - bl.height);
+		var cr = new Dim(destination.width - segments[CentreRight].width + destination.x, destination.y + tr.height, segments[CentreRight].width, destination.height - tr.height - br.height);
+		var cm = new Dim(destination.x + tl.width, destination.y + tl.height, destination.width - tl.width - tr.width, destination.height - tm.height - bm.height);
 
+		drawSubImageDim(g2, img, segments[TopLeft], tl);
+		drawScaledSubImageDim(g2, img, segments[TopMiddle], tm);
+		drawSubImageDim(g2, img, segments[TopRight], tr);
+		drawScaledSubImageDim(g2, img, segments[CentreLeft], cl);
+		drawScaledSubImageDim(g2, img, segments[CentreMiddle], cm);
+		drawScaledSubImageDim(g2, img, segments[CentreRight], cr);
+		drawSubImageDim(g2, img, segments[BottomLeft], bl);
+		drawScaledSubImageDim(g2, img, segments[BottomMiddle], bm);
+		drawSubImageDim(g2, img, segments[BottomRight], br);
 	}
 
 	public static function drawRectDim(g2:Graphics, destination:Dim, lineThickness:Float = 1.0)
