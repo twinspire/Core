@@ -69,6 +69,7 @@ class UpdateContext {
 
         _drag = new DragObject();
         _drag.dragIndex = -1;
+        _drag.childIndex = -1;
         _mouseDownPosFirst = new FastVector2(-1, -1);
 
         _isDragStart = -1;
@@ -258,7 +259,12 @@ class UpdateContext {
             }
 
             if (GlobalEvents.isMouseButtonDown(BUTTON_LEFT)) {
-                _mouseIsDown = index;
+                if (_drag.childIndex > -1) {
+                    _mouseIsDown = _drag.childIndex;
+                }
+                else {
+                    _mouseIsDown = index;
+                }
             }
 
             if (GlobalEvents.getMouseDelta() != 0) {
@@ -305,6 +311,7 @@ class UpdateContext {
             }
 
             _drag.dragIndex = -1;
+            _drag.childIndex = -1;
             _drag.firstMousePosition = new FastVector2(-1, -1);
         }
 
@@ -313,22 +320,22 @@ class UpdateContext {
                 _mouseDownPosFirst = FastVector2.fromVector2(GlobalEvents.getMousePosition());
             }
 
-            var parentIndex = _gctx.dimensionLinks[_mouseFocusIndexUI];
             var theChild = _mouseIsDown;
             var dragStarted = false;
             if (_drag.dragIndex == -1) {
                 dragStarted = true;
             }
-
+            
+            var parentIndex = _gctx.dimensionLinks[_mouseIsDown];
             if (parentIndex > -1) {
                 // if the parent is draggable and we mouse down and move,
                 // drag the parent and prevent mouse release on the focused index.
 
-                if (_gctx.queries[parentIndex].allowDragging && _gctx.queries[parentIndex].dragOptions.allowParentDrag) {
+                if (_gctx.queries[parentIndex].allowDragging && _gctx.queries[theChild].dragOptions.allowParentDrag) {
                     _drag.dragIndex = parentIndex;
-                    _mouseIsDown = parentIndex; // move mouse down event to parent when dragging
+                    _drag.childIndex = theChild;
                 }
-                else if (_gctx.queries[_mouseIsDown].allowDragging) {
+                else if (_gctx.queries[theChild].allowDragging) {
                     _drag.dragIndex = _mouseIsDown;
                 }
             }
@@ -350,6 +357,12 @@ class UpdateContext {
                 if (theChild != _drag.dragIndex) { // ignore drag options 
                     _gctx.dimensions[_drag.dragIndex].x += offset.x;
                     _gctx.dimensions[_drag.dragIndex].y += offset.y;
+
+                    var childIndices = _gctx.dimensionLinks.whereIndices((dl) -> dl == parentIndex);
+                    for (child in childIndices) {
+                        _gctx.dimensions[child].x += offset.x;
+                        _gctx.dimensions[child].y += offset.y;
+                    }
                 }
                 else if (query.dragOptions.constrained && parentIndex > -1) {
                     // our child is constrained, but the parent is not draggable
