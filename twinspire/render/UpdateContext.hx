@@ -47,6 +47,7 @@ class UpdateContext {
     private var _drag:DragObject;
     private var _isDragStart:Int;
     private var _isDragEnd:Int;
+    private var _containerDragIndex:Int;
 
     private var _deltaTime:Float;
 
@@ -66,6 +67,7 @@ class UpdateContext {
         _mouseFocusIndexUI = -1;
         _activatedIndex = -1;
         _charString = "";
+        _containerDragIndex = -1;
 
         _drag = new DragObject();
         _drag.dragIndex = -1;

@@ -1,7 +1,9 @@
 package twinspire.render;
 
+import kha.Image;
 import kha.math.FastVector2;
 
+import twinspire.events.Buttons;
 import twinspire.math.UnitMeasurement;
 
 class Container {
@@ -30,9 +32,37 @@ class Container {
     * This is also used for automated events, such as mouse scroll for the container.
     **/
     public var increment:Float;
+    /**
+    * Determines if this container should scroll infinitely. When this is `true`, `content` snapping is
+    * disabled.
+    **/
+    public var infiniteScroll:Bool;
+    /**
+    * Set a soft limit on infinite scrolling, meaning that gaps between the maximum `width` or `height` of the `content`
+    * value should not exceed this limit. This is a soft limit and is therefore not handled internally by
+    * Twinspire. You should implement any content snapping yourself.
+    **/
+    public var softInfiniteLimit:Float;
+    /**
+    * Enables the ability to move the children of this container with right-click.
+    **/
+    public var enableScrollWithClick:Buttons;
+    /**
+    * Allow scrolling to be smoothly animated between start and finish when using the mouse wheel.
+    **/
+    public var smoothScrolling:Bool;
+    /**
+    * An array of indices linked to dimensions.
+    **/
+    public var childIndices:Array<Int>;
 
     public function new() {
-        
+        enableScrollWithClick = BUTTON_NONE;
+        softInfiniteLimit = 0.0;
+        infiniteScroll = false;
+        increment = 0.1;
+        childIndices = [];
+
     }
 
 }

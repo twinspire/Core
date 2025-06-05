@@ -2,6 +2,7 @@ package twinspire.events;
 
 enum abstract Buttons(Int) from Int to Int
 {
+	var BUTTON_NONE			=	-1;
 	var BUTTON_LEFT			=	0;
 	var BUTTON_RIGHT		=	1;
 	var BUTTON_MIDDLE		=	2;

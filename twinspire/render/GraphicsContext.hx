@@ -211,6 +211,24 @@ class GraphicsContext {
         };
     }
 
+    /**
+    * Set the scroll position of a given container. Optionally set the scrolling of the container using
+    * mouse behaviours to infinite. If you set the container to infinite and set scroll to (0, 0), the offset
+    * stays in place and does not reset.
+    *
+    * @param containerIndex The index of the container, not the dimension.
+    * @param scroll The scroll position to set this container to.
+    * @param infinite (Optional) A value to specify if the container should scroll infinitely.
+    **/
+    public function setContainerScroll(containerIndex:Int, scroll:FastVector2, ?infinite:Bool = false) {
+        var container = containers[containerIndex];
+        container.infiniteScroll = infinite;
+        if (container.infiniteScroll) {
+            if (scroll.x != 0 && scroll.y != 0) {
+                container.offset = new FastVector2(scroll.x, scroll.y);
+            }
+        }
+    }
 
     public function begin() {
         _ended = false;
