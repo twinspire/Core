@@ -1,5 +1,7 @@
 package twinspire.geom;
 
+import kha.math.FastVector2;
+
 class Dim
 {
 

@@ -84,6 +84,33 @@ class GraphicsContext {
     }
 
     /**
+    * Get the dimension at the given index. Any offsets assigned to the dimension is resolved
+    * before returned. This function is best used for rendering.
+    *
+    * @param index The index of the dimension
+    * @return Returns either a reference to a given dimension, or a copy of a dimension if linked to a container.
+    **/
+    public function getDimensionAtIndex(index:Int) {
+        var containerIndex = -1;
+        for (i in 0...containers.length) {
+            var c = containers[i];
+            if (c.childIndices.contains(index)) {
+                containerIndex = i;
+                break;
+            }
+        }
+
+        if (containerIndex == -1) {
+            return dimensions[index];
+        }
+        else {
+            var c = containers[containerIndex];
+            var d = dimensions[index];
+            return new Dim(d.x + c.offset.x, d.y + c.offset.y, d.width, d.height);
+        }
+    }
+
+    /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
     *
