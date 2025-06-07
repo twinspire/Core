@@ -6,6 +6,7 @@ class DragObject {
 
     public var dragIndex:Int;
     public var childIndex:Int;
+    public var scrollIndex:Int;
     public var firstMousePosition:FastVector2;
     
     public function new() {

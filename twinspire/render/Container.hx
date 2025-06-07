@@ -62,7 +62,7 @@ class Container {
         infiniteScroll = false;
         increment = 100;
         childIndices = [];
-
+        offset = new FastVector2(0, 0);
     }
 
 }

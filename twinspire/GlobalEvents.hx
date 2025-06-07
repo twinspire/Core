@@ -10,6 +10,7 @@ import twinspire.events.EventType;
 import twinspire.events.TouchState;
 import twinspire.events.GamepadState;
 import twinspire.events.KeyModifiers;
+import twinspire.events.Buttons;
 
 import kha.input.KeyCode;
 
@@ -298,7 +299,23 @@ class GlobalEvents
 	{
 		return (mouseButton == button && mouseReleased);
 	}
-	
+
+	/**
+	* Get a value determining if any mouse button is down.
+	* @return Bool
+	**/
+	function isAnyMouseButtonDown():Bool {
+		return mouseButton > cast BUTTON_NONE;
+	}
+
+	/**
+	* Get a value determining if any mouse button is down.
+	* @return Bool
+	**/
+	function isAnyMouseButtonReleased():Bool {
+		return (mouseButton > cast BUTTON_NONE) && mouseReleased;
+	}
+
 	/**
 	 * Get a value determining how far the mouse has moved since the last frame.
 	 * @return Vector2
