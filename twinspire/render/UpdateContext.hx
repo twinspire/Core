@@ -252,7 +252,7 @@ class UpdateContext {
 
             isMouseOver = index;
 
-            if (GlobalEvents.isMouseButtonReleased(BUTTON_LEFT)) {
+            if (GlobalEvents.isAnyMouseButtonReleased()) {
                 // check that the mouse is actually within the active component
                 // when the mouse button is released.
                 if (GlobalEvents.isMouseOverDim(dim)) {
@@ -263,7 +263,6 @@ class UpdateContext {
                 _mouseDownPosFirst = new FastVector2(-1, -1);
             }
 
-            //_drag.scrollIndex = -1;
             var containers = _gctx.containers.whereIndices((c) -> c.enableScrollWithClick != BUTTON_NONE);
             
             for (c in containers) {
@@ -280,24 +279,16 @@ class UpdateContext {
                 else {
                     _mouseIsDown = index;
 
-                    var scroll = new FastVector2(-1, -1);
                     if (_drag.scrollIndex > -1) {
-                        scroll = _gctx.containers[_drag.scrollIndex].offset;
+                        trace(_gctx.containers[_drag.scrollIndex].offset);
                     }
-
-                    var mousePos = GlobalEvents.getMousePosition();
-                    
-                    trace('Mouse Down: ${_mouseDownPosFirst}, Scroll Offset: ${scroll}');
                 }
             }
 
             if (GlobalEvents.isAnyMouseButtonReleased()) {
-                var scroll = new FastVector2(-1, -1);
                 if (_drag.scrollIndex > -1) {
-                    scroll = _gctx.containers[_drag.scrollIndex].offset;
+                    trace(_gctx.containers[_drag.scrollIndex].offset);
                 }
-
-                trace('Mouse Down: ${_mouseDownPosFirst}, Scroll Offset: ${scroll}');
 
                 _activatedIndex = -1;
                 _mouseDownPosFirst = new FastVector2(-1, -1);
@@ -362,7 +353,7 @@ class UpdateContext {
             
             
             var parentIndex = _gctx.dimensionLinks[_mouseIsDown];
-            if (parentIndex > -1 && _drag.scrollIndex != -1) {
+            if (parentIndex > -1 && _drag.scrollIndex == -1) {
                 // if the parent is draggable and we mouse down and move,
                 // drag the parent and prevent mouse release on the focused index.
 
@@ -374,7 +365,7 @@ class UpdateContext {
                     _drag.dragIndex = _mouseIsDown;
                 }
             }
-            else if (_drag.scrollIndex != -1) {
+            else if (_drag.scrollIndex == -1) {
                 if (_gctx.queries[_mouseIsDown].allowDragging) {
                     _drag.dragIndex = _mouseIsDown;
                 }
