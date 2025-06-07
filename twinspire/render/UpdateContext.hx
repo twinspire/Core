@@ -158,15 +158,17 @@ class UpdateContext {
 
             for (i in 0..._gctx.dimensions.length) {
                 var query = _gctx.queries[i];
-                var active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i]);
+                var actualDim = _gctx.getDimensionAtIndex(i);
+
+                var active = GlobalEvents.isMouseOverDim(actualDim);
                 if (remainActive) {
-                    active = GlobalEvents.isMouseOverDim(_gctx.dimensions[i], _mouseDownPosFirst);
+                    active = GlobalEvents.isMouseOverDim(actualDim, _mouseDownPosFirst);
                 }
 
-                if (active && _gctx.dimensions[i].order > currentOrder
+                if (active && actualDim.order > currentOrder
                     && query.type != QUERY_STATIC) {
                     _tempUI.push(i);
-                    currentOrder = _gctx.dimensions[i].order;
+                    currentOrder = actualDim.order;
                 }
             }
         }
@@ -280,19 +282,19 @@ class UpdateContext {
                         // TODO: We are doing things in pixels for now as we do not have a way
                         // to measure buffer or screen space.
 
-                        if (mouseScrollDelta < 0 && container.offset.x > 0) {
-                            container.offset.x -= container.increment;
-                        }
-                        else if (mouseScrollDelta > 0 && container.offset.x < container.content.x - dim.width) {
+                        if (mouseScrollDelta < 0 && container.offset.x < 0) {
                             container.offset.x += container.increment;
+                        }
+                        else if (mouseScrollDelta > 0 && container.offset.x > -(container.content.x - dim.width)) {
+                            container.offset.x -= container.increment;
                         }
                     }
                     else {
-                        if (mouseScrollDelta < 0 && container.offset.y > 0) {
-                            container.offset.y -= container.increment;
-                        }
-                        else if (mouseScrollDelta > 0 && container.offset.y < container.content.y - dim.height) {
+                        if (mouseScrollDelta < 0 && container.offset.y < 0) {
                             container.offset.y += container.increment;
+                        }
+                        else if (mouseScrollDelta > 0 && container.offset.y > -(container.content.y - dim.height)) {
+                            container.offset.y -= container.increment;
                         }
                     }
                 }
@@ -787,23 +789,52 @@ class UpdateContext {
 
         // do container checks here.
         for (i in 0..._gctx.containers.length) {
+            // calculate content
+            var maxWidth = 0.0;
+            var maxHeight = 0.0;
             var container = _gctx.containers[i];
+            var containerDim = _gctx.dimensions[container.dimIndex];
+            // give a gap of a third of the container
+            // to allow a more natural view of the contents
+            var gap = containerDim.width * 0.3; 
+
+            for (child in container.childIndices) {
+                var dim = _gctx.dimensions[child];
+                if (dim.x + dim.width > maxWidth + gap) {
+                    maxWidth = dim.x + dim.width + gap;
+                }
+                
+                if (dim.y + dim.height > maxHeight + gap) {
+                    maxHeight = dim.y + dim.height + gap;
+                }
+            }
+
+            container.content = new FastVector2(maxWidth, maxHeight);
+        }
+
+        for (i in 0..._gctx.containers.length) {
+            var container = _gctx.containers[i];
+            // infinite scroll, so don't clamp anything
+            if (container.infiniteScroll) {
+                continue;
+            }
+
             var dim = _gctx.dimensions[container.dimIndex];
 
-            if (container.offset.x < 0) {
+            if (container.offset.x > 0) {
                 container.offset.x = 0;
             }
 
-            if (container.offset.x > container.content.x - dim.width) {
-                container.offset.x = container.content.x - dim.width;
+            if (container.offset.x < -(container.content.x - dim.width) && container.content.x > dim.width) {
+                container.offset.x = -(container.content.x - dim.width);
             }
 
-            if (container.offset.y < 0) {
+            if (container.offset.y > 0) {
                 container.offset.y = 0;
             }
 
-            if (container.offset.y > container.content.y - dim.height) {
-                container.offset.y = container.content.y - dim.height;
+            if (container.offset.y < -(container.content.y - dim.height) && container.content.y > dim.height) {
+                container.offset.y = -(container.content.y - dim.height);
             }
         }
     }

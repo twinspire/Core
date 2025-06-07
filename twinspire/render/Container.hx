@@ -60,7 +60,7 @@ class Container {
         enableScrollWithClick = BUTTON_NONE;
         softInfiniteLimit = 0.0;
         infiniteScroll = false;
-        increment = 0.1;
+        increment = 100;
         childIndices = [];
 
     }

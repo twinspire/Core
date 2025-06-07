@@ -106,7 +106,34 @@ class GraphicsContext {
         else {
             var c = containers[containerIndex];
             var d = dimensions[index];
-            return new Dim(d.x + c.offset.x, d.y + c.offset.y, d.width, d.height);
+            return new Dim(d.x + c.offset.x, d.y + c.offset.y, d.width, d.height, d.order);
+        }
+    }
+
+    /**
+    * Like `getDimensionAtIndex`, except the returning dimension is relative to the container it resides.
+    * If the dimension does not belong to a container, it returns the exact dimension as is.
+    *
+    * @param index The index of the dimension.
+    **/
+    public function getDimensionRelativeAtIndex(index:Int) {
+        var containerIndex = -1;
+        for (i in 0...containers.length) {
+            var c = containers[i];
+            if (c.childIndices.contains(index)) {
+                containerIndex = i;
+                break;
+            }
+        }
+
+        if (containerIndex == -1) {
+            return dimensions[index];
+        }
+        else {
+            var c = containers[containerIndex];
+            var d = dimensions[index];
+            var cDim = dimensions[c.dimIndex];
+            return new Dim(d.x - cDim.x + c.offset.x, d.y - cDim.y + c.offset.y, d.width, d.height, d.order);
         }
     }
 
