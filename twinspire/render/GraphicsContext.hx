@@ -25,6 +25,10 @@ class GraphicsContext {
     private var _currentMenu:Int;
     private var _activeMenu:Int;
 
+    private var _containerOffsetsChanged:Bool;
+    private var _containerLastOffsets:Array<FastVector2>;
+    private var _dimClientPositions:Array<FastVector2>;
+
     /**
     * A collection of dimensions within this context. Do not write directly.
     **/
@@ -70,6 +74,9 @@ class GraphicsContext {
         activities = [];
         _ended = false;
         _currentMenu = -1;
+        _containerOffsetsChanged = false;
+        _dimClientPositions = [];
+        _containerLastOffsets = [];
     }
 
     /**
@@ -138,6 +145,16 @@ class GraphicsContext {
     }
 
     /**
+    * Gets a dimension at its respective client coordinates after resolving container offsets.
+    * Takes into account any multiples of containers.
+    *
+    * @param index The index of the dimension.
+    **/
+    public function getClientDimensionAtIndex(index:Int) {
+        return _dimClientPositions[index];
+    }
+
+    /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
     *
@@ -154,6 +171,7 @@ class GraphicsContext {
         
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
+        _dimClientPositions.push(new FastVector2(dim.x, dim.y));
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
@@ -186,6 +204,7 @@ class GraphicsContext {
 
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
+        _dimClientPositions.push(new FastVector2(dim.x, dim.y));
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
@@ -222,7 +241,7 @@ class GraphicsContext {
 
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
-
+        _dimClientPositions.push(new FastVector2(dim.x, dim.y));
         var index = _dimTemp.length - 1;
         if (noVirtualSceneChange) {
             index += dimensions.length;
@@ -312,11 +331,12 @@ class GraphicsContext {
     * Stop adding dimensions to the current menu.
     **/
     public function endMenu() {
-        _currentMenu = -1;
         if (menuCursorRenderId != null) {
             var index = addStatic(new Dim(0, 0, 0, 0), menuCursorRenderId);
             _menus[_currentMenu].dimIndex = index;
         }
+
+        _currentMenu = -1;
     }
 
     /**
@@ -355,6 +375,76 @@ class GraphicsContext {
 
         for (i in 0...activities.length) {
             activities[i] = null;
+        }
+
+        
+        var containersChanged = new Array<Int>();
+        
+        // add any additional containers added in current frame
+        if (_containerLastOffsets.length != containers.length) {
+            var remainder = containers.length - _containerLastOffsets.length;
+            // ensure remainder is positive
+            if (remainder > 0) {
+                for (i in 0...remainder) {
+                    _containerLastOffsets.push(new FastVector2(containers[i + _containerLastOffsets.length].offset.x, containers[i + _containerLastOffsets.length].offset.y));
+                    // force a check on all additional containers
+                    containersChanged.push(i + containers.length);
+                }
+            }
+        }
+
+        // determine which containers were last changed
+        for (i in 0..._containerLastOffsets.length) {
+            var current = containers[i].offset;
+            var last = _containerLastOffsets[i];
+
+            if (current.x != last.x || current.y != last.y) {
+                containersChanged.push(i);
+            }
+        }
+
+        // recalculate client dimensions for all dimensions affected
+        // by a container change
+        if (containersChanged.length > -1) {
+            var dimIndicesChanged = new Array<Int>();
+
+            for (ci in 0...containersChanged.length) {
+                var container = containers[ci];
+                for (di in container.childIndices) {
+                    dimIndicesChanged.push(di);
+                }
+            }
+
+            for (index in dimIndicesChanged) {
+                // iterate each dimension
+                var dim = dimensions[index];
+                var childIndex = index;
+                
+                var containerIndex = -1;
+                // contain an offset resolving to client coordinates
+                var offset = new FastVector2(0, 0);
+                var found = 0;
+                
+                // loop all containers and check a child index is not found
+                // i.e., reached the root-level.
+                while (found != -1) {
+                    var innerFound = -1;
+                    for (i in 0...containers.length) {
+                        var c = containers[i];
+                        if (c.childIndices.contains(childIndex)) {
+                            offset.x += c.offset.x;
+                            offset.y += c.offset.y;
+                            innerFound = i;
+                            childIndex = c.dimIndex;
+                            break;
+                        }
+                    }
+
+                    found = innerFound;
+                }
+
+                _dimClientPositions[index] = new FastVector2(offset.x, offset.y);
+            }
         }
 
         _ended = true;

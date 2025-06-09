@@ -305,7 +305,7 @@ class GlobalEvents
 	* @return Bool
 	**/
 	function isAnyMouseButtonDown():Bool {
-		return mouseButton > cast BUTTON_NONE;
+		return (mouseButton > cast BUTTON_NONE) && mouseDown;
 	}
 
 	/**
@@ -314,6 +314,13 @@ class GlobalEvents
 	**/
 	function isAnyMouseButtonReleased():Bool {
 		return (mouseButton > cast BUTTON_NONE) && mouseReleased;
+	}
+
+	/**
+	* Get a value determining if no mouse button is down at all
+	**/
+	function isNoMouseButtonDown() {
+		return mouseButton == BUTTON_NONE && !mouseReleased && !mouseDown;
 	}
 
 	/**

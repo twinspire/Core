@@ -41,7 +41,8 @@ class UpdateContext {
     private var _charString:String;
     private var _activatedIndex:Int;
 
-    private var _mouseDownPosFirst:FastVector2;
+    private var _lastMousePosition:FastVector2;
+    private var _mouseDownFirstPos:FastVector2;
     private var _mouseDragTolerance:Float = 3.0;
 
     private var _drag:DragObject;
@@ -73,7 +74,8 @@ class UpdateContext {
         _drag.dragIndex = -1;
         _drag.childIndex = -1;
         _drag.scrollIndex = -1;
-        _mouseDownPosFirst = new FastVector2(-1, -1);
+        _lastMousePosition = FastVector2.fromVector2(GlobalEvents.getMousePosition());
+        _mouseDownFirstPos = new FastVector2(-1, -1);
 
         _isDragStart = -1;
         _isDragEnd = -1;
@@ -148,22 +150,30 @@ class UpdateContext {
         _tempUI = [];
         _mouseFocusIndexUI = -1;
 
+        if (_mouseDownFirstPos.x == -1 && GlobalEvents.isAnyMouseButtonDown()) {
+            _mouseDownFirstPos = FastVector2.fromVector2(GlobalEvents.getMousePosition());
+        }
+        else if (GlobalEvents.isNoMouseButtonDown()) {
+            _mouseDownFirstPos = new FastVector2(-1, -1);
+        }
+
         var mousePos = GlobalEvents.getMousePosition();
         var currentOrder = -1;
 
         if (_drag.dragIndex == -1) {
             var remainActive = false;
-            if (_mouseDownPosFirst.x > -1 && _mouseDownPosFirst.y > -1) {
+            if (_mouseDownFirstPos.x > -1 && _mouseDownFirstPos.y > -1) {
                 remainActive = true;
             }
 
             for (i in 0..._gctx.dimensions.length) {
                 var query = _gctx.queries[i];
-                var actualDim = _gctx.getDimensionAtIndex(i);
+                var actualPos = _gctx.getClientDimensionAtIndex(i);
+                var actualDim = new Dim(actualPos.x, actualPos.y, _gctx.dimensions[i].width, _gctx.dimensions[i].height);
 
                 var active = GlobalEvents.isMouseOverDim(actualDim);
                 if (remainActive) {
-                    active = GlobalEvents.isMouseOverDim(actualDim, _mouseDownPosFirst);
+                    active = GlobalEvents.isMouseOverDim(actualDim, _mouseDownFirstPos);
                 }
 
                 if (active && actualDim.order > currentOrder
@@ -259,39 +269,23 @@ class UpdateContext {
                     _mouseIsReleased = index;
                     _activatedIndex = index;
                 }
-                
-                _mouseDownPosFirst = new FastVector2(-1, -1);
             }
 
             var containers = _gctx.containers.whereIndices((c) -> c.enableScrollWithClick != BUTTON_NONE);
             
             for (c in containers) {
                 var container = _gctx.containers[c];
-                if (GlobalEvents.isMouseButtonDown(container.enableScrollWithClick)) {
+                var containerDim = _gctx.dimensions[container.dimIndex];
+                
+                if (GlobalEvents.isMouseOverDim(containerDim) && 
+                    GlobalEvents.isMouseButtonDown(container.enableScrollWithClick)) {
                     _drag.scrollIndex = container.dimIndex;
-                }
-            }
-
-            if (GlobalEvents.isAnyMouseButtonDown()) {
-                if (_drag.childIndex > -1 && _drag.scrollIndex != -1) {
-                    _mouseIsDown = _drag.childIndex;
-                }
-                else {
-                    _mouseIsDown = index;
-
-                    if (_drag.scrollIndex > -1) {
-                        trace(_gctx.containers[_drag.scrollIndex].offset);
-                    }
+                    break; // Only one container can be scrolled at a time
                 }
             }
 
             if (GlobalEvents.isAnyMouseButtonReleased()) {
-                if (_drag.scrollIndex > -1) {
-                    trace(_gctx.containers[_drag.scrollIndex].offset);
-                }
-
                 _activatedIndex = -1;
-                _mouseDownPosFirst = new FastVector2(-1, -1);
                 if (_drag.dragIndex > -1) {
                     _isDragEnd = _drag.dragIndex;
                 }
@@ -300,6 +294,15 @@ class UpdateContext {
                 _drag.childIndex = -1;
                 _drag.scrollIndex = -1;
                 _drag.firstMousePosition = new FastVector2(-1, -1);
+            }
+
+            if (GlobalEvents.isAnyMouseButtonDown()) {
+                if (_drag.childIndex > -1 && _drag.scrollIndex != -1) {
+                    _mouseIsDown = _drag.childIndex;
+                }
+                else {
+                    _mouseIsDown = index;
+                }
             }
 
             if (GlobalEvents.getMouseDelta() != 0) {
@@ -340,17 +343,15 @@ class UpdateContext {
 
         _mouseFocusIndexUI = isMouseOver;
 
-        if (_mouseIsDown > -1) {
-            if (_mouseDownPosFirst.x == -1) {
-                _mouseDownPosFirst = FastVector2.fromVector2(GlobalEvents.getMousePosition());
-            }
+        var mousePos = GlobalEvents.getMousePosition();
+        var diff = new FastVector2(mousePos.x - _lastMousePosition.x, mousePos.y - _lastMousePosition.y);
 
+        if (_mouseIsDown > -1) {
             var theChild = _mouseIsDown;
             var dragStarted = false;
             if (_drag.dragIndex == -1 && _drag.scrollIndex != -1) {
                 dragStarted = true;
             }
-            
             
             var parentIndex = _gctx.dimensionLinks[_mouseIsDown];
             if (parentIndex > -1 && _drag.scrollIndex == -1) {
@@ -377,17 +378,15 @@ class UpdateContext {
                 }
 
                 var query = _gctx.queries[theChild];
-                var mousePos = GlobalEvents.getMousePosition();
-                var offset = new FastVector2(mousePos.x - _mouseDownPosFirst.x, mousePos.y - _mouseDownPosFirst.y);
 
-                if (theChild != _drag.dragIndex) { // ignore drag options 
-                    _gctx.dimensions[_drag.dragIndex].x += offset.x;
-                    _gctx.dimensions[_drag.dragIndex].y += offset.y;
+                if (theChild != _drag.dragIndex) {
+                    _gctx.dimensions[_drag.dragIndex].x += diff.x;
+                    _gctx.dimensions[_drag.dragIndex].y += diff.y;
 
                     var childIndices = _gctx.dimensionLinks.whereIndices((dl) -> dl == parentIndex);
                     for (child in childIndices) {
-                        _gctx.dimensions[child].x += offset.x;
-                        _gctx.dimensions[child].y += offset.y;
+                        _gctx.dimensions[child].x += diff.x;
+                        _gctx.dimensions[child].y += diff.y;
                     }
                 }
                 else if (query.dragOptions.constrained && parentIndex > -1) {
@@ -395,7 +394,7 @@ class UpdateContext {
                     // constrain child movement to parent dimensions.
                     switch (query.dragOptions.orientation) {
                         case ORIENTATION_HORIZONTAL: {
-                            _gctx.dimensions[theChild].x += offset.x;
+                            _gctx.dimensions[theChild].x += diff.x;
 
                             if (_gctx.dimensions[theChild].x < _gctx.dimensions[parentIndex].x) {
                                 _gctx.dimensions[theChild].x = _gctx.dimensions[parentIndex].x;
@@ -406,7 +405,7 @@ class UpdateContext {
                             }
                         }
                         case ORIENTATION_VERTICAL: {
-                            _gctx.dimensions[theChild].y += offset.y;
+                            _gctx.dimensions[theChild].y += diff.y;
 
                             if (_gctx.dimensions[theChild].y < _gctx.dimensions[parentIndex].y) {
                                 _gctx.dimensions[theChild].y = _gctx.dimensions[parentIndex].y;
@@ -418,19 +417,26 @@ class UpdateContext {
                         }
                     }
                 }
-        
-                _mouseDownPosFirst = new FastVector2(mousePos.x, mousePos.y);
             }
             else if (_drag.scrollIndex > -1) {
-                var mousePos = GlobalEvents.getMousePosition();
-                //trace('First Mouse Pos: ${_mouseDownPosFirst}; Mouse Pos: ${mousePos};');
+                // Find the container index for the current scroll
+                var containerIndex = -1;
                 
-                var offset = new FastVector2(mousePos.x - _mouseDownPosFirst.x, mousePos.y - _mouseDownPosFirst.y);
-
-                _gctx.containers[_drag.scrollIndex].offset.x += offset.x;
-                _gctx.containers[_drag.scrollIndex].offset.y += offset.y;
+                for (i in 0..._gctx.containers.length) {
+                    if (_gctx.containers[i].dimIndex == _drag.scrollIndex) {
+                        containerIndex = i;
+                        break;
+                    }
+                }
                 
-                _mouseDownPosFirst = new FastVector2(mousePos.x, mousePos.y);
+                // Only scroll if the correct button is still being held down
+                if (containerIndex > -1) {
+                    _gctx.containers[containerIndex].offset.x += diff.x;
+                    _gctx.containers[containerIndex].offset.y += diff.y;
+                }
+                else {
+                    _drag.scrollIndex = -1;
+                }
             }
         }
     }
@@ -870,6 +876,8 @@ class UpdateContext {
                 container.offset.y = -(container.content.y - dim.height);
             }
         }
+
+        _lastMousePosition = FastVector2.fromVector2(GlobalEvents.getMousePosition());
     }
 
     /**
