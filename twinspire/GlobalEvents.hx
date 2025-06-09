@@ -95,6 +95,7 @@ class GlobalEvents
 		keysUp = [ for (i in 0...255) false ];
 		mouseDelta = 0;
 		mouseMoveX = mouseMoveY = 0;
+		
 		for (touch in touchStates)
 		{
 			touch.touchReleased = false;
@@ -320,7 +321,7 @@ class GlobalEvents
 	* Get a value determining if no mouse button is down at all
 	**/
 	function isNoMouseButtonDown() {
-		return mouseButton == BUTTON_NONE && !mouseReleased && !mouseDown;
+		return !mouseReleased && !mouseDown;
 	}
 
 	/**

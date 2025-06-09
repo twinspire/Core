@@ -168,10 +168,10 @@ class UpdateContext {
 
             for (i in 0..._gctx.dimensions.length) {
                 var query = _gctx.queries[i];
-                var actualPos = _gctx.getClientDimensionAtIndex(i);
-                var actualDim = new Dim(actualPos.x, actualPos.y, _gctx.dimensions[i].width, _gctx.dimensions[i].height);
+                var actualDim = _gctx.getClientDimensionAtIndex(i);
 
                 var active = GlobalEvents.isMouseOverDim(actualDim);
+
                 if (remainActive) {
                     active = GlobalEvents.isMouseOverDim(actualDim, _mouseDownFirstPos);
                 }
@@ -297,7 +297,7 @@ class UpdateContext {
             }
 
             if (GlobalEvents.isAnyMouseButtonDown()) {
-                if (_drag.childIndex > -1 && _drag.scrollIndex != -1) {
+                if (_drag.childIndex > -1 && _drag.scrollIndex == -1) {
                     _mouseIsDown = _drag.childIndex;
                 }
                 else {
@@ -387,7 +387,11 @@ class UpdateContext {
                     for (child in childIndices) {
                         _gctx.dimensions[child].x += diff.x;
                         _gctx.dimensions[child].y += diff.y;
+
+                        _gctx.markDimChange(child);
                     }
+
+                    _gctx.markDimChange(_drag.dragIndex);
                 }
                 else if (query.dragOptions.constrained && parentIndex > -1) {
                     // our child is constrained, but the parent is not draggable

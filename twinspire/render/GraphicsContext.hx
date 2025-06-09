@@ -19,6 +19,7 @@ class GraphicsContext {
 
     private var _dimTemp:Array<Dim>;
     private var _dimTempLinkTo:Array<Int>;
+    private var _dimForceChangeIndices:Array<Int>;
     private var _containerTemp:Array<Container>;
     private var _ended:Bool;
     private var _menus:Array<Menu>;
@@ -66,6 +67,7 @@ class GraphicsContext {
     public function new() {
         _dimTemp = [];
         _dimTempLinkTo = [];
+        _dimForceChangeIndices = [];
         _containerTemp = [];
         containers = [];
         dimensions = [];
@@ -151,7 +153,18 @@ class GraphicsContext {
     * @param index The index of the dimension.
     **/
     public function getClientDimensionAtIndex(index:Int) {
-        return _dimClientPositions[index];
+        return new Dim(_dimClientPositions[index].x, _dimClientPositions[index].y, dimensions[index].width, dimensions[index].height, dimensions[index].order);
+    }
+
+    /**
+    * Force a dimension's position to change at a given index.
+    *
+    * @param index The index of the dimension.
+    **/
+    public function markDimChange(index:Int) {
+        if (!_dimForceChangeIndices.contains(index)) {
+            _dimForceChangeIndices.push(index);
+        }
     }
 
     /**
@@ -405,16 +418,24 @@ class GraphicsContext {
 
         // recalculate client dimensions for all dimensions affected
         // by a container change
-        if (containersChanged.length > -1) {
-            var dimIndicesChanged = new Array<Int>();
+        var dimIndicesChanged = new Array<Int>();
 
+        if (containersChanged.length > -1) {
             for (ci in 0...containersChanged.length) {
                 var container = containers[ci];
                 for (di in container.childIndices) {
                     dimIndicesChanged.push(di);
                 }
             }
+        }
 
+        for (index in _dimForceChangeIndices) {
+            if (!dimIndicesChanged.contains(index)) {
+                dimIndicesChanged.push(index);
+            }
+        }
+
+        if (dimIndicesChanged.length > 0) {
             for (index in dimIndicesChanged) {
                 // iterate each dimension
                 var dim = dimensions[index];
@@ -443,7 +464,7 @@ class GraphicsContext {
                     found = innerFound;
                 }
 
-                _dimClientPositions[index] = new FastVector2(offset.x, offset.y);
+                _dimClientPositions[index] = new FastVector2(dim.x + offset.x, dim.y + offset.y);
             }
         }
 
