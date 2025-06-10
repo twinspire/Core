@@ -9,7 +9,7 @@ class State {
     public var selection:Array<Int>;
     public var lineStart:Int;
     public var lineEnd:Int;
-    public var builder:StringBuf;
+    public var builder:StringBuffer;
     public var upIndex:Int;
     public var downIndex:Int;
     public var undo:Array<UndoState>;
@@ -49,8 +49,7 @@ class State {
     public function clearAll() {
         var cleared = false;
         if (builder.length > 0) {
-            builder = null;
-            builder = new StringBuf(); // overwrite existing buffer
+            builder.reset();
             selection = [];
             cleared = true;
         }
@@ -60,6 +59,32 @@ class State {
 
     public function undoPushState() {
         var text = builder.toString();
+        var item = new UndoState();
+        item.selection = selection.copy();
+        item.len = text.length;
+        item.text = text;
+        undo.push(item);
+    }
+
+    public function performUndo() {
+        if (undo.length > 0) {
+            undoPushState();
+            var item = undo.pop();
+            selection = item.selection.copy();
+            builder.reset();
+            builder.addString(item.text);
+        }
+    }
+
+    public function undoClear() {
+        undo = [];
+    }
+
+    public function inputText(text:String) {
+        if (text.length > 0) {
+            return 0;
+        }
+
         
     }
 
