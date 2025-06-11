@@ -195,9 +195,9 @@ class UpdateContext {
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
         
-        var isTextInput = !determineInitialMouseEvents();
-        trace(isTextInput);
-        if (!handleKeyEvents() || isTextInput) {
+        determineInitialMouseEvents();
+        
+        if (!handleKeyEvents()) {
             return;
         }
 
@@ -205,26 +205,23 @@ class UpdateContext {
     }
 
     private function determineInitialMouseEvents() {
-        if (_tempUI.length == 0 && GlobalEvents.isAnyMouseButtonReleased()) {
+        if (_tempUI.length == 0 && GlobalEvents.isAnyMouseButtonDown()) {
             _activatedIndex = -1;
         }
 
         var i = _tempUI.length - 1;
+        var hasTextInput = false;
         while (i > -1) {
             var index = _tempUI[i--];
-            if (_gctx.queries[index].acceptsTextInput) {
-                _activatedIndex = index;
-            }
-            else {
-                _activatedIndex = -1;
+            if (_gctx.queries[index].acceptsTextInput && _drag.dragIndex == -1) {
+                hasTextInput = true;
+                break;
             }
         }
 
-        if (_activatedIndex > -1) {
-            return false;
+        if (!hasTextInput && GlobalEvents.isAnyMouseButtonReleased()) {
+            _activatedIndex = -1;
         }
-
-        return true;
     }
 
     private function handleKeyEvents() {
@@ -305,6 +302,10 @@ class UpdateContext {
             }
 
             if (GlobalEvents.isAnyMouseButtonReleased()) {
+                if (query.acceptsTextInput) {
+                    _activatedIndex = isMouseOver;
+                }
+
                 if (_drag.dragIndex > -1) {
                     _isDragEnd = _drag.dragIndex;
                 }
@@ -686,7 +687,7 @@ class UpdateContext {
             return false;
         }
 
-        var result = _charString.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+        var result = _charString.length > 0 && _gctx.queries[index].type != QUERY_STATIC && _activatedIndex == index;
 
         if (result) {
             var parentIndex = _gctx.dimensionLinks[index];

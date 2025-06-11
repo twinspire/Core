@@ -29,6 +29,7 @@ class InputRenderer {
 
 
     public function new(containerIndex:Int, inputIndex:Int) {
+        trace(containerIndex);
         this.containerIndex = containerIndex;
         this.inputIndex = inputIndex;
 
@@ -40,7 +41,7 @@ class InputRenderer {
     public function update(ctx:UpdateContext) {
         var container:Container = null;
         @:privateAccess(UpdateContent) {
-            if (containerIndex < ctx._gctx.containers.length - 1) {
+            if (containerIndex < ctx._gctx.containers.length) {
                 container = ctx._gctx.containers[containerIndex];
             }
         }
@@ -53,7 +54,8 @@ class InputRenderer {
         ctx.isMouseReleased(container.dimIndex);
         ctx.isMouseScrolling(container.dimIndex);
 
-        if (ctx.getActivatedIndex() == container.dimIndex) {
+        var isActive = ctx.getActivatedIndex() == container.dimIndex;
+        if (isActive) {
             ctx.isDragging(container.dimIndex);
             ctx.isKeyEnter(container.dimIndex);
             ctx.isKeyDown(container.dimIndex);

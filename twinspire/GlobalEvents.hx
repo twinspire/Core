@@ -29,6 +29,7 @@ class GlobalEvents
 	@:noCompletion var mouseMoveY:Int;
 	@:noCompletion var mouseButton:Int;
 	@:noCompletion var mouseReleased:Bool;
+	@:noCompletion var mouseRecentlyReleased:Bool;
 	@:noCompletion var mouseDown:Bool;
 	@:noCompletion var mouseDelta:Int;
 	@:noCompletion var mouseLocked:Bool;
@@ -90,6 +91,7 @@ class GlobalEvents
 	function end()
 	{
 		keyChar = "";
+		mouseRecentlyReleased = mouseReleased;
 		mouseReleased = false;
 		appActivated = false;
 		appDeactivated = false;
@@ -312,11 +314,11 @@ class GlobalEvents
 	}
 
 	/**
-	* Get a value determining if any mouse button is down.
+	* Get a value determining if any mouse button has recently been released.
 	* @return Bool
 	**/
 	function isAnyMouseButtonReleased():Bool {
-		return (mouseButton > cast BUTTON_NONE) && mouseReleased;
+		return (mouseButton > cast BUTTON_NONE) && mouseRecentlyReleased;
 	}
 
 	/**
