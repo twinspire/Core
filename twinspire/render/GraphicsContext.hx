@@ -1,12 +1,15 @@
 package twinspire.render;
 
-import kha.math.FastVector2;
+import twinspire.geom.Dim;
 import twinspire.render.UpdateContext;
-import twinspire.Application;
-import kha.graphics2.Graphics;
 import twinspire.render.QueryType;
 import twinspire.render.RenderQuery;
-import twinspire.geom.Dim;
+import twinspire.text.InputRenderer;
+import twinspire.text.TextInputState;
+import twinspire.Application;
+
+import kha.graphics2.Graphics;
+import kha.math.FastVector2;
 
 typedef ContainerResult = {
     var dimIndex:Int;
@@ -50,6 +53,10 @@ class GraphicsContext {
     * A collection of activities. Do not write directly.
     **/
     public var activities:Array<Activity>;
+    /**
+    * A collection of text input states. Do not write directly.
+    **/
+    public var textInputs:Array<TextInputState>;
     /**
     * Defines how the `end()` call works with permanent storage. See `end()` for more info.
     **/
@@ -295,6 +302,21 @@ class GraphicsContext {
             dimIndex: container.dimIndex,
             containerIndex: result
         };
+    }
+
+    public function addTextInput(dim:Dim, linkTo:Int = -1):ContainerResult {
+        var container = new Container();
+        container.dimIndex = addUI(dim, InputRenderer.RenderId, linkTo);
+        container.offset = new FastVector2(0, 0);
+        container.content = new FastVector2(0, 0);
+
+        _containerTemp.push(container);
+        var result = _containerTemp.length - 1;
+        if (noVirtualSceneChange) {
+            result += containers.length;
+        }
+
+
     }
 
     /**

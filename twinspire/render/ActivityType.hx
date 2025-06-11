@@ -12,6 +12,7 @@ enum abstract ActivityType(Int) from Int to Int {
     var ACTIVITY_DRAG_START         =   8;
     var ACTIVITY_DRAG_END           =   9;
     var ACTIVITY_DRAGGING           =   10;
+    var ACTIVITY_TEXT_CHANGE        =   11;
 
-    var ACTIVITY_MAX                =   11;
+    var ACTIVITY_MAX                =   12;
 }
