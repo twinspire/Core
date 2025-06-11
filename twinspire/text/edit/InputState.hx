@@ -136,18 +136,20 @@ class InputState {
             start = temp;
         }
         
-        if (start < 0) {
-            start = 0;
-        }
         if (start > builder.length - 1) {
             start = builder.length - 1;
         }
 
-        if (end < 0) {
-            end = 0;
+        if (start < 0) {
+            start = 0;
         }
+        
         if (end > builder.length - 1) {
             end = builder.length - 1;
+        }
+
+        if (end < 0) {
+            end = 0;
         }
 
         return { start: start, end: end };

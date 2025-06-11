@@ -40,6 +40,10 @@ class StringBuffer {
         }
     }
 
+    public inline function getData() {
+        return s;
+    }
+
     public inline function new(?max:Int = 0) {
         s = [];
         current = 0;

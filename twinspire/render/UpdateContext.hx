@@ -92,6 +92,10 @@ class UpdateContext {
         return _gctx.dimensions[index].clone();
     }
 
+    public function getTextInputState(index:Int) {
+        return _gctx.textInputs[index];
+    }
+
     /**
     * Begin update context and start performing event simulations.
     **/
@@ -191,11 +195,36 @@ class UpdateContext {
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
         
-        if (!handleKeyEvents()) {
+        var isTextInput = !determineInitialMouseEvents();
+        trace(isTextInput);
+        if (!handleKeyEvents() || isTextInput) {
             return;
         }
 
         handleMouseEvents();
+    }
+
+    private function determineInitialMouseEvents() {
+        if (_tempUI.length == 0 && GlobalEvents.isAnyMouseButtonReleased()) {
+            _activatedIndex = -1;
+        }
+
+        var i = _tempUI.length - 1;
+        while (i > -1) {
+            var index = _tempUI[i--];
+            if (_gctx.queries[index].acceptsTextInput) {
+                _activatedIndex = index;
+            }
+            else {
+                _activatedIndex = -1;
+            }
+        }
+
+        if (_activatedIndex > -1) {
+            return false;
+        }
+
+        return true;
     }
 
     private function handleKeyEvents() {
@@ -262,15 +291,6 @@ class UpdateContext {
 
             isMouseOver = index;
 
-            if (GlobalEvents.isAnyMouseButtonReleased()) {
-                // check that the mouse is actually within the active component
-                // when the mouse button is released.
-                if (GlobalEvents.isMouseOverDim(dim)) {
-                    _mouseIsReleased = index;
-                    _activatedIndex = index;
-                }
-            }
-
             var containers = _gctx.containers.whereIndices((c) -> c.enableScrollWithClick != BUTTON_NONE);
             
             for (c in containers) {
@@ -285,7 +305,6 @@ class UpdateContext {
             }
 
             if (GlobalEvents.isAnyMouseButtonReleased()) {
-                _activatedIndex = -1;
                 if (_drag.dragIndex > -1) {
                     _isDragEnd = _drag.dragIndex;
                 }
@@ -477,13 +496,13 @@ class UpdateContext {
                 if (_mouseFocusIndexUI == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_OVER;
-                    _gctx.activities[parentIndex] = activity;
+                    _gctx.activities[parentIndex].push(activity);
                 }
             }
 
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_OVER;
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -512,13 +531,13 @@ class UpdateContext {
                 if (_mouseIsDown == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_DOWN;
-                    _gctx.activities[parentIndex] = activity;
+                    _gctx.activities[parentIndex].push(activity);
                 }
             }
 
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_DOWN;
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -542,13 +561,13 @@ class UpdateContext {
                 if (_mouseIsReleased == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_CLICKED;
-                    _gctx.activities[parentIndex] = activity;
+                    _gctx.activities[parentIndex].push(activity);
                 }
             }
 
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_CLICKED;
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -574,14 +593,14 @@ class UpdateContext {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_SCROLL;
                     activity.data.push(_mouseScrollValue);
-                    _gctx.activities[parentIndex] = activity;
+                    _gctx.activities[parentIndex].push(activity);
                 }
             }
 
             var activity = new Activity();
             activity.type = ACTIVITY_MOUSE_SCROLL;
             activity.data.push(_mouseScrollValue);
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -608,14 +627,14 @@ class UpdateContext {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_UP;
                     activity.data.push(_keysUp);
-                    _gctx.activities[parentIndex] = activity;
+                    _gctx.activities[parentIndex].push(activity);
                 }
             }
 
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_UP;
             activity.data.push(_keysUp);
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -642,14 +661,14 @@ class UpdateContext {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_DOWN;
                     activity.data.push(_keysDown);
-                    _gctx.activities[parentIndex] = activity;
+                    _gctx.activities[parentIndex].push(activity);
                 }
             }
 
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_DOWN;
             activity.data.push(_keysDown);
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -676,14 +695,14 @@ class UpdateContext {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_ENTER;
                     activity.data.push(_charString);
-                    _gctx.activities[parentIndex] = activity;
+                    _gctx.activities[parentIndex].push(activity);
                 }
             }
 
             var activity = new Activity();
             activity.type = ACTIVITY_KEY_ENTER;
             activity.data.push(_charString);
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -706,7 +725,7 @@ class UpdateContext {
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_DRAG_START;
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -729,7 +748,7 @@ class UpdateContext {
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_DRAGGING;
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -752,7 +771,7 @@ class UpdateContext {
         if (result) {
             var activity = new Activity();
             activity.type = ACTIVITY_DRAG_END;
-            _gctx.activities[index] = activity;
+            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -829,6 +848,7 @@ class UpdateContext {
         _keysUp = [];
         _isDragStart = -1;
         _isDragEnd = -1;
+        _charString = "";
 
         // do container checks here.
         for (i in 0..._gctx.containers.length) {

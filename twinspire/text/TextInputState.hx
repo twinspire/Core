@@ -1,5 +1,6 @@
 package twinspire.text;
 
+import twinspire.render.GraphicsContext.TextInputResult;
 import twinspire.text.edit.InputState;
 import twinspire.render.GraphicsContext.ContainerResult;
 
@@ -30,11 +31,11 @@ class TextInputState {
 
     }
 
-    public function setup(index:ContainerResult, method:TextInputMethod) {
+    public function setup(index:TextInputResult, method:TextInputMethod) {
         this.index = index;
         this.method = method;
 
-        inputRenderer = new InputRenderer(index.containerIndex);
+        inputRenderer = new InputRenderer(index.containerIndex, index.textInputIndex);
         inputHandler = new InputState();
     }
 

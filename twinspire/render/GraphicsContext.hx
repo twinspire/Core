@@ -6,6 +6,7 @@ import twinspire.render.QueryType;
 import twinspire.render.RenderQuery;
 import twinspire.text.InputRenderer;
 import twinspire.text.TextInputState;
+import twinspire.text.TextInputMethod;
 import twinspire.Application;
 
 import kha.graphics2.Graphics;
@@ -14,6 +15,11 @@ import kha.math.FastVector2;
 typedef ContainerResult = {
     var dimIndex:Int;
     var containerIndex:Int;
+}
+
+typedef TextInputResult = {
+    > ContainerResult,
+    var textInputIndex:Int;
 }
 
 @:allow(Application)
@@ -52,7 +58,7 @@ class GraphicsContext {
     /**
     * A collection of activities. Do not write directly.
     **/
-    public var activities:Array<Activity>;
+    public var activities:Array<Array<Activity>>;
     /**
     * A collection of text input states. Do not write directly.
     **/
@@ -81,6 +87,7 @@ class GraphicsContext {
         dimensionLinks = [];
         queries = [];
         activities = [];
+        textInputs = [];
         _ended = false;
         _currentMenu = -1;
         _containerOffsetsChanged = false;
@@ -202,7 +209,7 @@ class GraphicsContext {
         query.renderType = renderType;
         queries.push(query);
 
-        activities.push(null);
+        activities.push([]);
 
         return index;
     }
@@ -235,7 +242,7 @@ class GraphicsContext {
         query.renderType = renderType;
         queries.push(query);
 
-        activities.push(null);
+        activities.push([]);
 
         if (_currentMenu > -1) {
             _menus[_currentMenu].indices.push(index);
@@ -272,7 +279,7 @@ class GraphicsContext {
         query.renderType = renderType;
         queries.push(query);
 
-        activities.push(null);
+        activities.push([]);
 
         return index;
     }
@@ -283,6 +290,8 @@ class GraphicsContext {
     * that enables scroll and other like events to occur automatically.
     *
     * @param dim The dimension of this container.
+    * @param renderType An integer used to determine what is rendered.
+    * @param linkTo An optional index specifying that this dimension should be linked to another index.
     *
     * @return An index value of the position of this container as it would be in permanent storage.
     **/
@@ -304,9 +313,23 @@ class GraphicsContext {
         };
     }
 
-    public function addTextInput(dim:Dim, linkTo:Int = -1):ContainerResult {
+    /**
+    * Add a container that is used as the basis for text input. An internal text input handler and text renderer
+    * is implemented in the underlying `TextInputState`. To access, use the `textInputs` variable of this class
+    * and use it to pass in your update and render contexts accordingly.
+    *
+    * You can control how the text input is rendered. There is `ImSingle`, `ImMultiline` and `Buffered`.
+    *
+    * @param dim The dimension to which this text input is rendered.
+    * @param method The renderer method to use.
+    * @param linkTo An optional index specifying that this dimension should be linked to another index.
+    *
+    * @return Returns three indices to represent the dim, container and input text states stored in this context.
+    **/
+    public function addTextInput(dim:Dim, method:TextInputMethod, linkTo:Int = -1):TextInputResult {
         var container = new Container();
         container.dimIndex = addUI(dim, InputRenderer.RenderId, linkTo);
+        queries[container.dimIndex].acceptsTextInput = true;
         container.offset = new FastVector2(0, 0);
         container.content = new FastVector2(0, 0);
 
@@ -316,7 +339,17 @@ class GraphicsContext {
             result += containers.length;
         }
 
+        var inputResult:TextInputResult = {
+            containerIndex: result,
+            dimIndex: container.dimIndex,
+            textInputIndex: textInputs.length
+        };
 
+        var inputState = new TextInputState();
+        inputState.setup(inputResult, method);
+        textInputs.push(inputState);
+
+        return inputResult;
     }
 
     /**
@@ -409,9 +442,8 @@ class GraphicsContext {
         _containerTemp = [];
 
         for (i in 0...activities.length) {
-            activities[i] = null;
+            activities[i] = [];
         }
-
         
         var containersChanged = new Array<Int>();
         
@@ -421,7 +453,7 @@ class GraphicsContext {
             // ensure remainder is positive
             if (remainder > 0) {
                 for (i in 0...remainder) {
-                    _containerLastOffsets.push(new FastVector2(containers[i + _containerLastOffsets.length].offset.x, containers[i + _containerLastOffsets.length].offset.y));
+                    _containerLastOffsets.push(new FastVector2());
                     // force a check on all additional containers
                     containersChanged.push(i + containers.length);
                 }

@@ -80,6 +80,7 @@ class GlobalEvents
 		filesDropped = [];
 		keysUp = [ for (i in 0...255) false ];
 		keysDown = [ for (i in 0...255) false ];
+		keyChar = "";
 	}
 
 	/**
@@ -88,6 +89,7 @@ class GlobalEvents
 	 */
 	function end()
 	{
+		keyChar = "";
 		mouseReleased = false;
 		appActivated = false;
 		appDeactivated = false;
