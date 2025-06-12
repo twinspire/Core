@@ -385,20 +385,9 @@ class InputRenderer {
 
     private function handleKeyWithRepeat(key:KeyCode, deltaTime:Float, action:() -> Void) {
         var dimIndex = gtx.containers[containerIndex].dimIndex;
-        if (utx.hasActivityData(dimIndex, ACTIVITY_KEY_ENTER, key)) {
-            action();
-            var repeat:KeyRepeatInfo = {
-                timeHeld: 0.0,
-                isRepeating: false,
-                initialDelay: 0.5,
-                repeatRate: 0.1,
-                lastRepeatTime: 0.0
-            };
-
-            keyRepeatStates.set(key, repeat);
-        }
-        else if (utx.hasActivityData(dimIndex, ACTIVITY_KEY_DOWN, key)) {
+        if (utx.hasActivityData(dimIndex, ACTIVITY_KEY_DOWN, key)) {
             if (!keyRepeatStates.exists(key)) {
+                action();
                 var repeat:KeyRepeatInfo = {
                     timeHeld: 0.0,
                     isRepeating: false,
@@ -409,21 +398,22 @@ class InputRenderer {
 
                 keyRepeatStates.set(key, repeat);
             }
-
-            var repeatInfo = keyRepeatStates.get(key);
-            repeatInfo.timeHeld += deltaTime;
-            if (!repeatInfo.isRepeating) {
-                if (repeatInfo.timeHeld >= repeatInfo.initialDelay) {
-                    repeatInfo.isRepeating = true;
-                    repeatInfo.lastRepeatTime = 0.0;
-                    action();
-                }
-            }
             else {
-                repeatInfo.lastRepeatTime += deltaTime;
-                if (repeatInfo.lastRepeatTime >= repeatInfo.repeatRate) {
-                    repeatInfo.lastRepeatTime = 0.0;
-                    action();
+                var repeatInfo = keyRepeatStates.get(key);
+                repeatInfo.timeHeld += deltaTime;
+                if (!repeatInfo.isRepeating) {
+                    if (repeatInfo.timeHeld >= repeatInfo.initialDelay) {
+                        repeatInfo.isRepeating = true;
+                        repeatInfo.lastRepeatTime = 0.0;
+                        action();
+                    }
+                }
+                else {
+                    repeatInfo.lastRepeatTime += deltaTime;
+                    if (repeatInfo.lastRepeatTime >= repeatInfo.repeatRate) {
+                        repeatInfo.lastRepeatTime = 0.0;
+                        action();
+                    }
                 }
             }
         }
