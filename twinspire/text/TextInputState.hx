@@ -26,6 +26,10 @@ class TextInputState {
     * The handler used to manage and obtain input text data.
     **/
     public var inputHandler:InputState;
+    /**
+    * Use carriage-return, line feed for new lines.
+    **/
+    public var crlf:Bool;
 
     public function new() {
 

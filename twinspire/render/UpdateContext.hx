@@ -779,6 +779,71 @@ class UpdateContext {
     }
 
     /**
+    * Gets the activity data for a given activity type at the specified dimension index.
+    * Returns `null` if no activity is found for that type or an event was never received.
+    *
+    * @param index The dimension index.
+    * @param type The activity type to check.
+    *
+    * @return The array of data for a specific activity type, if any exist. `null` otherwise.
+    **/
+    public function getActivity(index:Int, type:ActivityType):Array<Dynamic> {
+        if (_gctx.activities[index].length == 0) {
+            return null;
+        }
+
+        for (a in _gctx.activities[index]) {
+            if (a.type == type) {
+                return a.data;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+    * Checks if the given activity data for and activity type and dimension index matches
+    * to the activity data stored for the event. This function uses `getActivity` internally.
+    *
+    * @param index The index of the dimension.
+    * @param type The type of activity.
+    * @param data An array of data to match.
+    *
+    * @return Returns `true` if the data matches, `false` otherwise. Returns `false` if there is no data.
+    **/
+    public function hasActivityData(index:Int, type:ActivityType, data:...Dynamic) {
+        var array = getActivity(index, type);
+        if (array == null) {
+            return false;
+        }
+
+        if (array.length == 0) {
+            return false;
+        }
+
+        var result = true;
+        if (array.length != data.length) {
+            return false;
+        }
+
+        for (i in 0...data.length) {
+            var matched = false;
+            for (j in 0...array.length) {
+                if (array[j] == data[i]) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                result = false;
+                break;
+            }
+        }
+
+        return result;
+    }
+
+    /**
     * Retains a mouse-down effect for the given index, allowing for preserving a visual state
     * between frames.
     **/
