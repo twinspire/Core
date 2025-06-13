@@ -110,6 +110,9 @@ class InputRenderer {
         
         var lineHeight = fontSize * 1.1;
         var select = inputState.inputHandler.sortedSelection();
+        var x = dim.x - container.offset.x;
+        var y = dim.y - container.offset.y;
+
         gtx.g2.scissorDim(dim);
 
         switch (inputState.method) {
@@ -122,14 +125,14 @@ class InputRenderer {
                     var lineSelEnd = Math.min(select.end - line.start, state.length);
 
                     if (lineSelStart < lineSelEnd) {
-                        var selX = dim.x;
+                        var selX = x;
                         if (lineSelStart > 0) {
                             selX += font.widthOfCharacters(fontSize, state.getData(), line.start, cast lineSelStart);
                         }
 
                         var selWidth = font.widthOfCharacters(fontSize, state.getData(), cast lineSelStart, cast (lineSelEnd - lineSelStart));
                         gtx.g2.color = selectionColor;
-                        gtx.g2.fillRectDim(new Dim(selX, dim.y, selWidth, lineHeight));
+                        gtx.g2.fillRectDim(new Dim(selX, y, selWidth, lineHeight));
                     }
                 }
                 
@@ -138,7 +141,7 @@ class InputRenderer {
                 gtx.g2.fontSize = fontSize;
                 
                 if (state.length > 0) {
-                    gtx.g2.drawCharacters(state.getData(), 0, state.length, dim.x, dim.y);
+                    gtx.g2.drawCharacters(state.getData(), 0, state.length, x, y);
                 }
 
                 
@@ -159,9 +162,9 @@ class InputRenderer {
             var cursorPos = inputState.inputHandler.selection[0];
             var cursorCoord = getCursorCoordinates(inputState, cursorPos);
             var cursorHeight = fontSize;
-            var cursorY = cursorCoord.y + dim.y + (lineHeight - cursorHeight) / 2;
+            var cursorY = cursorCoord.y + y + (lineHeight - cursorHeight) / 2;
             gtx.g2.color = cursorColor;
-            gtx.g2.fillRect(cursorCoord.x + dim.x, cursorY, 2, cursorHeight);
+            gtx.g2.fillRect(cursorCoord.x + x, cursorY, 2, cursorHeight);
         }
 
         gtx.g2.disableScissor();
@@ -182,6 +185,13 @@ class InputRenderer {
 
         active = utx.getActivatedIndex() == container.dimIndex;
         mouseIsOver = false;
+
+        if (!active) {
+            container.offset.x = 0;
+            container.offset.y = 0;
+            return;
+        }
+
         this.gtx = gtx;
         this.utx = utx;
 
@@ -524,7 +534,7 @@ class InputRenderer {
         if (cursorCoord.x < container.offset.x) {
             container.offset.x = cursorCoord.x;
         }
-        else if (cursorCoord.x - container.offset.x > dim.width + 10) {
+        else if (cursorCoord.x - container.offset.x + 10 > dim.width + 10) {
             container.offset.x = cursorCoord.x - dim.width + 10;
         }
 

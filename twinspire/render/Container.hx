@@ -18,6 +18,10 @@ class Container {
     **/
     public var offset:FastVector2;
     /**
+    * Tells that the offset should not be automatically adjusted internally by event simulations.
+    **/
+    public var manual:Bool;
+    /**
     * The size of the content for this container. This is automatically worked out at the end of each frame.
     **/
     public var content:FastVector2;

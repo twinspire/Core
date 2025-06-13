@@ -915,10 +915,10 @@ class UpdateContext {
 
         // do container checks here.
         for (i in 0..._gctx.containers.length) {
+            var container = _gctx.containers[i];
             // calculate content
             var maxWidth = 0.0;
             var maxHeight = 0.0;
-            var container = _gctx.containers[i];
             var containerDim = _gctx.dimensions[container.dimIndex];
             // give a gap of a third of the container
             // to allow a more natural view of the contents
@@ -940,8 +940,8 @@ class UpdateContext {
 
         for (i in 0..._gctx.containers.length) {
             var container = _gctx.containers[i];
-            // infinite scroll, so don't clamp anything
-            if (container.infiniteScroll) {
+            // infinite scroll or manual intervention, so don't clamp anything
+            if (container.infiniteScroll || container.manual) {
                 continue;
             }
 

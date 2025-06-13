@@ -330,6 +330,7 @@ class GraphicsContext {
         var container = new Container();
         container.dimIndex = addUI(dim, InputRenderer.RenderId, linkTo);
         queries[container.dimIndex].acceptsTextInput = true;
+        container.manual = true;
         container.offset = new FastVector2(0, 0);
         container.content = new FastVector2(0, 0);
 
