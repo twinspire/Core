@@ -403,7 +403,7 @@ class InputRenderer {
                     timeHeld: 0.0,
                     isRepeating: false,
                     initialDelay: 0.5,
-                    repeatRate: 0.1,
+                    repeatRate: 0.05,
                     lastRepeatTime: 0.0
                 };
 
