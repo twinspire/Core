@@ -129,7 +129,7 @@ class InputRenderer {
 
                         var selWidth = font.widthOfCharacters(fontSize, state.getData(), cast lineSelStart, cast (lineSelEnd - lineSelStart));
                         gtx.g2.color = selectionColor;
-                        gtx.g2.fillRectDim(new Dim(dim.x + selX, dim.y, selWidth, lineHeight));
+                        gtx.g2.fillRectDim(new Dim(selX, dim.y, selWidth, lineHeight));
                     }
                 }
                 
@@ -190,27 +190,31 @@ class InputRenderer {
             for (k in keys) {
                 inputState.inputHandler.inputText(Std.string(k));
             }
+            updateScroll(inputState);
         }
 
         handleKeyWithRepeat(KeyCode.Backspace, utx.deltaTime, () -> {
             inputState.inputHandler.performCommand(Backspace);
             updateLineInfo(inputState);
+            updateScroll(inputState);
         });
 
         handleKeyWithRepeat(KeyCode.Delete, utx.deltaTime, () -> {
             inputState.inputHandler.performCommand(Delete);
             updateLineInfo(inputState);
+            updateScroll(inputState);
         });
 
         if (inputState.method != ImSingleLine) {
             if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_UP, KeyCode.Return)) {
                 inputState.inputHandler.performCommand(New_Line);
                 updateLineInfo(inputState);
+                updateScroll(inputState);
             }
         }
 
         handleKeyWithRepeat(KeyCode.Left, utx.deltaTime, () -> {
-            if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_DOWN, KeyCode.Shift)) {
+            if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                 inputState.inputHandler.performCommand(Select_Left);
             }
             else {
@@ -218,10 +222,11 @@ class InputRenderer {
             }
             cursorVisible = true;
             cursorBlinkTime = 0.0;
+            updateScroll(inputState);
         });
 
         handleKeyWithRepeat(KeyCode.Right, utx.deltaTime, () -> {
-            if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_DOWN, KeyCode.Shift)) {
+            if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                 inputState.inputHandler.performCommand(Select_Right);
             }
             else {
@@ -229,12 +234,13 @@ class InputRenderer {
             }
             cursorVisible = true;
             cursorBlinkTime = 0.0;
+            updateScroll(inputState);
         });
 
         if (inputState.method != ImSingleLine) {
             handleKeyWithRepeat(KeyCode.Up, utx.deltaTime, () -> {
                 updateUpDownIndices(inputState);
-                if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_DOWN, KeyCode.Shift)) {
+                if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                     inputState.inputHandler.performCommand(Select_Up);
                 }
                 else {
@@ -242,11 +248,12 @@ class InputRenderer {
                 }
                 cursorVisible = true;
                 cursorBlinkTime = 0.0;
+                updateScroll(inputState);
             });
 
             handleKeyWithRepeat(KeyCode.Down, utx.deltaTime, () -> {
                 updateUpDownIndices(inputState);
-                if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_DOWN, KeyCode.Shift)) {
+                if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                     inputState.inputHandler.performCommand(Select_Down);
                 }
                 else {
@@ -254,12 +261,14 @@ class InputRenderer {
                 }
                 cursorVisible = true;
                 cursorBlinkTime = 0.0;
+                updateScroll(inputState);
             });
         }
 
-        if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_DOWN, KeyCode.Control)) {
+        if (GlobalEvents.isKeyDown(KeyCode.Control)) {
             if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_UP, KeyCode.A)) {
                 inputState.inputHandler.performCommand(Select_All);
+                updateScroll(inputState);
             }
             if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_UP, KeyCode.C)) {
                 inputState.inputHandler.performCommand(Copy);
@@ -267,22 +276,24 @@ class InputRenderer {
             if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_UP, KeyCode.X)) {
                 inputState.inputHandler.performCommand(Cut);
                 updateLineInfo(inputState);
+                updateScroll(inputState);
             }
             if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_UP, KeyCode.V)) {
                 inputState.inputHandler.performCommand(Paste);
                 updateLineInfo(inputState);
+                updateScroll(inputState);
             }
             if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_UP, KeyCode.Z)) {
                 inputState.inputHandler.performCommand(Undo);
                 updateLineInfo(inputState);
+                updateScroll(inputState);
             }
             if (utx.hasActivityData(container.dimIndex, ACTIVITY_KEY_UP, KeyCode.Y)) {
                 inputState.inputHandler.performCommand(Redo);
                 updateLineInfo(inputState);
+                updateScroll(inputState);
             }
         }
-
-        updateScroll(inputState);
     }
 
     private function updateLineInfo(inputState:TextInputState) {
@@ -385,7 +396,7 @@ class InputRenderer {
 
     private function handleKeyWithRepeat(key:KeyCode, deltaTime:Float, action:() -> Void) {
         var dimIndex = gtx.containers[containerIndex].dimIndex;
-        if (utx.hasActivityData(dimIndex, ACTIVITY_KEY_DOWN, key)) {
+        if (GlobalEvents.isKeyDown(key)) {
             if (!keyRepeatStates.exists(key)) {
                 action();
                 var repeat:KeyRepeatInfo = {

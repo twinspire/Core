@@ -822,9 +822,6 @@ class UpdateContext {
         }
 
         var result = true;
-        if (array.length != data.length) {
-            return false;
-        }
 
         for (i in 0...data.length) {
             var matched = false;
