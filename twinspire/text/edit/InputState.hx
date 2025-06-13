@@ -183,8 +183,8 @@ class InputState {
         if (pos < 0) {
             pos = 0;
         }
-        if (pos > builder.length - 1) {
-            pos = builder.length - 1;
+        if (pos > builder.length) {
+            pos = builder.length;
         }
 
         switch (t) {
@@ -192,7 +192,7 @@ class InputState {
                 pos = 0;
             }
             case End: {
-                pos = builder.length - 1;
+                pos = builder.length;
             }
             case Left: {
                 pos -= 1;
@@ -251,8 +251,8 @@ class InputState {
         if (pos < 0) {
             pos = 0;
         }
-        if (pos > builder.length - 1) {
-            pos = builder.length - 1;
+        if (pos > builder.length) {
+            pos = builder.length;
         }
 
         return pos;
@@ -284,10 +284,10 @@ class InputState {
         else {
             var low = selection[0];
             var high = translatePosition(t);
-            low = cast Math.min(low, high);
-            high = cast Math.max(low, high);
-            remove(low, high);
-            selection = [ low, low ];
+            var newLow = cast Math.min(low, high);
+            var newHigh = cast Math.max(low, high);
+            remove(newLow, newHigh);
+            selection = [ newLow, newLow ];
         }
     }
 

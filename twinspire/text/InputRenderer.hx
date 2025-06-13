@@ -428,7 +428,7 @@ class InputRenderer {
                 }
             }
         }
-        else if (utx.hasActivityData(dimIndex, ACTIVITY_KEY_UP, key)) {
+        else if (GlobalEvents.isKeyUp(key, 0)) {
             keyRepeatStates.remove(key);
         }
     }
