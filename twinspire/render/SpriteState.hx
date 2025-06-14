@@ -18,10 +18,15 @@ class SpriteState {
     * This is suitable for state machines.
     **/
     public var groups:Map<String, Array<Int>>;
+    /**
+    * Specifies the animation looping method, if any should exist.
+    **/
+    public var animationLoop:Map<String, SpriteAnimationLoop>;
 
     public function new() {
         patches = [];
         groups = [];
+        animationLoop = [];
     }
 
 }

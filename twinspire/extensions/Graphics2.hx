@@ -1,5 +1,6 @@
 package twinspire.extensions;
 
+import twinspire.render.Sprite;
 import twinspire.geom.Dim;
 import twinspire.render.Patch;
 
@@ -53,8 +54,14 @@ class Graphics2
 		g2.drawScaledSubImage(img, source.x, source.y, source.width, source.height, destination.x, destination.y, destination.width, destination.height);
 	}
 
+
 	public static function drawPatchedImage(g2:Graphics, img:Image, patch:Patch, destination:Dim) {
 		var segments = patch.getSegments();
+		if (segments.length != 9) {
+			drawScaledSubImageDim(g2, img, patch.source, destination);
+			return;
+		}
+
 		var tl = new Dim(destination.x, destination.y, segments[TopLeft].width, segments[TopLeft].height);
 		var tr = new Dim(destination.width - segments[TopRight].width + destination.x, destination.y, segments[TopRight].width, segments[TopRight].height);
 		var tm = new Dim(destination.x + segments[TopLeft].width, destination.y, destination.width - tl.width - tr.width, tl.height);
@@ -327,6 +334,31 @@ class Graphics2
 	{
 		g2.scissor(cast dim.x, cast dim.y, cast dim.width, cast dim.height);
 	}
+
+	public static function drawSprite(g2:Graphics, sprite:Sprite, index:Int, dim:Dim) {
+		var state = sprite.states[index];
+		if (state.patches.length == 0) {
+			drawScaledImageDim(g2, state.image, dim);
+		}
+		else {
+			drawPatchedImage(g2, state.image, state.patches[0], dim);
+		}
+	}
+
+	public static function drawSpritePatch(g2:Graphics, sprite:Sprite, stateIndex:Int, patchIndex:Int, dim:Dim) {
+		var state = sprite.states[stateIndex];
+		drawPatchedImage(g2, state.image, state.patches[patchIndex], dim);
+	}
+
+	public static function drawSpriteGroup(g2:Graphics, sprite:Sprite, index:Int, group:String, dim:Dim) {
+		var state = sprite.states[index];
+		if (state.groups.exists(group)) {
+			var groupIndices = state.groups.get(group);
+			drawPatchedImage(g2, state.image, state.patches[groupIndices[0]], dim);
+		}
+	}
+
+	
 
 	/**
 	 * Draws a arc.
