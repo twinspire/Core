@@ -41,6 +41,7 @@ class GraphicsContext {
     private var _dimClientPositions:Array<FastVector2>;
 
     private var _buffers:Array<Image>;
+    private var _bufferDimensionIndices:Array<Array<Int>>;
     private var _currentBuffer:Int;
 
     /**
@@ -79,7 +80,14 @@ class GraphicsContext {
 
     private var _g2:Graphics;
     public var g2(get, default):Graphics;
-    function get_g2() return _g2;
+    function get_g2() {
+        if (_currentBuffer > -1 && _currentBuffer < _buffers.length) {
+            return _buffers[_currentBuffer].g2;
+        }
+        else {
+            return _g2;
+        }
+    }
 
     public function new() {
         _dimTemp = [];
@@ -108,6 +116,43 @@ class GraphicsContext {
     public function getTemporaryDimAtNewIndex(index:Int) {
         var resolvedIndex = index - (dimensions.length - 1);
         return _dimTemp[resolvedIndex];
+    }
+
+    /**
+    * Create a buffer to the given width and height.
+    *
+    * @return Returns a buffer index.
+    **/
+    public function createBuffer(width:Int, height:Int) {
+        return _buffers.push(Image.createRenderTarget(width, height)) - 1;
+    }
+
+    /**
+    * Begin using a buffer to render to. Anything rendered to this buffer is not
+    * considered rendered until `endBuffer` is called.
+    *
+    * If you create dimensions within this buffer, use `getDimensionAtIndex` or
+    * `getDimensionRelativeAtIndex` to get the logical or relative position of a dimension
+    * within the buffer.
+    *
+    * Every time you refer to a dimension within this buffer, always call this function
+    * prior to any rendering or events taking place.
+    *
+    * @param index The index of the buffer.
+    **/
+    public function beginBuffer(index:Int) {
+        _currentBuffer = index;
+    }
+
+    /**
+    * End the current buffer and return it.
+    **/
+    public function endBuffer():Image {
+        if (_currentBuffer > -1 && _currentBuffer < _buffers.length) {
+            return _buffers[_currentBuffer];
+        }
+
+        return null;
     }
 
     /**

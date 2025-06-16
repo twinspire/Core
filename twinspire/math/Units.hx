@@ -1,5 +1,6 @@
 package twinspire.math;
 
+import kha.math.FastVector2;
 import twinspire.utils.ExtraMath;
 
 class Units {
@@ -165,6 +166,63 @@ class Units {
                 return -1;
             }
         }
+    }
+
+    /**
+    * Calculate the percentile of two different sizes to get a zoom factor.
+    *
+    * @param fromSize The size to measure from.
+    * @param toSize The target size.
+    *
+    * @return A percentage of the difference between the two sizes.
+    **/
+    public static function zoom(fromSize:FastVector2, toSize:FastVector2):FastVector2 {
+        var ratioW = toSize.x / fromSize.x;
+        var ratioH = toSize.y / fromSize.y;
+        return new FastVector2(ratioW, ratioH);
+    }
+
+    /**
+    * Convert a size to a new size that conforms to the given number of units and given basis.
+    * This function considers conforming to the height of the client for calculating the pixel size.
+    * 
+    * If you wish to use a different aspect ratio to the screen, specify this using the `aspectRatio`
+    * value.
+    *
+    * @param size The size to convert.
+    * @param unitValue A `FastVector2` value that is a measure of the provided unit measurements (or `basis`).
+    * @param basis The unit measurement basis to use.
+    * @param aspectRatio (Optional) The aspect ratio to conform to if different from the current client's size.
+    *
+    * @return Returns `null` if `basis` is not valid.
+    **/
+    public static function conformToScreen(size:FastVector2, unitValue:FastVector2, basis:Int = -1, ?aspectRatio:Float = null):FastVector2 {
+        if (basis < 0 || basis > MEASURE_KILOMETRES) {
+            return null;
+        }
+
+        if (aspectRatio == null) {
+            aspectRatio = size.x / size.y;
+        }
+
+        var height = toPixels(unitValue.y, basis);
+        var width = toPixels(unitValue.x, basis);
+
+        var ratio = width / height;
+
+        var newRatio = ratio;
+        if (ratio != aspectRatio) {
+            // change the multiplication ratio to match our aspect ratio
+            newRatio = aspectRatio;
+            width = width / ratio * newRatio;
+            height = height / ratio * newRatio;
+        }
+
+        var unitsHeight = height / unitValue.y;
+        var finalHeight = unitsHeight / unitValue.y * height;
+        var finalWidth = finalHeight * newRatio;
+
+        return new FastVector2(finalWidth, finalHeight);
     }
 
 }
