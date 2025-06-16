@@ -40,7 +40,7 @@ class Container {
     * Sets the zoom factor of the buffer as a percentage of the original buffer size. Use
     * `Units.zoom` from `twinspire.math` to calculate a zoom factor for convenience.
     **/
-    public var bufferZoomFactor:FastVector2;
+    public var bufferZoomFactor:Float;
     /**
     * Set a value to determine if the buffer should receive user input events for dimensions inside it.
     * Sprites always receive events from user input (except mouse or touch events).
@@ -85,7 +85,7 @@ class Container {
         offset = new FastVector2(0, 0);
         measurement = UNIT_POINTS;
         bufferIndex = -1;
-        bufferZoomFactor = new FastVector2(1, 1);
+        bufferZoomFactor = 1.0;
     }
 
 }

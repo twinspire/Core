@@ -11,6 +11,7 @@ class Dim
 	public var width:Float;
 	public var height:Float;
 	public var visible:Bool;
+	public var scale:Float;
 
 	public inline function new(x:Float, y:Float, width:Float, height:Float, order:Int = 0)
 	{
@@ -20,6 +21,7 @@ class Dim
 		this.height = height;
         this.order = order;
 		this.visible = true;
+		this.scale = 1.0;
 	}
 
 	public function getX()
@@ -52,8 +54,12 @@ class Dim
 
 	public function clone()
 	{
-		var dim = new Dim(this.x, this.y, this.width, this.height, this.order);
+		var dim = new Dim(x, y, width, height, order);
 		return dim;
+	}
+
+	public inline function get() {
+		return new Dim(x, y, width * scale, height * scale);
 	}
 
 	/**

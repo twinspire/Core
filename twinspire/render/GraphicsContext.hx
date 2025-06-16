@@ -1,6 +1,5 @@
 package twinspire.render;
 
-import kha.Image;
 import twinspire.geom.Dim;
 import twinspire.render.UpdateContext;
 import twinspire.render.QueryType;
@@ -9,9 +8,11 @@ import twinspire.text.InputRenderer;
 import twinspire.text.TextInputState;
 import twinspire.text.TextInputMethod;
 import twinspire.Application;
+using twinspire.extensions.ArrayExtensions;
 
 import kha.graphics2.Graphics;
 import kha.math.FastVector2;
+import kha.Image;
 
 typedef ContainerResult = {
     var dimIndex:Int;
@@ -27,6 +28,7 @@ typedef TextInputResult = {
 @:allow(UpdateContext)
 class GraphicsContext {
 
+    private var _inRenderContext:Bool;
     private var _dimTemp:Array<Dim>;
     private var _dimTempLinkTo:Array<Int>;
     private var _dimForceChangeIndices:Array<Int>;
@@ -94,17 +96,21 @@ class GraphicsContext {
         _dimTempLinkTo = [];
         _dimForceChangeIndices = [];
         _containerTemp = [];
+        _ended = false;
+        _currentMenu = -1;
+        _containerOffsetsChanged = false;
+        _dimClientPositions = [];
+        _containerLastOffsets = [];
+        _buffers = [];
+        _bufferDimensionIndices = [];
+        _currentBuffer = -1;
+
         containers = [];
         dimensions = [];
         dimensionLinks = [];
         queries = [];
         activities = [];
         textInputs = [];
-        _ended = false;
-        _currentMenu = -1;
-        _containerOffsetsChanged = false;
-        _dimClientPositions = [];
-        _containerLastOffsets = [];
     }
 
     /**
@@ -124,6 +130,7 @@ class GraphicsContext {
     * @return Returns a buffer index.
     **/
     public function createBuffer(width:Int, height:Int) {
+        _bufferDimensionIndices.push([]);
         return _buffers.push(Image.createRenderTarget(width, height)) - 1;
     }
 
@@ -148,11 +155,31 @@ class GraphicsContext {
     * End the current buffer and return it.
     **/
     public function endBuffer():Image {
+        if (_inRenderContext) {
+            var bufferContainerIndex = containers.findIndex((c) -> c.bufferIndex == _currentBuffer);
+            var container = containers[bufferContainerIndex];
+            
+            for (child in container.childIndices) {
+                dimensions[child].scale = container.bufferZoomFactor;
+            }
+        }
+
         if (_currentBuffer > -1 && _currentBuffer < _buffers.length) {
-            return _buffers[_currentBuffer];
+            var temp = _currentBuffer;
+            _currentBuffer = -1;
+            return _buffers[temp];
         }
 
         return null;
+    }
+
+    private function addDimensionIndexToBuffer(index:Int) {
+        if (_currentBuffer > -1) {
+            var arr = _bufferDimensionIndices[_currentBuffer].filter((i) -> i == index);
+            if (arr.length == 0) {
+                _bufferDimensionIndices[_currentBuffer].push(index);
+            }
+        }
     }
 
     /**
@@ -177,8 +204,9 @@ class GraphicsContext {
         }
         else {
             var c = containers[containerIndex];
+            var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
             var d = dimensions[index];
-            return new Dim(d.x + c.offset.x, d.y + c.offset.y, d.width, d.height, d.order);
+            return new Dim(d.x + c.offset.x * scale, d.y + c.offset.y * scale, d.width, d.height, d.order);
         }
     }
 
@@ -203,9 +231,10 @@ class GraphicsContext {
         }
         else {
             var c = containers[containerIndex];
-            var d = dimensions[index];
+            var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
+            var d = dimensions[index].get();
             var cDim = dimensions[c.dimIndex];
-            return new Dim(d.x - cDim.x + c.offset.x, d.y - cDim.y + c.offset.y, d.width, d.height, d.order);
+            return new Dim(d.x - cDim.x + c.offset.x * scale, d.y - cDim.y + c.offset.y * scale, d.width, d.height, d.order);
         }
     }
 
@@ -260,6 +289,8 @@ class GraphicsContext {
 
         activities.push([]);
 
+        addDimensionIndexToBuffer(index);
+
         return index;
     }
 
@@ -297,6 +328,8 @@ class GraphicsContext {
             _menus[_currentMenu].indices.push(index);
         }
 
+        addDimensionIndexToBuffer(index);
+
         return index;
     }
 
@@ -330,6 +363,8 @@ class GraphicsContext {
 
         activities.push([]);
 
+        addDimensionIndexToBuffer(index);
+
         return index;
     }
 
@@ -355,6 +390,8 @@ class GraphicsContext {
         if (noVirtualSceneChange) {
             result += containers.length;
         }
+
+        addDimensionIndexToBuffer(container.dimIndex);
 
         return {
             dimIndex: container.dimIndex,
@@ -395,6 +432,8 @@ class GraphicsContext {
             textInputIndex: textInputs.length
         };
 
+        addDimensionIndexToBuffer(container.dimIndex);
+
         var inputState = new TextInputState();
         inputState.setup(inputResult, method);
         textInputs.push(inputState);
@@ -421,10 +460,12 @@ class GraphicsContext {
         }
     }
 
+    /**
+    * Begin the `GraphicsContext`.
+    **/
     public function begin() {
         _ended = false;
     }
-
     
     /**
     * Begin a menu starting from the last dimension added to temporary storage.
@@ -542,7 +583,7 @@ class GraphicsContext {
         if (dimIndicesChanged.length > 0) {
             for (index in dimIndicesChanged) {
                 // iterate each dimension
-                var dim = dimensions[index];
+                var dim = dimensions[index].get();
                 var childIndex = index;
                 
                 var containerIndex = -1;
@@ -556,9 +597,11 @@ class GraphicsContext {
                     var innerFound = -1;
                     for (i in 0...containers.length) {
                         var c = containers[i];
+                        // determine if the offset should change based on whether the container is buffered
+                        var scale = (c.bufferIndex == -1 ? 1 : c.bufferZoomFactor);
                         if (c.childIndices.contains(childIndex)) {
-                            offset.x += c.offset.x;
-                            offset.y += c.offset.y;
+                            offset.x += c.offset.x * scale;
+                            offset.y += c.offset.y * scale;
                             innerFound = i;
                             childIndex = c.dimIndex;
                             break;

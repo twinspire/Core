@@ -205,14 +205,24 @@ class Application
 
 		@:privateAccess(GraphicsContext) {
 			_graphicsContext._g2 = g2;
+			_graphicsContext._inRenderContext = true;
 		}
 
 		if (sceneManager != null) {
 			sceneManager.render(_graphicsContext);
-			sceneManager.end(_updateContext, _graphicsContext);
 		}
 		else {
 			render(_graphicsContext);
+		}
+
+		@:privateAccess(GraphicsContext) {
+			_graphicsContext._inRenderContext = false;
+		}
+
+		if (sceneManager != null) {
+			sceneManager.end(_updateContext, _graphicsContext);
+		}
+		else {
 			end(_updateContext, _graphicsContext);
 		}
 
