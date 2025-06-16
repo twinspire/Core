@@ -73,14 +73,145 @@ class Graphics2
 		var cm = new Dim(destination.x + tl.width, destination.y + tl.height, destination.width - tl.width - tr.width, destination.height - tm.height - bm.height);
 
 		drawSubImageDim(g2, img, segments[TopLeft], tl);
-		drawScaledSubImageDim(g2, img, segments[TopMiddle], tm);
+		
+		if (patch.repeatMethods[PatchMethodIndex.Top] == PatchStretch) {
+			drawScaledSubImageDim(g2, img, segments[TopMiddle], tm);
+		}
+		else {
+			drawImageRepeat(g2, img, segments[TopMiddle], tm, 2);
+		}
+
 		drawSubImageDim(g2, img, segments[TopRight], tr);
-		drawScaledSubImageDim(g2, img, segments[CentreLeft], cl);
-		drawScaledSubImageDim(g2, img, segments[CentreMiddle], cm);
-		drawScaledSubImageDim(g2, img, segments[CentreRight], cr);
+
+		if (patch.repeatMethods[PatchMethodIndex.Left] == PatchStretch) {
+			drawScaledSubImageDim(g2, img, segments[CentreLeft], cl);
+		}
+		else {
+			drawImageRepeat(g2, img, segments[CentreLeft], cl, 1);
+		}
+
+		if (patch.repeatMethods[PatchMethodIndex.Centre] == PatchStretch) {
+			drawScaledSubImageDim(g2, img, segments[CentreMiddle], cm);
+		}
+		else {
+			drawImageRepeat(g2, img, segments[CentreMiddle], cm, 0);
+		}
+		
+		if (patch.repeatMethods[PatchMethodIndex.Right] == PatchStretch) {
+			drawScaledSubImageDim(g2, img, segments[CentreRight], cr);
+		}
+		else {
+			drawImageRepeat(g2, img, segments[CentreRight], cr, 1);
+		}
+		
 		drawSubImageDim(g2, img, segments[BottomLeft], bl);
-		drawScaledSubImageDim(g2, img, segments[BottomMiddle], bm);
+
+		if (patch.repeatMethods[PatchMethodIndex.Bottom] == PatchStretch) {
+			drawScaledSubImageDim(g2, img, segments[BottomMiddle], bm);
+		}
+		else {
+			drawImageRepeat(g2, img, segments[BottomMiddle], bm, 2);
+		}
+		
 		drawSubImageDim(g2, img, segments[BottomRight], br);
+	}
+
+	/**
+	* axis: 0 = both; 1 = vertical, 2 = horizontal
+	**/
+	public static function drawImageRepeat(g2:Graphics, img:Image, source:Dim, destination:Dim, axis:Int = 0) {
+		var yRepeat = 0.0;
+		var xRepeat = 0.0;
+		var yRemainder = 0.0;
+		var xRemainder = 0.0;
+
+		if (destination.width < source.width && axis != 1) {
+			xRemainder = destination.width - source.width;
+		}
+		else if (axis != 1) {
+			xRepeat = Math.floor(destination.width / source.width);
+			xRemainder = Math.ceil(destination.width % source.width);
+		}
+
+		if (destination.height < source.height && axis != 2) {
+			yRemainder = destination.height - source.height;
+		}
+		else if (axis != 2) {
+			yRepeat = Math.floor(destination.height / source.height);
+			yRemainder = Math.ceil(destination.height % source.height);
+		}
+
+		if (xRepeat > 0.0 && yRepeat > 0.0) {
+			// use a for loop as a grid for each row/column
+			var castedX = cast(xRepeat, Int);
+			var castedY = cast(yRepeat, Int);
+			for (y in 0...castedY) {
+				for (x in 0...castedX) {
+					var targetDim = new Dim(destination.x + (x * source.width), destination.y + (y * source.height), source.width, source.height);
+					drawSubImageDim(g2, img, source, targetDim);
+
+					if (x == castedX - 1) {
+						// last x in loop, draw remainder
+						if (xRemainder > 0.0) {
+							var clippedSource = new Dim(source.x, source.y, xRemainder, source.height);
+							var targetDim = new Dim(destination.x + (xRepeat * source.width), destination.y + (y * source.height), xRemainder, source.height);
+							drawSubImageDim(g2, img, clippedSource, targetDim);
+						}
+					}
+				}
+
+				if (y == castedY - 1) {
+					// last y in loop, draw remainder
+					if (yRemainder > 0.0) {
+						var clippedSource = new Dim(source.x, source.y, source.width, yRemainder);
+						var targetDim = new Dim(destination.x + (xRepeat * source.width), destination.y + (y * source.height), xRemainder, source.height);
+						drawSubImageDim(g2, img, clippedSource, targetDim);
+					}
+				}
+			}
+
+			if (xRemainder > 0.0 && yRemainder > 0.0) {
+				var clippedSource = new Dim(source.x, source.y, xRemainder, yRemainder);
+				var targetDim = new Dim(destination.x + (xRepeat * source.width), destination.y + (yRepeat * source.height), xRemainder, yRemainder);
+				drawSubImageDim(g2, img, clippedSource, targetDim);
+			}
+
+			return;
+		}
+		
+		if (axis == 1 || axis == 0) {
+			var x = xRepeat;
+			var offset = 0.0;
+			while (x > 0) {
+				var targetDim = new Dim(destination.x + offset, destination.y, source.width, source.height);
+				drawSubImageDim(g2, img, source, targetDim);
+				offset += source.width;
+				x -= 1;
+			}
+
+			if (xRemainder > 0) {
+				var clippedSource = new Dim(source.x, source.y, xRemainder, source.height);
+				var targetDim = new Dim(destination.x + offset, destination.y, xRemainder, source.height);
+				drawSubImageDim(g2, img, clippedSource, targetDim);
+			}
+		}
+
+		if (axis == 2 || axis == 0) {
+			var y = yRepeat;
+			var offset = 0.0;
+			while (y > 0) {
+				var targetDim = new Dim(destination.x, destination.y + offset, source.width, source.height);
+				drawSubImageDim(g2, img, source, targetDim);
+				offset += source.height;
+				y -= 1;
+			}
+
+			if (yRemainder > 0) {
+				var clippedSource = new Dim(source.x, source.y, source.width, yRemainder);
+				var targetDim = new Dim(destination.x, destination.y + offset, source.width, yRemainder);
+				drawSubImageDim(g2, img, clippedSource, targetDim);
+			}
+		}
 	}
 
 	public static function drawRectDim(g2:Graphics, destination:Dim, lineThickness:Float = 1.0)
@@ -341,7 +472,13 @@ class Graphics2
 			drawScaledImageDim(g2, state.image, dim);
 		}
 		else {
-			drawPatchedImage(g2, state.image, state.patches[0], dim);
+			if (sprite.size.x > 0 && sprite.size.y > 0) {
+				var destination = state.getDestinationDims()[0];
+				drawPatchedImage(g2, state.image, state.patches[0], new Dim(dim.x + destination.x, dim.y + destination.y, destination.width, destination.height));
+			}
+			else {
+				drawPatchedImage(g2, state.image, state.patches[0], dim);
+			}
 		}
 	}
 

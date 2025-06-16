@@ -56,4 +56,18 @@ class Sprite {
         sizingMethod = Stretch;
     }
 
+    /**
+    * Update the sizes and positions of all states to the target size specified by the
+    * `size` variable. Ensure this function is called at least once before using this sprite.
+    **/
+    public function updateSizes() {
+        if (size.x == 0 || size.y == 0) {
+            return;
+        }
+
+        for (state in states) {
+            state.calculateSizing(size, sizingMethod, fillBaseline, fillAnchor);
+        }
+    }
+
 }

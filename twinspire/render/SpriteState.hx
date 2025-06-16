@@ -34,6 +34,13 @@ class SpriteState {
     }
 
     /**
+    * Get the destination dimensions of each patch in this state.
+    **/
+    public function getDestinationDims() {
+        return _destinationDims;
+    }
+
+    /**
     * Calculate the target dimensions of each patch in this `SpriteState` using the given parameters.
     * Favour using the underlying `updateSizes` function of the `Sprite` class, instead of using this function directly.
     *
@@ -143,9 +150,47 @@ class SpriteState {
                     
                     switch (anchor) {
                         case AnchorBottom: {
+                            var gap = targetSize.x - destWidth;
+                            if (gap < 0) {
+                                gap = 0.0;
+                            }
+
+                            destX = (destWidth - gap) / 2;
+                            destY = targetSize.y - destHeight;
+                        }
+                        case AnchorLeft: {
+                            var gap = targetSize.y - destHeight;
+                            if (gap < 0) {
+                                gap = 0.0;
+                            }
+
+                            destX = 0;
+                            destY = (destHeight - gap) / 2;
+                        }
+                        case AnchorRight: {
+                            var gap = targetSize.y - destHeight;
+                            if (gap < 0) {
+                                gap = 0.0;
+                            }
+
+                            destX = targetSize.x - destWidth;
+                            destY = (destHeight - gap) / 2;
+                        }
+                        case AnchorTop: {
+                            var gap = targetSize.x - destWidth;
+                            if (gap < 0) {
+                                gap = 0.0;
+                            }
+
+                            destX = (destWidth - gap) / 2;
+                            destY = 0;
+                        }
+                        default: {
                             
                         }
                     }
+
+                    _destinationDims.push(new Dim(destX, destY, destWidth, destHeight));
                 }
             }
         }

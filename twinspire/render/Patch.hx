@@ -14,6 +14,25 @@ enum abstract PatchIndex(Int) to Int {
     var BottomRight;
 }
 
+enum abstract PatchRepeatMethod(Int) to Int {
+    /**
+    * Specifies that the destination images are stretched. This is default behaviour.
+    **/
+    var PatchStretch;
+    /**
+    * Specifies that the destination images are repeated along their respective axis.
+    **/
+    var PatchRepeat;
+}
+
+enum abstract PatchMethodIndex(Int) to Int {
+    var Top;
+    var Left;
+    var Centre;
+    var Right;
+    var Bottom;
+}
+
 class Patch {
     
     private var _segments:Array<Dim>;
@@ -22,14 +41,28 @@ class Patch {
     public var left:Float;
     public var right:Float;
     public var bottom:Float;
+    public var repeatMethods:Array<PatchRepeatMethod>;
     public var source:Dim;
 
-    public inline function new(source:Dim, top:Float, left:Float, right:Float, bottom:Float) {
+    public inline function new(source:Dim, top:Float, left:Float, right:Float, bottom:Float, ?repeats:Array<PatchRepeatMethod> = null) {
         this.source = source;
         this.top = top;
         this.left = left;
         this.right = right;
         this.bottom = bottom;
+
+        repeatMethods = [];
+        
+        if (repeats == null) {
+            repeatMethods.push(PatchStretch); // Top
+            repeatMethods.push(PatchStretch); // Left
+            repeatMethods.push(PatchStretch); // Centre
+            repeatMethods.push(PatchStretch); // Right
+            repeatMethods.push(PatchStretch); // Bottom
+        }
+        else {
+            repeatMethods = repeats;
+        }
 
         _segments = [];
         createSegments();
