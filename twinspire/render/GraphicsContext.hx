@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import kha.Image;
 import twinspire.geom.Dim;
 import twinspire.render.UpdateContext;
 import twinspire.render.QueryType;
@@ -38,6 +39,9 @@ class GraphicsContext {
     private var _containerOffsetsChanged:Bool;
     private var _containerLastOffsets:Array<FastVector2>;
     private var _dimClientPositions:Array<FastVector2>;
+
+    private var _buffers:Array<Image>;
+    private var _currentBuffer:Int;
 
     /**
     * A collection of dimensions within this context. Do not write directly.

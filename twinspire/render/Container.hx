@@ -32,6 +32,11 @@ class Container {
     **/
     public var measurement:UnitMeasurement;
     /**
+    * Specifies the back buffer image used to target for rendering and perform event simulations.
+    * Using this implies `measurement` to be `UNIT_PIXELS_BUFFER` unless `UNIT_POINTS` is used.
+    **/
+    public var bufferIndex:Int;
+    /**
     * Either a pixel or point incremental value depending on the measurement type.
     * This is also used for automated events, such as mouse scroll for the container.
     **/
@@ -67,6 +72,7 @@ class Container {
         increment = 100;
         childIndices = [];
         offset = new FastVector2(0, 0);
+        measurement = UNIT_POINTS;
     }
 
 }
