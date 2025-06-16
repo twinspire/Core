@@ -158,14 +158,14 @@ class Graphics2
 							drawSubImageDim(g2, img, clippedSource, targetDim);
 						}
 					}
-				}
 
-				if (y == castedY - 1) {
-					// last y in loop, draw remainder
-					if (yRemainder > 0.0) {
-						var clippedSource = new Dim(source.x, source.y, source.width, yRemainder);
-						var targetDim = new Dim(destination.x + (xRepeat * source.width), destination.y + (y * source.height), xRemainder, source.height);
-						drawSubImageDim(g2, img, clippedSource, targetDim);
+					if (y == castedY - 1) {
+						// last y in loop, draw remainder
+						if (yRemainder > 0.0) {
+							var clippedSource = new Dim(source.x, source.y, source.width, yRemainder);
+							var targetDim = new Dim(destination.x + (x * source.width), destination.y + (yRepeat * source.height), source.width, yRemainder);
+							drawSubImageDim(g2, img, clippedSource, targetDim);
+						}
 					}
 				}
 			}
@@ -179,7 +179,7 @@ class Graphics2
 			return;
 		}
 		
-		if (axis == 1 || axis == 0) {
+		if (axis == 2 || axis == 0) {
 			var x = xRepeat;
 			var offset = 0.0;
 			while (x > 0) {
@@ -196,7 +196,7 @@ class Graphics2
 			}
 		}
 
-		if (axis == 2 || axis == 0) {
+		if (axis == 1 || axis == 0) {
 			var y = yRepeat;
 			var offset = 0.0;
 			while (y > 0) {
