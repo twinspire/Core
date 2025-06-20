@@ -37,7 +37,7 @@ class ArrayExtensions
 	 * Return an `Array<T>` of all items that matches the given condition from a callback
 	 * function.
 	 */
-	public static function where<T>(arr:Array<T>, callback:(T) -> Bool):Iterable<T>
+	public static function where<T>(arr:Array<T>, callback:(T) -> Bool):Array<T>
 	{
 		var results = new Array<T>();
 		for (i in 0...arr.length)
@@ -53,7 +53,7 @@ class ArrayExtensions
 	* Return an `Array<Int>` of indices of all items that matches the given condition from a callback
 	* function.
 	**/
-	public static function whereIndices<T>(arr:Array<T>, callback:(T) -> Bool):Iterable<Int>
+	public static function whereIndices<T>(arr:Array<T>, callback:(T) -> Bool):Array<Int>
 	{
 		var results = new Array<Int>();
 		for (i in 0...arr.length)

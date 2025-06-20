@@ -183,6 +183,15 @@ class GraphicsContext {
     }
 
     /**
+    * Gets the links of a dimension as indices.
+    *
+    * @param index The index of the dimension.
+    **/
+    public function getLinksFromIndex(index:Int):Array<Int> {
+        return dimensionLinks.whereIndices((i) -> i == index);
+    }
+
+    /**
     * Get the dimension at the given index. Any offsets assigned to the dimension is resolved
     * before returned. This function is best used for rendering.
     *
