@@ -308,8 +308,12 @@ class UpdateContext {
 
                 if (_drag.dragIndex > -1) {
                     _isDragEnd = _drag.dragIndex;
+                    _mouseIsReleased = _drag.dragIndex;
                 }
-
+                else {
+                    _mouseIsReleased = isMouseOver;
+                }
+                
                 _drag.dragIndex = -1;
                 _drag.childIndex = -1;
                 _drag.scrollIndex = -1;
