@@ -86,7 +86,7 @@ class UpdateContext {
     **/
     public function getDimensionAt(index:Int) {
         if (index < 0 || index > _gctx.dimensions.length - 1) {
-            throw "Index of out range.";
+            return null;
         }
 
         return _gctx.dimensions[index].clone();
@@ -792,6 +792,10 @@ class UpdateContext {
     * @return The array of data for a specific activity type, if any exist. `null` otherwise.
     **/
     public function getActivity(index:Int, type:ActivityType):Array<Dynamic> {
+        if (_gctx.activities[index] == null) {
+            return null;
+        }
+
         if (_gctx.activities[index].length == 0) {
             return null;
         }
@@ -818,10 +822,6 @@ class UpdateContext {
     public function hasActivityData(index:Int, type:ActivityType, data:...Dynamic) {
         var array = getActivity(index, type);
         if (array == null) {
-            return false;
-        }
-
-        if (array.length == 0) {
             return false;
         }
 

@@ -921,6 +921,48 @@ class Dimensions
     }
 
     /**
+    * Shrink the given dimension by an `amount` in pixels.
+    **/
+    public static function dimShrink(a:Dim, amount:Float) {
+        return new Dim(a.x + amount / 2, a.y + amount / 2, a.width - amount, a.height - amount);
+    }
+
+    /**
+    * Shrink the width of a given dimension by an `amount` in pixels.
+    **/
+    public static function dimShrinkW(a:Dim, amount:Float) {
+        return new Dim(a.x + amount / 2, a.y, a.width - amount, a.height);
+    }
+
+    /**
+    * Shrink the height of a given dimension by an `amount` in pixels.
+    **/
+    public static function dimShrinkH(a:Dim, amount:Float) {
+        return new Dim(a.x, a.y + amount / 2, a.width, a.height - amount);
+    }
+
+    /**
+    * Grow the given dimension by an `amount` in pixels.
+    **/
+    public static function dimGrow(a:Dim, amount:Float) {
+        return new Dim(a.x - amount / 2, a.y - amount / 2, a.width + amount, a.height + amount);
+    }
+
+    /**
+    * Grow the width of a given dimension by an `amount` in pixels.
+    **/
+    public static function dimGrowW(a:Dim, amount:Float) {
+        return new Dim(a.x - amount / 2, a.y, a.width + amount, a.height);
+    }
+
+    /**
+    * Grow the height of a given dimension by an `amount` in pixels.
+    **/
+    public static function dimGrowH(a:Dim, amount:Float) {
+        return new Dim(a.x, a.y - amount / 2, a.width, a.height + amount);
+    }
+
+    /**
      * Measure the width and height of the given text with font and fontSize parameters provided by
      * the given `g2` instance.
      * @param font The instance of a font to measure against.
