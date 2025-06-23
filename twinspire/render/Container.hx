@@ -74,7 +74,7 @@ class Container {
     /**
     * An array of indices linked to dimensions.
     **/
-    public var childIndices:Array<Int>;
+    public var childIndices:Array<DimIndex>;
 
     public function new() {
         enableScrollWithClick = BUTTON_NONE;

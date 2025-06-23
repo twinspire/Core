@@ -65,4 +65,33 @@ class ArrayExtensions
 		return results;
 	}
 
+	/**
+	* Return a boolean value that determines if all of the elements meet the conditions of `onEach` from 
+	* a given set of indices.
+	**/
+	public static function eachOf<T>(arr:Array<T>, ofIndices:Array<Int>, onEach:(T) -> Bool):Bool {
+		for (index in ofIndices) {
+			var ok = onEach(arr[index]);
+			if (!ok) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	* 
+	**/
+	public static function each<T>(arr:Array<T>, onEach:(T) -> Bool):Bool {
+		for (i in 0...arr.length) {
+			var ok = onEach(arr[i]);
+			if (!ok) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 }

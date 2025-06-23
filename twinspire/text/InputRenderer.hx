@@ -70,9 +70,9 @@ class InputRenderer {
             return;
         }
 
-        ctx.isMouseOver(container.dimIndex);
-        ctx.isMouseReleased(container.dimIndex);
-        ctx.isMouseScrolling(container.dimIndex);
+        ctx.isMouseOver(Direct(container.dimIndex));
+        ctx.isMouseReleased(Direct(container.dimIndex));
+        ctx.isMouseScrolling(Direct(container.dimIndex));
 
         var isActive = ctx.getActivatedIndex() == container.dimIndex;
         if (isActive) {
@@ -82,13 +82,13 @@ class InputRenderer {
                 cursorBlinkTime = 0.0;
             }
 
-            ctx.isDragging(container.dimIndex);
-            if (ctx.isKeyEnter(container.dimIndex)) {
+            ctx.isDragging(Direct(container.dimIndex));
+            if (ctx.isKeyEnter(Direct(container.dimIndex))) {
                 cursorVisible = true;
                 cursorBlinkTime = 0.0;
             }
-            ctx.isKeyDown(container.dimIndex);
-            ctx.isKeyUp(container.dimIndex);
+            ctx.isKeyDown(Direct(container.dimIndex));
+            ctx.isKeyUp(Direct(container.dimIndex));
         }
         else {
             cursorVisible = false;
@@ -106,7 +106,7 @@ class InputRenderer {
 
         var container = gtx.containers[containerIndex];
         var inputState = gtx.textInputs[inputIndex];
-        var dim = gtx.getClientDimensionAtIndex(container.dimIndex);
+        var dim = gtx.getClientDimensionsAtIndex(Direct(container.dimIndex))[0];
         
         var lineHeight = fontSize * 1.1;
         var select = inputState.inputHandler.sortedSelection();
@@ -307,7 +307,7 @@ class InputRenderer {
     }
 
     private function updateLineInfo(inputState:TextInputState) {
-        var destination = gtx.getClientDimensionAtIndex(inputState.index.dimIndex);
+        var destination = gtx.getClientDimensionsAtIndex(inputState.index.dimIndex)[0];
 
         switch (inputState.method) {
             case ImMultiLine(breaks): {

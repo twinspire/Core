@@ -84,12 +84,28 @@ class UpdateContext {
     /**
     * Gets a copy of a dimension at the given index.
     **/
-    public function getDimensionAt(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
-            return null;
-        }
+    public function getDimensionsAt(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                if (item < 0 || item > _gctx.dimensions.length - 1) {
+                    return [ null ];
+                }
 
-        return _gctx.dimensions[index].clone();
+                return [ _gctx.dimensions[item].clone() ];
+            }
+            case Group(item): {
+                var results = [];
+                for (grp in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (grp > _gctx.dimensions.length - 1) {
+                        break;
+                    }
+
+                    results.push(_gctx.dimensions[grp].clone());
+                }
+
+                return results;
+            }
+        }
     }
 
     public function getTextInputState(index:Int) {
@@ -172,7 +188,7 @@ class UpdateContext {
 
             for (i in 0..._gctx.dimensions.length) {
                 var query = _gctx.queries[i];
-                var actualDim = _gctx.getClientDimensionAtIndex(i);
+                var actualDim = _gctx.getClientDimensionsAtIndex(Direct(i))[0];
 
                 var active = GlobalEvents.isMouseOverDim(actualDim);
 
@@ -412,10 +428,10 @@ class UpdateContext {
                         _gctx.dimensions[child].x += diff.x;
                         _gctx.dimensions[child].y += diff.y;
 
-                        _gctx.markDimChange(child);
+                        _gctx.markDimChange(Direct(child));
                     }
 
-                    _gctx.markDimChange(_drag.dragIndex);
+                    _gctx.markDimChange(Direct(_drag.dragIndex));
                 }
                 else if (query.dragOptions.constrained && parentIndex > -1) {
                     // our child is constrained, but the parent is not draggable
@@ -487,27 +503,65 @@ class UpdateContext {
     /**
     * Checks that the following dimension at the given index is receiving a mouse
     * over event.
+    *
+    * If the index is a reference to a group and `allGroup` is true, if any index is
+    * `true`, all indices are considered to have the mouse over them.
+    *
     * @param index The index of the dimension to check.
+    * @param allGroup (Optional) Specify that all indices in a group receive this event if one returns `true`.
     **/
-    public function isMouseOver(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
+    public function isMouseOver(index:DimIndex, ?allGroup:Bool = false) {
+        var actualIndex = -1;
+        var partOfGroup = false;
+        switch (index) {
+            case Direct(item): {
+                actualIndex = item;
+            }
+            case Group(item): {
+                partOfGroup = true;
+                for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (dim == _mouseFocusIndexUI) {
+                        actualIndex = dim;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (actualIndex < 0 || actualIndex > _gctx.dimensions.length - 1) {
             return false;
         }
 
-        var result = _mouseFocusIndexUI == index && _gctx.queries[index].type != QUERY_STATIC;
+        var result = _mouseFocusIndexUI == actualIndex && _gctx.queries[actualIndex].type != QUERY_STATIC;
         if (result) {
-            var parentIndex = _gctx.dimensionLinks[index];
-            if (parentIndex > -1) {
-                if (_mouseFocusIndexUI == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
-                    var activity = new Activity();
-                    activity.type = ACTIVITY_MOUSE_OVER;
-                    _gctx.activities[parentIndex].push(activity);
-                }
+            var parentIndex = _gctx.dimensionLinks[actualIndex];
+            if (parentIndex > -1 && !partOfGroup) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_MOUSE_OVER;
+                _gctx.activities[parentIndex].push(activity);
             }
 
-            var activity = new Activity();
-            activity.type = ACTIVITY_MOUSE_OVER;
-            _gctx.activities[index].push(activity);
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_OVER;
+                        _gctx.activities[actualIndex].push(activity);
+                        return result;
+                    }
+
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_OVER;
+                        _gctx.activities[child].push(activity);    
+                    }
+                }
+                default: {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_OVER;
+                    _gctx.activities[actualIndex].push(activity);
+                }
+            }
         }
 
         return result;
@@ -520,29 +574,62 @@ class UpdateContext {
     *
     * @param index The index of the dimension to check.
     **/
-    public function isMouseDown(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
+    public function isMouseDown(index:DimIndex, ?allGroup:Bool = false) {
+        var actualIndex = -1;
+        var partOfGroup = false;
+        switch (index) {
+            case Direct(item): {
+                actualIndex = item;
+            }
+            case Group(item): {
+                partOfGroup = true;
+                for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (dim == _mouseIsDown) {
+                        actualIndex = dim;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (actualIndex < 0 || actualIndex > _gctx.dimensions.length - 1) {
             return false;
         }
 
-        var result = _mouseIsDown == index && _gctx.queries[index].type != QUERY_STATIC;
-        if (_retainedMouseDown.indexOf(index) > -1) {
+        var result = _mouseIsDown == actualIndex && _gctx.queries[actualIndex].type != QUERY_STATIC;
+        if (_retainedMouseDown.indexOf(actualIndex) > -1) {
             result = true;
         }
 
         if (result) {
-            var parentIndex = _gctx.dimensionLinks[index];
-            if (parentIndex > -1) {
-                if (_mouseIsDown == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
-                    var activity = new Activity();
-                    activity.type = ACTIVITY_MOUSE_DOWN;
-                    _gctx.activities[parentIndex].push(activity);
-                }
+            var parentIndex = _gctx.dimensionLinks[actualIndex];
+            if (parentIndex > -1 && !partOfGroup) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_MOUSE_DOWN;
+                _gctx.activities[parentIndex].push(activity);
             }
 
-            var activity = new Activity();
-            activity.type = ACTIVITY_MOUSE_DOWN;
-            _gctx.activities[index].push(activity);
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_DOWN;
+                        _gctx.activities[actualIndex].push(activity);
+                        return result;
+                    }
+
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_DOWN;
+                        _gctx.activities[child].push(activity);    
+                    }
+                }
+                default: {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_DOWN;
+                    _gctx.activities[actualIndex].push(activity);
+                }
+            }
         }
 
         return result;
@@ -554,25 +641,58 @@ class UpdateContext {
     *
     * @param index The index of the dimension to check.
     **/
-    public function isMouseReleased(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
+    public function isMouseReleased(index:DimIndex, ?allGroup:Bool = false) {
+        var actualIndex = -1;
+        var partOfGroup = false;
+        switch (index) {
+            case Direct(item): {
+                actualIndex = item;
+            }
+            case Group(item): {
+                partOfGroup = true;
+                for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (dim == _mouseIsReleased) {
+                        actualIndex = dim;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (actualIndex < 0 || actualIndex > _gctx.dimensions.length - 1) {
             return false;
         }
 
-        var result = _mouseIsReleased == index && _gctx.queries[index].type != QUERY_STATIC;
+        var result = _mouseIsReleased == actualIndex && _gctx.queries[actualIndex].type != QUERY_STATIC;
         if (result) {
-            var parentIndex = _gctx.dimensionLinks[index];
-            if (parentIndex > -1) {
-                if (_mouseIsReleased == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
-                    var activity = new Activity();
-                    activity.type = ACTIVITY_MOUSE_CLICKED;
-                    _gctx.activities[parentIndex].push(activity);
-                }
+            var parentIndex = _gctx.dimensionLinks[actualIndex];
+            if (parentIndex > -1 && !partOfGroup) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_MOUSE_CLICKED;
+                _gctx.activities[parentIndex].push(activity);
             }
 
-            var activity = new Activity();
-            activity.type = ACTIVITY_MOUSE_CLICKED;
-            _gctx.activities[index].push(activity);
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_CLICKED;
+                        _gctx.activities[actualIndex].push(activity);
+                        return result;
+                    }
+
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_CLICKED;
+                        _gctx.activities[child].push(activity);    
+                    }
+                }
+                default: {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_CLICKED;
+                    _gctx.activities[actualIndex].push(activity);
+                }
+            }
         }
 
         return result;
@@ -585,129 +705,201 @@ class UpdateContext {
     * @param index The index of the dimension to check.
     * @return Returns a boolean value to determine its scroll state. Get the scroll state data from `activities` in `GraphicsContext`.
     **/
-    public function isMouseScrolling(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
+    public function isMouseScrolling(index:DimIndex, ?allGroup:Bool = false) {
+        var actualIndex = -1;
+        var partOfGroup = false;
+        switch (index) {
+            case Direct(item): {
+                actualIndex = item;
+            }
+            case Group(item): {
+                partOfGroup = true;
+                for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (dim == _mouseIsScrolling) {
+                        actualIndex = dim;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (actualIndex < 0 || actualIndex > _gctx.dimensions.length - 1) {
             return false;
         }
 
-        var result = _mouseIsScrolling == index && _gctx.queries[index].type != QUERY_STATIC;
+        var result = _mouseIsScrolling == actualIndex && _gctx.queries[actualIndex].type != QUERY_STATIC;
         if (result) {
-            var parentIndex = _gctx.dimensionLinks[index];
+            var parentIndex = _gctx.dimensionLinks[actualIndex];
             if (parentIndex > -1) {
-                if (_mouseIsScrolling == index && _gctx.queries[parentIndex].type != QUERY_STATIC) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_MOUSE_SCROLL;
+                activity.data.push(_mouseScrollValue);
+                _gctx.activities[parentIndex].push(activity);
+            }
+
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_SCROLL;
+                        activity.data.push(_mouseScrollValue);
+                        _gctx.activities[actualIndex].push(activity);
+                        return result;
+                    }
+
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_SCROLL;
+                        activity.data.push(_mouseScrollValue);
+                        _gctx.activities[child].push(activity);    
+                    }
+                }
+                default: {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_SCROLL;
                     activity.data.push(_mouseScrollValue);
-                    _gctx.activities[parentIndex].push(activity);
+                    _gctx.activities[actualIndex].push(activity);
                 }
             }
-
-            var activity = new Activity();
-            activity.type = ACTIVITY_MOUSE_SCROLL;
-            activity.data.push(_mouseScrollValue);
-            _gctx.activities[index].push(activity);
         }
+
 
         return result;
     }
 
     /**
-    * Checks that the following dimension at the given index is receiving a key up
-    * event.
+    * Checks that a key up event is received and provide it to the given index.
+    * Unlike positional events, like mouse or touch, keyboard events typically give an index the listened events, rather than
+    * checking if an index has received an event.
     *
     * @param index The index of the dimension to check.
+    * @param activatedOnly A boolean value specifying that only the activated dimension index should receive this event, if one is activated.
+    * If there is no activated item, this function returns `false` and no activity is submitted.
     * @return Returns a boolean value to determine the key up event. Get the key code data from `activities` in `GraphicsContext`.
     **/
-    public function isKeyUp(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
-            return false;
-        }
-
-        var result = _keysUp.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+    public function isKeyUp(?index:DimIndex, ?activatedOnly:Bool = false) {
+        var result = _keysUp.length > 0;
 
         if (result) {
-            var parentIndex = _gctx.dimensionLinks[index];
-            if (parentIndex > -1) {
-                if (_gctx.queries[parentIndex].type != QUERY_STATIC) {
+            if (activatedOnly && _activatedIndex > -1) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_KEY_UP;
+                activity.data.push(_keysUp);
+                _gctx.activities[_activatedIndex].push(activity);
+                return result;
+            }
+            else if (activatedOnly) {
+                return false;
+            }
+
+            switch (index) {
+                case Direct(item): {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_UP;
                     activity.data.push(_keysUp);
-                    _gctx.activities[parentIndex].push(activity);
+                    _gctx.activities[item].push(activity);
+                }
+                case Group(item): {
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_KEY_UP;
+                        activity.data.push(_keysUp);
+                        _gctx.activities[child].push(activity);
+                    }
                 }
             }
-
-            var activity = new Activity();
-            activity.type = ACTIVITY_KEY_UP;
-            activity.data.push(_keysUp);
-            _gctx.activities[index].push(activity);
         }
 
         return result;
     }
 
     /**
-    * Checks that the following dimension at the given index is receiving a key down
-    * event.
+    * Checks that a key is down and provide it to the given index.  
+    * Unlike positional events, like mouse or touch, keyboard events typically give an index the listened events, rather than
+    * checking if an index has received an event.
     *
     * @param index The index of the dimension to check.
+    * @param activatedOnly A boolean value specifying that only the activated dimension index should receive this event, if one is activated.
+    * If there is no activated item, this function returns `false` and no activity is submitted.
     * @return Returns a boolean value to determine the key down event. Get the key code data from `activities` in `GraphicsContext`.
     **/
-    public function isKeyDown(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
-            return false;
-        }
-
-        var result = _keysDown.length > 0 && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+    public function isKeyDown(?index:DimIndex, ?activatedOnly:Bool = false) {
+        var result = _keysDown.length > 0;
 
         if (result) {
-            var parentIndex = _gctx.dimensionLinks[index];
-            if (parentIndex > -1) {
-                if (_gctx.queries[parentIndex].type != QUERY_STATIC) {
+            if (activatedOnly && _activatedIndex > -1) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_KEY_DOWN;
+                activity.data.push(_keysDown);
+                _gctx.activities[_activatedIndex].push(activity);
+                return result;
+            }
+            else if (activatedOnly) {
+                return false;
+            }
+
+            switch (index) {
+                case Direct(item): {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_DOWN;
                     activity.data.push(_keysDown);
-                    _gctx.activities[parentIndex].push(activity);
+                    _gctx.activities[item].push(activity);
+                }
+                case Group(item): {
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_KEY_DOWN;
+                        activity.data.push(_keysDown);
+                        _gctx.activities[child].push(activity);
+                    }
                 }
             }
-
-            var activity = new Activity();
-            activity.type = ACTIVITY_KEY_DOWN;
-            activity.data.push(_keysDown);
-            _gctx.activities[index].push(activity);
         }
 
         return result;
     }
 
     /**
-    * Checks that the following dimension at the given index is receiving a key enter
-    * event.
+    * Checks that a key enter event is received and provide it to the given index.
+    * Unlike positional events, like mouse or touch, keyboard events typically give an index the listened events, rather than
+    * checking if an index has received an event.
     *
     * @param index The index of the dimension to check.
+    * @param activatedOnly A boolean value specifying that only the activated dimension index should receive this event, if one is activated.
+    * If there is no activated item, this function returns `false` and no activity is submitted.
     * @return Returns a boolean value to determine the key enter event. Get the key string data from `activities` in `GraphicsContext`.
     **/
-    public function isKeyEnter(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
-            return false;
-        }
-
-        var result = _charString.length > 0 && _gctx.queries[index].type != QUERY_STATIC && _activatedIndex == index;
+    public function isKeyEnter(?index:DimIndex, ?activatedOnly:Bool = false) {
+        var result = _charString.length > 0;
 
         if (result) {
-            var parentIndex = _gctx.dimensionLinks[index];
-            if (parentIndex > -1) {
-                if (_gctx.queries[parentIndex].type != QUERY_STATIC) {
+            if (activatedOnly && _activatedIndex > -1) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_KEY_ENTER;
+                activity.data.push(_charString);
+                _gctx.activities[_activatedIndex].push(activity);
+                return result;
+            }
+            else if (activatedOnly) {
+                return false;
+            }
+
+            switch (index) {
+                case Direct(item): {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_ENTER;
                     activity.data.push(_charString);
-                    _gctx.activities[parentIndex].push(activity);
+                    _gctx.activities[item].push(activity);
+                }
+                case Group(item): {
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_KEY_ENTER;
+                        activity.data.push(_charString);
+                        _gctx.activities[child].push(activity);
+                    }
                 }
             }
-
-            var activity = new Activity();
-            activity.type = ACTIVITY_KEY_ENTER;
-            activity.data.push(_charString);
-            _gctx.activities[index].push(activity);
         }
 
         return result;
@@ -718,19 +910,51 @@ class UpdateContext {
     * event.
     *
     * @param index The index of the dimension to check.
+    * @param allGroup 
     * @return Returns a boolean value to determine the drag start event.
     **/
-    public function isDragStart(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
-            return false;
+    public function isDragStart(?index:DimIndex, ?allGroup:Bool = false) {
+        var actualIndex = -1;
+        var partOfGroup = false;
+        switch (index) {
+            case Direct(item): {
+                actualIndex = item;
+            }
+            case Group(item): {
+                partOfGroup = true;
+                for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (dim == _isDragStart) {
+                        actualIndex = dim;
+                        break;
+                    }
+                }
+            }
         }
 
-        var result = _isDragStart == index && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+        var result = _isDragStart == actualIndex && (_activatedIndex == -1 || _activatedIndex == actualIndex);
 
         if (result) {
-            var activity = new Activity();
-            activity.type = ACTIVITY_DRAG_START;
-            _gctx.activities[index].push(activity);
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_DRAG_START;
+                        _gctx.activities[actualIndex].push(activity);
+                        return result;
+                    }
+
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_DRAG_START;
+                        _gctx.activities[child].push(activity);    
+                    }
+                }
+                default: {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_DRAG_START;
+                    _gctx.activities[actualIndex].push(activity);
+                }
+            }
         }
 
         return result;
@@ -743,17 +967,52 @@ class UpdateContext {
     * @param index The index of the dimension to check.
     * @return Returns a boolean value to determine the drag event.
     **/
-    public function isDragging(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
+    public function isDragging(?index:DimIndex, ?allGroup:Bool = false) {
+        var actualIndex = -1;
+        var partOfGroup = false;
+        switch (index) {
+            case Direct(item): {
+                actualIndex = item;
+            }
+            case Group(item): {
+                partOfGroup = true;
+                for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (dim == _drag.dragIndex) {
+                        actualIndex = dim;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (actualIndex < 0 || actualIndex > _gctx.dimensions.length - 1) {
             return false;
         }
 
-        var result = _drag.dragIndex == index && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+        var result = _drag.dragIndex == actualIndex && (_activatedIndex == -1 || _activatedIndex == actualIndex);
 
         if (result) {
-            var activity = new Activity();
-            activity.type = ACTIVITY_DRAGGING;
-            _gctx.activities[index].push(activity);
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_DRAGGING;
+                        _gctx.activities[actualIndex].push(activity);
+                        return result;
+                    }
+
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_DRAGGING;
+                        _gctx.activities[child].push(activity);    
+                    }
+                }
+                default: {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_DRAGGING;
+                    _gctx.activities[actualIndex].push(activity);
+                }
+            }
         }
 
         return result;
@@ -766,17 +1025,52 @@ class UpdateContext {
     * @param index The index of the dimension to check.
     * @return Returns a boolean value to determine the drag end event.
     **/
-    public function isDragEnd(index:Int) {
-        if (index < 0 || index > _gctx.dimensions.length - 1) {
+    public function isDragEnd(?index:DimIndex, ?allGroup:Bool = false) {
+        var actualIndex = -1;
+        var partOfGroup = false;
+        switch (index) {
+            case Direct(item): {
+                actualIndex = item;
+            }
+            case Group(item): {
+                partOfGroup = true;
+                for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (dim == _isDragEnd) {
+                        actualIndex = dim;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (actualIndex < 0 || actualIndex > _gctx.dimensions.length - 1) {
             return false;
         }
 
-        var result = _isDragEnd == index && _gctx.queries[index].type != QUERY_STATIC && (_activatedIndex == -1 || _activatedIndex == index);
+        var result = _isDragEnd == actualIndex && (_activatedIndex == -1 || _activatedIndex == actualIndex);
 
         if (result) {
-            var activity = new Activity();
-            activity.type = ACTIVITY_DRAG_END;
-            _gctx.activities[index].push(activity);
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_DRAG_END;
+                        _gctx.activities[actualIndex].push(activity);
+                        return result;
+                    }
+
+                    for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_DRAG_END;
+                        _gctx.activities[child].push(activity);    
+                    }
+                }
+                default: {
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_DRAG_END;
+                    _gctx.activities[actualIndex].push(activity);
+                }
+            }
         }
 
         return result;
@@ -929,13 +1223,19 @@ class UpdateContext {
             var gap = containerDim.width * 0.3; 
 
             for (child in container.childIndices) {
-                var dim = _gctx.dimensions[child];
-                if (dim.x + dim.width > maxWidth + gap) {
-                    maxWidth = dim.x + dim.width + gap;
-                }
-                
-                if (dim.y + dim.height > maxHeight + gap) {
-                    maxHeight = dim.y + dim.height + gap;
+                switch (child) {
+                    case Direct(childItem): {
+                        var dim = _gctx.dimensions[childItem];
+                        maxWidth = Math.max(dim.x + dim.width + gap, maxWidth);
+                        maxHeight = Math.max(dim.y + dim.height + gap, maxHeight);
+                    }
+                    case Group(childGroup): {
+                        for (grpDim in _gctx.getDimIndicesAtGroupIndex(childGroup)) {
+                            var dim = _gctx.dimensions[grpDim];
+                            maxWidth = Math.max(dim.x + dim.width + gap, maxWidth);
+                            maxHeight = Math.max(dim.y + dim.height + gap, maxHeight);
+                        }
+                    }
                 }
             }
 

@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import twinspire.DimIndex;
 import twinspire.geom.Dim;
 import twinspire.render.UpdateContext;
 import twinspire.render.QueryType;
@@ -15,7 +16,7 @@ import kha.math.FastVector2;
 import kha.Image;
 
 typedef ContainerResult = {
-    var dimIndex:Int;
+    var dimIndex:DimIndex;
     var containerIndex:Int;
 }
 
@@ -45,6 +46,9 @@ class GraphicsContext {
     private var _buffers:Array<Image>;
     private var _bufferDimensionIndices:Array<Array<Int>>;
     private var _currentBuffer:Int;
+
+    private var _groups:Array<Array<Int>>;
+    private var _currentGroup:Int;
 
     /**
     * A collection of dimensions within this context. Do not write directly.
@@ -104,6 +108,8 @@ class GraphicsContext {
         _buffers = [];
         _bufferDimensionIndices = [];
         _currentBuffer = -1;
+        _groups = [];
+        _currentGroup = -1;
 
         containers = [];
         dimensions = [];
@@ -111,6 +117,39 @@ class GraphicsContext {
         queries = [];
         activities = [];
         textInputs = [];
+    }
+
+
+    /**
+    * Gets one or more queries that is referred to by the given `DimIndex`.
+    *
+    * @param index The `DimIndex` reference.
+    **/
+    public function getQueries(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                return [ queries[item] ];
+            }
+            case Group(item): {
+                return _groups[item].map((grp) -> queries[grp]);
+            }
+        }
+    }
+
+    /**
+    * Gets one or more activities that is referred to by the given `DimIndex`.
+    *
+    * @param index The `DimIndex` reference.
+    **/
+    public function getActivities(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                return [ activities[item] ];
+            }
+            case Group(item): {
+                return _groups[item].map((grp) -> activities[grp]);
+            }
+        }
     }
 
     /**
@@ -160,7 +199,16 @@ class GraphicsContext {
             var container = containers[bufferContainerIndex];
             
             for (child in container.childIndices) {
-                dimensions[child].scale = container.bufferZoomFactor;
+                switch (child) {
+                    case Direct(index): {
+                        dimensions[index].scale = container.bufferZoomFactor;
+                    }
+                    case Group(index): {
+                        for (item in _groups[index]) {
+                            dimensions[item].scale = container.bufferZoomFactor;
+                        }
+                    }
+                }
             }
         }
 
@@ -183,12 +231,122 @@ class GraphicsContext {
     }
 
     /**
+    * Begin a new group of dimensions. This function is a convenience for manipulating groups of
+    * dimensions at once. To refer to an existing group, specify the index.
+    *
+    * @param index (Optional) Specify the group index you wish to use. 
+    **/
+    public function beginGroup(?index:Int = -1) {
+        if (index > -1) {
+            if (index < _groups.length - 1) {
+                _currentGroup = index;
+            }
+            else {
+                // log error
+                return;
+            }
+        }
+        
+        _currentGroup = _groups.push([]) - 1;
+    }
+
+    /**
+    * Gets the last input index in the current group.
+    *
+    * @return Returns `-1` if no last input index can be found. 
+    **/
+    public function getLastDimIndexFromGroup() {
+        return getLastDimIndexAtGroup(_currentGroup);
+    }
+
+    /**
+    * Gets the last input index in the given group.
+    *
+    * @return Returns `-1` if no last input index can be found. 
+    **/
+    public function getLastDimIndexAtGroup(groupIndex:Int) {
+        if (groupIndex > -1 && groupIndex < _groups.length - 1) {
+            return _groups[groupIndex][_groups[groupIndex].length - 1];
+        }
+
+        return -1;
+    }
+
+    /**
+    * Gets the dim index from a given index in the current group.
+    *
+    * @return Returns `-1` if no dim index can be found. 
+    **/
+    public function getDimIndexFromGroup(index:Int) {
+        if (_currentGroup > -1 && _currentGroup < _groups.length - 1) {
+            if (index > -1 && index < _groups[_currentGroup].length - 1) {
+                return _groups[_currentGroup][index];
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+    * Gets the dim indices from the current group.
+    *
+    * @return Returns an array.
+    **/
+    public function getDimIndicesFromGroup() {
+        return getDimIndicesAtGroupIndex(_currentGroup);
+    }
+
+    /**
+    * Gets the dim indices from the given group index.
+    *
+    * @param groupIndex The index of the group.
+    * @return Returns an array.
+    **/
+    public function getDimIndicesAtGroupIndex(groupIndex:Int) {
+        if (groupIndex > -1 && groupIndex < _groups.length - 1) {
+            return _groups[groupIndex];
+        }
+
+        return [];
+    }
+
+    /**
+    * End the current group and return the index of the group.
+    **/
+    public function endGroup() {
+        var temp = _currentGroup;
+        _currentGroup = -1;
+        return temp;
+    }
+
+    private function addDimensionIndexToGroup(index:Int) {
+        if (_currentGroup > -1) {
+            _groups[_currentGroup].push(index);
+        }
+    }
+
+    /**
     * Gets the links of a dimension as indices.
     *
     * @param index The index of the dimension.
     **/
-    public function getLinksFromIndex(index:Int):Array<Int> {
-        return dimensionLinks.whereIndices((i) -> i == index);
+    public function getLinksFromIndex(index:DimIndex):Array<Int> {
+        switch (index) {
+            case Direct(item): {
+                return dimensionLinks.whereIndices((i) -> i == item);
+            }
+            case Group(item): {
+                var results = [];
+                for (child in _groups[item]) {
+                    var indices = dimensionLinks.whereIndices((i) -> i == child);
+                    for (i in indices) {
+                        results.push(i);
+                    }
+                }
+
+                return results;
+            }
+        }
     }
 
     /**
@@ -198,63 +356,116 @@ class GraphicsContext {
     * @param index The index of the dimension
     * @return Returns either a reference to a given dimension, or a copy of a dimension if linked to a container.
     **/
-    public function getDimensionAtIndex(index:Int) {
-        var containerIndex = -1;
-        for (i in 0...containers.length) {
-            var c = containers[i];
-            if (c.childIndices.contains(index)) {
-                containerIndex = i;
-                break;
+    public function getDimensionsAtIndex(index:DimIndex) {
+        var actualIndices = new Array<Int>();
+        switch (index) {
+            case Direct(item): {
+                actualIndices.push(item);
+            }
+            case Group(item): {
+                _groups[item].map((child) -> actualIndices.push(child));
             }
         }
 
-        if (containerIndex == -1) {
-            return dimensions[index];
+        var results = [];
+        for (actual in actualIndices) {
+            var containerIndex = -1;
+            for (i in 0...containers.length) {
+                var c = containers[i];
+                if (c.childIndices.contains(index)) {
+                    containerIndex = i;
+                    break;
+                }
+            }
+
+            if (containerIndex == -1) {
+                results.push(dimensions[actual]);
+            }
+            else {
+                var c = containers[containerIndex];
+                var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
+                var d = dimensions[actual];
+                results.push(new Dim(d.x + c.offset.x * scale, d.y + c.offset.y * scale, d.width, d.height, d.order));
+            }
         }
-        else {
-            var c = containers[containerIndex];
-            var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
-            var d = dimensions[index];
-            return new Dim(d.x + c.offset.x * scale, d.y + c.offset.y * scale, d.width, d.height, d.order);
-        }
+
+        return results;
     }
 
     /**
-    * Like `getDimensionAtIndex`, except the returning dimension is relative to the container it resides.
+    * Like `getDimensionsAtIndex`, except the returning dimension is relative to the container it resides.
     * If the dimension does not belong to a container, it returns the exact dimension as is.
     *
-    * @param index The index of the dimension.
+    * @param index The index of the dimension as a `DimIndex`.
     **/
-    public function getDimensionRelativeAtIndex(index:Int) {
-        var containerIndex = -1;
-        for (i in 0...containers.length) {
-            var c = containers[i];
-            if (c.childIndices.contains(index)) {
-                containerIndex = i;
-                break;
+    public function getDimensionsRelativeAtIndex(index:DimIndex) {
+        var actualIndices = new Array<Int>();
+
+        switch (index) {
+            case Direct(item): {
+                actualIndices.push(item);
+            }
+            case Group(item): {
+                if (item < _groups.length - 1) {
+                    for (child in _groups[item]) {
+                        actualIndices.push(child);
+                    }
+                }
             }
         }
 
-        if (containerIndex == -1) {
-            return dimensions[index];
+        var results = [];
+        for (actual in actualIndices) {
+            var containerIndex = -1;
+            for (i in 0...containers.length) {
+                var c = containers[i];
+                if (c.childIndices.contains(index)) {
+                    containerIndex = i;
+                    break;
+                }
+            }
+
+            if (containerIndex == -1) {
+                results.push(dimensions[actual]);
+            }
+            else {
+                var c = containers[containerIndex];
+                var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
+                var d = dimensions[actual].get();
+                var cDim = dimensions[c.dimIndex];
+                results.push(new Dim(d.x - cDim.x + c.offset.x * scale, d.y - cDim.y + c.offset.y * scale, d.width, d.height, d.order)); 
+            }
         }
-        else {
-            var c = containers[containerIndex];
-            var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
-            var d = dimensions[index].get();
-            var cDim = dimensions[c.dimIndex];
-            return new Dim(d.x - cDim.x + c.offset.x * scale, d.y - cDim.y + c.offset.y * scale, d.width, d.height, d.order);
-        }
+
+        return results;
     }
 
     /**
     * Gets a dimension at its respective client coordinates after resolving container offsets.
     * Takes into account any multiples of containers.
     *
-    * @param index The index of the dimension.
+    * @param index The index as a `DimIndex` of the dimension or group.
+    * @return The dimensions as an `Array<Dim>` or an empty array if a group or index is invalid.
     **/
-    public function getClientDimensionAtIndex(index:Int) {
-        return new Dim(_dimClientPositions[index].x, _dimClientPositions[index].y, dimensions[index].width, dimensions[index].height, dimensions[index].order);
+    public function getClientDimensionsAtIndex(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                if (item < dimensions.length) {
+                    return [ new Dim(_dimClientPositions[item].x, _dimClientPositions[item].y, dimensions[item].width, dimensions[item].height, dimensions[item].order) ];
+                }
+            }
+            case Group(item): {
+                if (item < _groups.length - 1) {
+                    var results = new Array<Dim>();
+                    for (child in _groups[item]) {
+                        results.push(new Dim(_dimClientPositions[child].x, _dimClientPositions[child].y, dimensions[child].width, dimensions[child].height, dimensions[child].order));
+                    }
+                    return results;
+                }
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -262,9 +473,22 @@ class GraphicsContext {
     *
     * @param index The index of the dimension.
     **/
-    public function markDimChange(index:Int) {
-        if (!_dimForceChangeIndices.contains(index)) {
-            _dimForceChangeIndices.push(index);
+    public function markDimChange(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                if (!_dimForceChangeIndices.contains(item)) {
+                    _dimForceChangeIndices.push(item);
+                }
+            }
+            case Group(item): {
+                if (item < _groups.length) {
+                    for (child in _groups[item]) {
+                        if (!_dimForceChangeIndices.contains(item)) {
+                            _dimForceChangeIndices.push(item);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -272,13 +496,16 @@ class GraphicsContext {
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
     *
+    * When `beginGroup` is used, this function returns the group index and adds the dimension index to the group.
+    *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     * @param linkTo An optional index specifying that this dimension should be linked to another index.
     *
-    * @return An index value of the position of this dimension as it would be in permanent storage.
+    * @return An index value of the position of this dimension as it would be in permanent storage,
+    * or the current group index.
     **/
-    public function addStatic(dim:Dim, renderType:Id, ?linkTo:Int = -1):Int {
+    public function addStatic(dim:Dim, renderType:Id, ?linkTo:Int = -1):DimIndex {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -299,21 +526,30 @@ class GraphicsContext {
         activities.push([]);
 
         addDimensionIndexToBuffer(index);
+        addDimensionIndexToGroup(index);
 
-        return index;
+        if (_currentGroup > -1) {
+            return Group(_currentGroup);
+        }
+        else {
+            return Direct(index);
+        }
     }
 
     /**
     * Add a UI dimension with the given render type. UI dimensions are considered to be
     * affected by user input but not physics simulations.
     *
+    * When `beginGroup` is used, this function returns the group index and adds the dimension index to the group.
+    *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     * @param linkTo An optional index specifying that this dimension should be linked to another index.
     *
-    * @return An index value of the position of this dimension as it would be in permanent storage.
+    * @return An index value of the position of this dimension as it would be in permanent storage,
+    * or the current group index.
     **/
-    public function addUI(dim:Dim, renderType:Id, ?linkTo:Int = -1) {
+    public function addUI(dim:Dim, renderType:Id, ?linkTo:Int = -1):DimIndex {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -338,21 +574,30 @@ class GraphicsContext {
         }
 
         addDimensionIndexToBuffer(index);
+        addDimensionIndexToGroup(index);
 
-        return index;
+        if (_currentGroup > -1) {
+            return Group(_currentGroup);
+        }
+        else {
+            return Direct(index);
+        }
     }
 
     /**
     * Add a Sprite dimension with the given render type. Sprite dimensions are considered to be
     * affected physics simulations but not user input.
     *
+    * When `beginGroup` is used, this function returns the group index and adds the dimension index to the group.
+    *
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     * @param linkTo An optional index specifying that this dimension should be linked to another index.
     *
-    * @return An index value of the position of this dimension as it would be in permanent storage.
+    * @return An index value of the position of this dimension as it would be in permanent storage,
+    * or the current group index.
     **/
-    public function addSprite(dim:Dim, renderType:Id, ?linkTo:Int = -1) {
+    public function addSprite(dim:Dim, renderType:Id, ?linkTo:Int = -1):DimIndex {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -373,8 +618,14 @@ class GraphicsContext {
         activities.push([]);
 
         addDimensionIndexToBuffer(index);
+        addDimensionIndexToGroup(index);
 
-        return index;
+        if (_currentGroup > -1) {
+            return Group(_currentGroup);
+        }
+        else {
+            return Direct(index);
+        }
     }
 
     /**
@@ -390,7 +641,11 @@ class GraphicsContext {
     **/
     public function addContainer(dim:Dim, renderType:Id, linkTo:Int = -1):ContainerResult {
         var container = new Container();
-        container.dimIndex = addUI(dim, renderType, linkTo);
+        var resultIndex = addUI(dim, renderType, linkTo);
+        container.dimIndex = switch(resultIndex) {
+            case Direct(index): index;
+            case Group(index): _groups[index][_groups[index].length - 1];
+        };
         container.offset = new FastVector2(0, 0);
         container.content = new FastVector2(0, 0);
 
@@ -403,7 +658,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(container.dimIndex);
 
         return {
-            dimIndex: container.dimIndex,
+            dimIndex: resultIndex,
             containerIndex: result
         };
     }
@@ -423,7 +678,11 @@ class GraphicsContext {
     **/
     public function addTextInput(dim:Dim, method:TextInputMethod, linkTo:Int = -1):TextInputResult {
         var container = new Container();
-        container.dimIndex = addUI(dim, InputRenderer.RenderId, linkTo);
+        var resultIndex = addUI(dim, InputRenderer.RenderId, linkTo);
+        container.dimIndex = switch (resultIndex) {
+            case Direct(index): index;
+            case Group(index): _groups[index][_groups[index].length - 1];
+        };
         queries[container.dimIndex].acceptsTextInput = true;
         container.manual = true;
         container.offset = new FastVector2(0, 0);
@@ -437,7 +696,7 @@ class GraphicsContext {
 
         var inputResult:TextInputResult = {
             containerIndex: result,
-            dimIndex: container.dimIndex,
+            dimIndex: resultIndex,
             textInputIndex: textInputs.length
         };
 
@@ -578,7 +837,14 @@ class GraphicsContext {
             for (ci in 0...containersChanged.length) {
                 var container = containers[ci];
                 for (di in container.childIndices) {
-                    dimIndicesChanged.push(di);
+                    switch (di) {
+                        case Direct(index): {
+                            dimIndicesChanged.push(index);
+                        }
+                        case Group(index): {
+                            dimIndicesChanged.concat(_groups[index]);
+                        }
+                    }
                 }
             }
         }
@@ -608,7 +874,10 @@ class GraphicsContext {
                         var c = containers[i];
                         // determine if the offset should change based on whether the container is buffered
                         var scale = (c.bufferIndex == -1 ? 1 : c.bufferZoomFactor);
-                        if (c.childIndices.contains(childIndex)) {
+                        if (c.childIndices.findIndex((di) -> switch (di) {
+                            case Direct(index): index == childIndex;
+                            case Group(index): _groups[index].contains(childIndex);
+                        }) != -1) {
                             offset.x += c.offset.x * scale;
                             offset.y += c.offset.y * scale;
                             innerFound = i;
