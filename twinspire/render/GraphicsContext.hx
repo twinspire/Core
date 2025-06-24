@@ -238,7 +238,7 @@ class GraphicsContext {
     **/
     public function beginGroup(?index:Int = -1) {
         if (index > -1) {
-            if (index < _groups.length - 1) {
+            if (index < _groups.length) {
                 _currentGroup = index;
             }
             else {
@@ -265,7 +265,7 @@ class GraphicsContext {
     * @return Returns `-1` if no last input index can be found. 
     **/
     public function getLastDimIndexAtGroup(groupIndex:Int) {
-        if (groupIndex > -1 && groupIndex < _groups.length - 1) {
+        if (groupIndex > -1 && groupIndex < _groups.length) {
             return _groups[groupIndex][_groups[groupIndex].length - 1];
         }
 
@@ -278,7 +278,7 @@ class GraphicsContext {
     * @return Returns `-1` if no dim index can be found. 
     **/
     public function getDimIndexFromGroup(index:Int) {
-        if (_currentGroup > -1 && _currentGroup < _groups.length - 1) {
+        if (_currentGroup > -1 && _currentGroup < _groups.length) {
             if (index > -1 && index < _groups[_currentGroup].length - 1) {
                 return _groups[_currentGroup][index];
             }
@@ -303,7 +303,7 @@ class GraphicsContext {
     * @return Returns an array.
     **/
     public function getDimIndicesAtGroupIndex(groupIndex:Int) {
-        if (groupIndex > -1 && groupIndex < _groups.length - 1) {
+        if (groupIndex > -1 && groupIndex < _groups.length) {
             return _groups[groupIndex];
         }
 
