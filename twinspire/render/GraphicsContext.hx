@@ -251,7 +251,10 @@ class GraphicsContext {
     }
 
     /**
-    * Gets the indices from a `DimIndex`.
+    * Gets the indices from a `DimIndex`. If you use links to a `Group` index,
+    * both the links and the wrapping dimension indices are included, and the
+    * wrapping index is likely to always be at zero (depending on your specific
+    * order of operations).
     **/
     public function getIndicesFromDimIndex(index:DimIndex) {
         switch (index) {
@@ -322,6 +325,24 @@ class GraphicsContext {
         }
 
         return [];
+    }
+
+    /**
+    * Gets the `DimIndex` of an integer value reference to the dimension stack,
+    * returning `Group` if the index is found in a group, otherwise `Direct`.
+    *
+    * @param value The dimension index to search for.
+    **/
+    public function getDimIndexFromInt(value:Int) {
+        for (i in 0..._groups.length) {
+            for (index in _groups[i]) {
+                if (index == value) {
+                    return Group(i);
+                }
+            }
+        }
+
+        return Direct(value);
     }
 
     /**
@@ -420,7 +441,10 @@ class GraphicsContext {
                 var c = containers[containerIndex];
                 var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
                 var d = dimensions[actual];
-                results.push(new Dim(d.x + c.offset.x * scale, d.y + c.offset.y * scale, d.width, d.height, d.order));
+                var value = new Dim(d.x + c.offset.x * scale, d.y + c.offset.y * scale, d.width, d.height, d.order);
+                value.visible = dimensions[actual].visible;
+                value.scale = dimensions[actual].scale;
+                results.push(value);
             }
         }
 
@@ -468,7 +492,10 @@ class GraphicsContext {
                 var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
                 var d = dimensions[actual].get();
                 var cDim = dimensions[c.dimIndex];
-                results.push(new Dim(d.x - cDim.x + c.offset.x * scale, d.y - cDim.y + c.offset.y * scale, d.width, d.height, d.order)); 
+                var value = new Dim(d.x - cDim.x + c.offset.x * scale, d.y - cDim.y + c.offset.y * scale, d.width, d.height, d.order);
+                value.visible = dimensions[actual].visible;
+                value.scale = dimensions[actual].scale;
+                results.push(value); 
             }
         }
 
@@ -486,14 +513,20 @@ class GraphicsContext {
         switch (index) {
             case Direct(item): {
                 if (item < dimensions.length) {
-                    return [ new Dim(_dimClientPositions[item].x, _dimClientPositions[item].y, dimensions[item].width, dimensions[item].height, dimensions[item].order) ];
+                    var value = new Dim(_dimClientPositions[item].x, _dimClientPositions[item].y, dimensions[item].width, dimensions[item].height, dimensions[item].order);
+                    value.visible = dimensions[item].visible;
+                    value.scale = dimensions[item].scale;
+                    return [ value ];
                 }
             }
             case Group(item): {
                 if (item < _groups.length) {
                     var results = new Array<Dim>();
                     for (child in _groups[item]) {
-                        results.push(new Dim(_dimClientPositions[child].x, _dimClientPositions[child].y, dimensions[child].width, dimensions[child].height, dimensions[child].order));
+                        var value = new Dim(_dimClientPositions[child].x, _dimClientPositions[child].y, dimensions[child].width, dimensions[child].height, dimensions[child].order);
+                        value.visible = dimensions[child].visible;
+                        value.scale = dimensions[child].scale;
+                        results.push(value);
                     }
                     return results;
                 }

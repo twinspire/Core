@@ -55,6 +55,8 @@ class Dim
 	public function clone()
 	{
 		var dim = new Dim(x, y, width, height, order);
+		dim.visible = visible;
+		dim.scale = scale;
 		return dim;
 	}
 
