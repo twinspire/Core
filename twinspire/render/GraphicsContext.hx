@@ -326,6 +326,27 @@ class GraphicsContext {
     }
 
     /**
+    * Gets a value to determine if the given index is valid (i.e., the dimension reference exists in the stack).
+    *
+    * @param index The dimension index to check.
+    **/
+    public function isDimIndexValid(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                return item > -1 && item < dimensions.length;
+            }
+            case Group(group): {
+                for (item in _groups[group]) {
+                    if (item < 0 || item > dimensions.length - 1) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+    }
+
+    /**
     * Gets the links of a dimension as indices.
     *
     * @param index The index of the dimension.
