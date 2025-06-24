@@ -251,6 +251,20 @@ class GraphicsContext {
     }
 
     /**
+    * Gets the indices from a `DimIndex`.
+    **/
+    public function getIndicesFromDimIndex(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                return [ item ];
+            }
+            case Group(group): {
+                return _groups[group];
+            }
+        }
+    }
+
+    /**
     * Gets the last input index in the current group.
     *
     * @return Returns `-1` if no last input index can be found. 
@@ -279,7 +293,7 @@ class GraphicsContext {
     **/
     public function getDimIndexFromGroup(index:Int) {
         if (_currentGroup > -1 && _currentGroup < _groups.length) {
-            if (index > -1 && index < _groups[_currentGroup].length - 1) {
+            if (index > -1 && index < _groups[_currentGroup].length) {
                 return _groups[_currentGroup][index];
             }
         }
@@ -427,7 +441,7 @@ class GraphicsContext {
                 actualIndices.push(item);
             }
             case Group(item): {
-                if (item < _groups.length - 1) {
+                if (item < _groups.length) {
                     for (child in _groups[item]) {
                         actualIndices.push(child);
                     }
@@ -476,7 +490,7 @@ class GraphicsContext {
                 }
             }
             case Group(item): {
-                if (item < _groups.length - 1) {
+                if (item < _groups.length) {
                     var results = new Array<Dim>();
                     for (child in _groups[item]) {
                         results.push(new Dim(_dimClientPositions[child].x, _dimClientPositions[child].y, dimensions[child].width, dimensions[child].height, dimensions[child].order));
