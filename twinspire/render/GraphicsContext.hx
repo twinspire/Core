@@ -237,6 +237,10 @@ class GraphicsContext {
     * @param index (Optional) Specify the group index you wish to use. 
     **/
     public function beginGroup(?index:Int = -1) {
+        if (_currentGroup > -1) {
+            throw "You cannot create a group within a group. End the current group before starting a new one.";
+        }
+
         if (index > -1) {
             if (index < _groups.length) {
                 _currentGroup = index;
