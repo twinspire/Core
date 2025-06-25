@@ -565,6 +565,36 @@ class GraphicsContext {
     }
 
     /**
+    * Create dimensions the equivalent of an existing given group and add to the current group.
+    * This function returns indices to the dimensions added within the group reference.
+    * The sizes remain the same and their positions are offset by the given `pos`, retaining
+    * all their previous properties, including render type, containers and others.
+    *
+    * @param dimIndex The dimension index referring to a group. If `Direct`, this function does nothing.
+    * @param pos The position the new dimensions are set to.
+    **/
+    public function addNextGroupReference(dimIndex:DimIndex, pos:FastVector2) {
+
+    }
+
+    private function createClonedDimensionsFromIndex(index:Int) {
+        var results = new Array<Dim>();
+        // check if the given index is associated to a container
+        var containerResults = containers.whereIndices((c) -> c.dimIndex == index);
+        if (containerResults.length > 0) {
+            // if there is a container, copy the container, clone dimensions from indices inside
+            
+
+        }
+        else {
+            // treat the index as a single dimension, copy only queries/activities
+
+        }
+
+        return results;
+    }
+
+    /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
     *
