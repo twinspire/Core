@@ -8,6 +8,7 @@ import js.html.FileReader;
 import js.Browser;
 #end
 
+import twinspire.render.AutoTrackInfo;
 import twinspire.render.UpdateContext;
 import twinspire.render.GraphicsContext;
 import twinspire.GlobalEvents;
@@ -128,6 +129,11 @@ class Application
 	**/
 	public var cutData:String;
 
+	/**
+	* Sets the internal `GraphicsContext` to use tracking objects and initialise auto tracking.
+	**/
+	public var useTracker:Bool;
+
 	private function new()
 	{
 		initEvents();
@@ -141,6 +147,9 @@ class Application
 	/**
 	* Initialise the optional update and graphics contexts and let the Application
 	* perform basic logic for you.
+	*
+	* If using the internal tracker, you can start adding auto-mappings to the `AutoTrackInfo`
+	* class between this call and before calling `start`.
 	**/
 	public function initContexts() {
 		if ((sceneManager != null && !(render == null || update == null || end == null)) || (sceneManager == null && (render == null || update == null || end == null)))  {
@@ -149,6 +158,12 @@ class Application
 
 		_graphicsContext = new GraphicsContext();
 		_updateContext = new UpdateContext(_graphicsContext);
+
+		if (useTracker) {
+			AutoTrackInfo.init();
+			_graphicsContext.useTracker = true;
+			_graphicsContext.tracker = [];
+		}
 	}
 
 	/**

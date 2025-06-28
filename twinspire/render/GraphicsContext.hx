@@ -83,6 +83,19 @@ class GraphicsContext {
     * should indicate the position in the menu. If `null`, nothing will be rendered.
     **/
     public var menuCursorRenderId:Null<Id>;
+    /**
+    * This is an optional tracking module that allows tracking the render, update and logical
+    * states of objects referred to by a `DimIndex`. It is important to set `useTracker` to `true`
+    * before using and operating on this variable. Ensure this is set at initialisation,
+    * before the application starts.
+    **/
+    public var tracker:Map<DimIndex, TrackingObject>;
+    /**
+    * Specifies that the `GraphicsContext` tracker is used to automatically add references
+    * to newly created dimensions.
+    **/
+    public var useTracker:Bool;
+
 
     private var _g2:Graphics;
     public var g2(get, default):Graphics;
@@ -726,6 +739,26 @@ class GraphicsContext {
         }
     }
 
+    private function setupTrackingObject(index:DimIndex, renderType:Id, data:Dynamic) {
+        if (useTracker &&
+            AutoTrackInfo.updateTracks.exists(renderType) &&
+            AutoTrackInfo.renderTracks.exists(renderType) &&
+            AutoTrackInfo.endTracks.exists(renderType) &&
+            AutoTrackInfo.initTracks.exists(renderType)) {
+            var object = AutoTrackInfo.initTracks[renderType](this, data);
+            if (Reflect.isObject(data)) {
+                for (f in Reflect.fields(data)) {
+                    object.data[f] = Reflect.field(data, f);
+                }
+            }
+
+            object.update = AutoTrackInfo.updateTracks[renderType];
+            object.render = AutoTrackInfo.renderTracks[renderType];
+            object.end = AutoTrackInfo.endTracks[renderType];
+            tracker[index] = object;
+        }
+    }
+
     /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
@@ -735,11 +768,12 @@ class GraphicsContext {
     * @param dim The dimension.
     * @param renderType An integer used to determine what is rendered.
     * @param linkTo An optional index specifying that this dimension should be linked to another index.
+    * @param data An optional data value specifying the data related to this dimension typically used for auto tracking.
     *
     * @return An index value of the position of this dimension as it would be in permanent storage,
     * or the current group index.
     **/
-    public function addStatic(dim:Dim, renderType:Id, ?linkTo:Int = -1):DimIndex {
+    public function addStatic(dim:Dim, renderType:Id, ?linkTo:Int = -1, ?data:Dynamic = null):DimIndex {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -762,12 +796,9 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        if (_currentGroup > -1) {
-            return Group(_currentGroup);
-        }
-        else {
-            return Direct(index);
-        }
+        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
+        setupTrackingObject(result, renderType, data ?? {});
+        return result;
     }
 
     /**
@@ -810,12 +841,9 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        if (_currentGroup > -1) {
-            return Group(_currentGroup);
-        }
-        else {
-            return Direct(index);
-        }
+        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
+        setupTrackingObject(result, renderType, data ?? {});
+        return result;
     }
 
     /**
@@ -854,12 +882,9 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        if (_currentGroup > -1) {
-            return Group(_currentGroup);
-        }
-        else {
-            return Direct(index);
-        }
+        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
+        setupTrackingObject(result, renderType, data ?? {});
+        return result;
     }
 
     /**
