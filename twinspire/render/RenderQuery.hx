@@ -37,4 +37,15 @@ class RenderQuery {
         dragOptions = new DragOptions();
     }
 
+    public function clone() {
+        var result = new RenderQuery();
+        result.acceptsKeyInput = acceptsKeyInput;
+        result.acceptsTextInput = acceptsTextInput;
+        result.allowDragging = allowDragging;
+        result.dragOptions = dragOptions;
+        result.renderType = renderType;
+        result.type = type;
+        return result;
+    }
+
 }

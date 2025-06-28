@@ -565,33 +565,165 @@ class GraphicsContext {
     }
 
     /**
-    * Create dimensions the equivalent of an existing given group and add to the current group.
-    * This function returns indices to the dimensions added within the group reference.
-    * The sizes remain the same and their positions are offset by the given `pos`, retaining
-    * all their previous properties, including render type, containers and others.
+    * Collate a given set of indices into a single group, returning the new group index as a
+    * `DimIndex`. Any existing groups found within the set of indices are extracted and moved into
+    * the new group. If the old group is emptied as a result of this, the group is deleted.
     *
-    * @param dimIndex The dimension index referring to a group. If `Direct`, this function does nothing.
-    * @param pos The position the new dimensions are set to.
+    * Any previous reference to other groups that you hold should be refreshed using the `refreshGroups`
+    * function.
+    *
+    * @param indices The indices to collate.
     **/
-    public function addNextGroupReference(dimIndex:DimIndex, pos:FastVector2) {
+    public function addNextGroupReference(indices:Array<Int>) {
+        // TODO   
+    }
 
+    /**
+    * Copy a dim index with the given `pos` offset from the original position of all
+    * dimensions within this function. This function takes into account possible containers.
+    *
+    * The result of copying this function is not visible until the next frame.
+    *
+    * @param dimIndex The dimension index to copy. 
+    * @param pos The position the new dimensions are set to.
+    *
+    * @return Return the references to the dimensions in temporary storage, prior to adding into the next frame. If further
+    * action is needed on temporary dimensions, do so before calling `end`.
+    **/
+    public function copyDimIndexOffset(dimIndex:DimIndex, pos:FastVector2) {
+        var dimRefs = new Array<Int>();
+        switch (dimIndex) {
+            case Direct(index): {
+                dimRefs = createClonedDimensionsFromIndex(index);
+            }
+            case Group(index): {
+                for (g in _groups[index]) {
+                    var indices = createClonedDimensionsFromIndex(g);
+                    dimRefs.concat(indices);
+                }
+            }
+        }
+
+        for (i in dimRefs) {
+            _dimTemp[i].x += pos.x;
+            _dimTemp[i].y += pos.y;
+        }
+
+        return dimRefs;
     }
 
     private function createClonedDimensionsFromIndex(index:Int) {
-        var results = new Array<Dim>();
+        var results = new Array<Int>();
         // check if the given index is associated to a container
         var containerResults = containers.whereIndices((c) -> c.dimIndex == index);
         if (containerResults.length > 0) {
             // if there is a container, copy the container, clone dimensions from indices inside
-            
+            var ref = containers[containerResults[0]];
 
+            var copiedContainer = new Container();
+            copiedContainer.dimIndex = ref.dimIndex;
+            copiedContainer.bufferIndex = ref.bufferIndex;
+            copiedContainer.bufferReceivesEvents = ref.bufferReceivesEvents;
+            copiedContainer.bufferZoomFactor = ref.bufferZoomFactor;
+            copiedContainer.content = new FastVector2();
+            copiedContainer.enableScrollWithClick = ref.enableScrollWithClick;
+            copiedContainer.increment = ref.increment;
+            copiedContainer.infiniteScroll = ref.infiniteScroll;
+            copiedContainer.manual = ref.manual;
+            copiedContainer.measurement = ref.measurement;
+            copiedContainer.offset = new FastVector2();
+            copiedContainer.smoothScrolling = ref.smoothScrolling;
+            copiedContainer.softInfiniteLimit = ref.softInfiniteLimit;
+
+            var newParentLink = -1;
+            var first = true;
+            for (child in ref.childIndices) {
+                var childDim = dimensions[child];
+                var childLink = dimensionLinks[child];
+
+                var link = -1;
+                if (childLink > -1) {
+                    link = newParentLink;
+                }
+
+                var dimIndex = getDimIndexFromInt(child);
+                var length = copyDimIndex(dimIndex, link);
+                var newIndices = [];
+
+                if (dimIndex.getName() == "Group") {
+                    beginGroup();
+                }
+
+                for (i in 0...length) {    
+                    results.push(_dimTemp.length - 1);
+                    var newIndex = dimensions.length + _dimTemp.length - 1;
+                    newIndices.push(newIndex);
+                    if (dimIndex.getName() == "Group") {
+                        addDimensionIndexToGroup(newIndex);
+                    }
+                }
+
+                if (first) {
+                    newParentLink = newIndex;
+                    first = false;
+                }
+
+                if (dimIndex.getName() == "Direct") {
+                    copiedContainer.childIndices.push(Direct(newIndices[0]));
+                }
+                else {
+                    copiedContainer.childIndices.push(Group(endGroup()));
+                }
+            }
+            
+            containers.push(copiedContainer);
         }
         else {
             // treat the index as a single dimension, copy only queries/activities
-
+            copyDimIndex(Direct(index));
+            results.push(_dimTemp.length - 1)
         }
 
         return results;
+    }
+
+    /**
+    * Copies a `DimIndex`, either as a group or a specific index.
+    * If copying a group of indices, `withLink` sets all the copied indices within the group to this index.
+    *
+    * The results of the copy do not move the dimension and are not seen until the next frame.
+    * For a more robust copy function, use `copyDimIndexOffset`.
+    * 
+    * @param index The index to copy.
+    *
+    * @return Return the number of copied indices.
+    **/
+    public function copyDimIndex(index:DimIndex, ?withLink:Int = -1):Int {
+        switch (index) {
+            case Direct(item): {
+                var dim = dimensions[item];
+                var clonedQuery = queries[item].clone();
+                var offset = _dimTemp.push(dim.clone());
+
+                var newIndex = dimensions.length + offset - 1;
+                queries.push(clonedQuery);
+                activities.push([]);
+
+                addDimensionIndexToBuffer(newIndex);
+                addDimensionIndexToBuffer(newIndex);
+
+                _dimTempLinkTo.push(withLink);
+
+                return 1;
+            }
+            case Group(item): {
+                for (g in _groups[item]) {
+                    copyDimIndex(Direct(g), withLink);
+                }
+
+                return _groups[item].length;
+            }
+        }
     }
 
     /**
