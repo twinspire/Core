@@ -49,6 +49,7 @@ class GraphicsContext {
 
     private var _groups:Array<Array<Int>>;
     private var _currentGroup:Int;
+    private var _currentGroupRenderType:Id;
 
     /**
     * A collection of dimensions within this context. Do not write directly.
@@ -123,6 +124,7 @@ class GraphicsContext {
         _currentBuffer = -1;
         _groups = [];
         _currentGroup = -1;
+        _currentGroupRenderType = null;
 
         containers = [];
         dimensions = [];
@@ -248,8 +250,9 @@ class GraphicsContext {
     * dimensions at once. To refer to an existing group, specify the index.
     *
     * @param index (Optional) Specify the group index you wish to use. 
+    * @param renderType (Optional) Specify if this group should be referenced to a specific render type.
     **/
-    public function beginGroup(?index:Int = -1) {
+    public function beginGroup(?index:Int = -1, ?renderType:Id = null) {
         if (_currentGroup > -1) {
             throw "You cannot create a group within a group. End the current group before starting a new one.";
         }
@@ -265,6 +268,7 @@ class GraphicsContext {
         }
         
         _currentGroup = _groups.push([]) - 1;
+        _currentGroupRenderType = renderType;
     }
 
     /**
@@ -366,6 +370,8 @@ class GraphicsContext {
     * End the current group and return the index of the group.
     **/
     public function endGroup() {
+        
+
         var temp = _currentGroup;
         _currentGroup = -1;
         return temp;
@@ -651,19 +657,19 @@ class GraphicsContext {
             var newParentLink = -1;
             var first = true;
             for (child in ref.childIndices) {
-                var childDim = dimensions[child];
-                var childLink = dimensionLinks[child];
+                var childIndex = getIndicesFromDimIndex(child)[0];
+                var childDim = dimensions[childIndex];
+                var childLink = dimensionLinks[childIndex];
 
                 var link = -1;
                 if (childLink > -1) {
                     link = newParentLink;
                 }
 
-                var dimIndex = getDimIndexFromInt(child);
-                var length = copyDimIndex(dimIndex, link);
+                var length = copyDimIndex(child, link);
                 var newIndices = [];
 
-                if (dimIndex.getName() == "Group") {
+                if (child.getName() == "Group") {
                     beginGroup();
                 }
 
@@ -671,17 +677,17 @@ class GraphicsContext {
                     results.push(_dimTemp.length - 1);
                     var newIndex = dimensions.length + _dimTemp.length - 1;
                     newIndices.push(newIndex);
-                    if (dimIndex.getName() == "Group") {
+                    if (child.getName() == "Group") {
                         addDimensionIndexToGroup(newIndex);
+                    }
+
+                    if (first) {
+                        newParentLink = newIndex;
+                        first = false;
                     }
                 }
 
-                if (first) {
-                    newParentLink = newIndex;
-                    first = false;
-                }
-
-                if (dimIndex.getName() == "Direct") {
+                if (child.getName() == "Direct") {
                     copiedContainer.childIndices.push(Direct(newIndices[0]));
                 }
                 else {
@@ -694,7 +700,7 @@ class GraphicsContext {
         else {
             // treat the index as a single dimension, copy only queries/activities
             copyDimIndex(Direct(index));
-            results.push(_dimTemp.length - 1)
+            results.push(_dimTemp.length - 1);
         }
 
         return results;
@@ -745,16 +751,17 @@ class GraphicsContext {
             AutoTrackInfo.renderTracks.exists(renderType) &&
             AutoTrackInfo.endTracks.exists(renderType) &&
             AutoTrackInfo.initTracks.exists(renderType)) {
-            var object = AutoTrackInfo.initTracks[renderType](this, data);
+            var type = _currentGroupRenderType ?? renderType;
+            var object = AutoTrackInfo.initTracks[type](this, data);
             if (Reflect.isObject(data)) {
                 for (f in Reflect.fields(data)) {
                     object.data[f] = Reflect.field(data, f);
                 }
             }
 
-            object.update = AutoTrackInfo.updateTracks[renderType];
-            object.render = AutoTrackInfo.renderTracks[renderType];
-            object.end = AutoTrackInfo.endTracks[renderType];
+            object.update = AutoTrackInfo.updateTracks[type];
+            object.render = AutoTrackInfo.renderTracks[type];
+            object.end = AutoTrackInfo.endTracks[type];
             tracker[index] = object;
         }
     }
@@ -797,7 +804,9 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
-        setupTrackingObject(result, renderType, data ?? {});
+        if (_currentGroup == -1) {
+            setupTrackingObject(result, renderType, data ?? {});
+        }
         return result;
     }
 
@@ -814,7 +823,7 @@ class GraphicsContext {
     * @return An index value of the position of this dimension as it would be in permanent storage,
     * or the current group index.
     **/
-    public function addUI(dim:Dim, renderType:Id, ?linkTo:Int = -1):DimIndex {
+    public function addUI(dim:Dim, renderType:Id, ?linkTo:Int = -1, ?data:Dynamic = null):DimIndex {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -842,7 +851,9 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
-        setupTrackingObject(result, renderType, data ?? {});
+        if (_currentGroup == -1) {
+            setupTrackingObject(result, renderType, data ?? {});
+        }
         return result;
     }
 
@@ -859,7 +870,7 @@ class GraphicsContext {
     * @return An index value of the position of this dimension as it would be in permanent storage,
     * or the current group index.
     **/
-    public function addSprite(dim:Dim, renderType:Id, ?linkTo:Int = -1):DimIndex {
+    public function addSprite(dim:Dim, renderType:Id, ?linkTo:Int = -1, ?data:Dynamic = null):DimIndex {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
@@ -883,7 +894,9 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
-        setupTrackingObject(result, renderType, data ?? {});
+        if (_currentGroup == -1) {
+            setupTrackingObject(result, renderType, data ?? {});
+        }
         return result;
     }
 
