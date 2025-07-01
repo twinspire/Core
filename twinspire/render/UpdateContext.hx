@@ -4,6 +4,7 @@ import kha.System;
 import js.lib.webassembly.Global;
 import kha.math.FastVector2;
 import twinspire.Application;
+import twinspire.events.GameEventProcessor;
 import twinspire.events.GameEvent;
 import twinspire.events.Buttons;
 import twinspire.GlobalEvents;
@@ -26,6 +27,7 @@ class UpdateContext {
 
     private var _gctx:GraphicsContext;
     private var _events:Array<GameEvent>;
+    private var _eventProcessor:GameEventProcessor;
 
     // UI stuff
     private var _tempUI:Array<Int>;
@@ -62,6 +64,7 @@ class UpdateContext {
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
         _events = [];
+        _eventProcessor = new GameEventProcessor();
         _retainedMouseDown = [];
         _moveToAnimations = [];
 
