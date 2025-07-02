@@ -2,7 +2,7 @@ package twinspire.events.game;
 
 class SceneChangeEvent extends GameEvent {
     
-    public static var id:Id;
+    public static var ID:Id;
 
     public var fromScene:Int;
     public var toScene:Int;
@@ -10,12 +10,12 @@ class SceneChangeEvent extends GameEvent {
     public var animIndex:Int;
 
     public function new(from:Int, to:Int, duration:Float) {
-        if (SceneChangeEvent.id == null) {
-            SceneChangeEvent.id = new Id();
+        if (SceneChangeEvent.ID == null) {
+            SceneChangeEvent.ID = new Id();
         }
         super();
 
-        this.id = SceneChangeEvent.id;
+        this.id = SceneChangeEvent.ID;
         fromScene = from;
         toScene = to;
         this.duration = duration;

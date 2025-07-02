@@ -9,6 +9,10 @@ class GameEventTimeline {
     private var _groupId:Int;
 
     /**
+    * The animation index to operate the timeline.
+    **/
+    public var animIndex:Int;
+    /**
     * A collection of nodes for this timeline.
     **/
     public var nodes:Array<GameEventTimeNode>;
@@ -36,6 +40,10 @@ class GameEventTimeline {
     * running the event's code.
     **/
     public var backgroundCallback:(FrameTask, GameEventTimeNode) -> Void;
+    /**
+    * The currently running task. Automatically assigned by Twinspire.
+    **/
+    public var currentTask:() -> Void;
 
     public function new() {
         _id += 1;
@@ -44,6 +52,7 @@ class GameEventTimeline {
         currentNode = -1;
         type = InSequence;
         background = true;
+        animIndex = -1;
     }
 
     /**
@@ -54,13 +63,6 @@ class GameEventTimeline {
         if (currentNode == -1) {
             currentNode = 0;
         }
-    }
-
-    /**
-    * Executed by Twinspire. This updates the timeline, checking nodes and calling the background callback.
-    **/
-    public function update() {
-        
     }
 
 }
