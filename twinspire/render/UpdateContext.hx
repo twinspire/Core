@@ -1,9 +1,12 @@
 package twinspire.render;
 
+import twinspire.events.GameEventTimeline;
+import twinspire.events.GameEventTimeNode;
 import kha.System;
 import js.lib.webassembly.Global;
 import kha.math.FastVector2;
 import twinspire.Application;
+import twinspire.events.GameEventProcessingType;
 import twinspire.events.GameEventProcessor;
 import twinspire.events.GameEvent;
 import twinspire.events.Buttons;
@@ -1275,15 +1278,70 @@ class UpdateContext {
     }
 
     /**
-    * Submit an event of a given type.
+    * Submit an event of a given type by ID, with optional data. When adding to a timeline,
+    * no duration is given to the generated event node. For a more robust solution for timeline
+    * events, use `submitGameEventToTimeline`.
+    *
+    * @param id The unique ID of the game event.
+    * @param type The game event processing type.
+    * @param data Any extra data to submit with the game event.
+    * @param timelineId If adding to a timeline, this is the given timeline Id to add this game event to.
     **/
-    public function submitGameEvent(id:Id, ?data:Array<Dynamic> = null) {
-        var gevent = new GameEvent();
-        gevent.id = id;
-        gevent.data = data;
-        _events.push(gevent);
+    public function submitGameEventById(id:Id, ?type:GameEventProcessingType, ?data:Array<Dynamic> = null, ?timelineId:Id) {
+        var event = new GameEvent();
+        event.id = id;
+        event.data = data;
+        if (type == Sequential) {
+            _eventProcessor.sequentialEvents.push(event);
+        }
+        else {
+            var indices = _eventProcessor.timelineEvents.whereIndices((t) -> t.id == timelineId);
+            if (indices.length > 0) {
+                var node = new GameEventTimeNode(event);
+                node.duration = 0.0;
+                _eventProcessor.timelineEvents[indices[0]].addNode(node);
+            }
+        }
     }
 
+    /**
+    * Submit a game event to the given timeline ID. Specify an optional `duration` for the underlying event if this event is expected
+    * to perform a frame-by-frame motion. For all other options, pass a callback to `optionsCallback`, which gives the newly created
+    * `GameEventTimeNode` that you can use to modify its behaviour. Make sure to return the event back to the function to ensure
+    * any changes are correctly stored.
+    *
+    * @param event The constructed game event. Can be a custom game event derived from `GameEvent`.
+    * @param timelineId The ID of the timeline to pass the event to.
+    * @param duration (Optional) The length of time (in seconds) that the event is expected to run for.
+    * @param optionsCallback (Optional) A callback used to modify the created `GameEventTimeNode`.
+    **/
+    public function submitGameEventToTimeline(event:GameEvent, timelineId:Id, ?duration:Float = 0.0, ?optionsCallback:(GameEventTimeNode) -> GameEventTimeNode) {
+        var indices = _eventProcessor.timelineEvents.whereIndices((t) -> t.id == timelineId);
+        if (indices.length == 0) {
+            return;
+        }
+
+        var node = new GameEventTimeNode(event);
+        node.duration = duration;
+        if (optionsCallback != null) {
+            node = optionsCallback(node);
+        }
+
+        _eventProcessor.timelineEvents[indices[0]].addNode(node);
+    }
+
+    /**
+    * Add an event timeline to the underlying event processor. The event timeline must have a valid `id`.
+    *
+    * @param timeline The timeline to add.
+    **/
+    public function addEventTimeline(timeline:GameEventTimeline) {
+        if (timeline.id == Id.None || timeline.id == cast -1) {
+            return;
+        }
+
+        _eventProcessor.timelineEvents.push(timeline);
+    }
 
     /**
     * Allow for checking game events, iterating over each and filtering on the ones
@@ -1292,88 +1350,105 @@ class UpdateContext {
     * This function is typically used at the end of the loop.
     *
     * @param callback The callback function to execute for any custom game events.
-    * @param exitCallback The callback function to execute when an exit event is triggered.
     **/
-    public function onEvent(callback:(GameEvent) -> Void, exitCallback:Void -> Void) {
+    public function onEvent(callback:(GameEvent) -> Void) {
         if (callback == null)
             return;
 
-        for (i in 0..._events.length) {
-            var e = _events.pop();
-            if (e.id == GameEvent.ExitApp) {
-                if (exitCallback != null) {
-                    exitCallback();
+        if (!_eventProcessor.hasEvents()) {
+            return;
+        }
+
+        var handled = _eventProcessor.processEvents();
+        for (e in handled) {
+            if (e.type == Sequential) {
+                if (!e.callback()) {
+                    callback(_eventProcessor.sequentialEvents[e.index]);
                 }
             }
-
-            if (cast(e.id, Int) > GameEvent.maximum) {
-                callback(e);
-            }
-            else {
-                if (e.id == GameEvent.SetDimPosition) {
-                    if (e.data.length != 2) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var firstArgIndex = Std.isOfType(e.data[0], Int);
-                    if (!firstArgIndex) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var secondArgDim = Std.isOfType(e.data[1], Dim);
-                    if (!secondArgDim) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var index = cast(e.data[0], Int);
-                    var dim = cast(e.data[1], Dim);
-                    trace(index);
-                    _gctx.dimensions[index] = dim.clone();
-                }
-                else if (e.id == GameEvent.MoveDim) {
-                    if (e.data.length != 4) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var firstArgDim = Std.isOfType(e.data[0], Dim);
-                    if (!firstArgDim) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var secondArgDim = Std.isOfType(e.data[1], Dim);
-                    if (!secondArgDim) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var thirdArgSeconds = Std.isOfType(e.data[2], Float);
-                    if (!thirdArgSeconds) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var fourthArgContextIndex = Std.isOfType(e.data[3], Int);
-                    if (!fourthArgContextIndex) {
-                        // TODO: Log error
-                        continue;
-                    }
-
-                    var moveTo = new MoveToAnimation();
-                    moveTo.start = cast (e.data[0], Dim);
-                    moveTo.end = cast (e.data[1], Dim);
-                    moveTo.duration = cast (e.data[2], Float);
-                    moveTo.animIndex = Animate.animateCreateTick();
-                    moveTo.contextIndex = cast (e.data[3], Int);
-
-                    _moveToAnimations.push(moveTo);
+            else if (e.type == Timeline) {
+                if (!e.callback()) {
+                    callback(_eventProcessor.timelineEvents[e.index].nodes[0].e);
                 }
             }
         }
+
+        // for (i in 0..._events.length) {
+        //     var e = _events.pop();
+        //     if (e.id == GameEvent.ExitApp) {
+        //         if (exitCallback != null) {
+        //             exitCallback();
+        //         }
+        //     }
+
+        //     if (cast(e.id, Int) > GameEvent.maximum) {
+        //         callback(e);
+        //     }
+        //     else {
+        //         if (e.id == GameEvent.SetDimPosition) {
+        //             if (e.data.length != 2) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var firstArgIndex = Std.isOfType(e.data[0], Int);
+        //             if (!firstArgIndex) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var secondArgDim = Std.isOfType(e.data[1], Dim);
+        //             if (!secondArgDim) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var index = cast(e.data[0], Int);
+        //             var dim = cast(e.data[1], Dim);
+        //             trace(index);
+        //             _gctx.dimensions[index] = dim.clone();
+        //         }
+        //         else if (e.id == GameEvent.MoveDim) {
+        //             if (e.data.length != 4) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var firstArgDim = Std.isOfType(e.data[0], Dim);
+        //             if (!firstArgDim) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var secondArgDim = Std.isOfType(e.data[1], Dim);
+        //             if (!secondArgDim) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var thirdArgSeconds = Std.isOfType(e.data[2], Float);
+        //             if (!thirdArgSeconds) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var fourthArgContextIndex = Std.isOfType(e.data[3], Int);
+        //             if (!fourthArgContextIndex) {
+        //                 // TODO: Log error
+        //                 continue;
+        //             }
+
+        //             var moveTo = new MoveToAnimation();
+        //             moveTo.start = cast (e.data[0], Dim);
+        //             moveTo.end = cast (e.data[1], Dim);
+        //             moveTo.duration = cast (e.data[2], Float);
+        //             moveTo.animIndex = Animate.animateCreateTick();
+        //             moveTo.contextIndex = cast (e.data[3], Int);
+
+        //             _moveToAnimations.push(moveTo);
+        //         }
+        //     }
+        // }
     }
 
     

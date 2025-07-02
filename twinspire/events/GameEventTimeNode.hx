@@ -9,15 +9,19 @@ class GameEventTimeNode {
     /**
     * The duration of this event.
     **/
-    public var duration:Float;
+    public var duration:Duration;
     /**
     * Determines if the next node in this timeline should execute.
     **/
     public var next:Bool;
     /**
-    * Get a value determining if this time node has been completed.
+    * Get or set a value determining if this time node has been completed.
     **/
     public var finished:Bool;
+    /**
+    * Set the options for this time node.
+    **/
+    public var options:GameEventOptions;
 
     public function new(e:GameEvent) {
         this.e = e;

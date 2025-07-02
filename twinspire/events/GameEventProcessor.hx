@@ -3,6 +3,12 @@ package twinspire.events;
 import kha.Scheduler;
 using twinspire.extensions.ArrayExtensions;
 
+typedef GameEventCallback = {
+    var callback:() -> Bool;
+    var type:GameEventProcessingType;
+    var index:Int;
+}
+
 class GameEventProcessor {
     
     /**
@@ -35,8 +41,8 @@ class GameEventProcessor {
     * Each callback function returns a `Bool` value representing if the event was handled internally
     * by Twinspire. If not handled internally, the `false` value can be used to perform your own logic.
     **/
-    public function processEvents():Array<() -> Bool> {
-        var callbacks = new Array<() -> Bool>();
+    public function processEvents():Array<GameEventCallback> {
+        var callbacks = new Array<GameEventCallback>();
 
         for (e in sequentialEvents) {
             var cb = function(event:GameEvent) {
@@ -49,7 +55,10 @@ class GameEventProcessor {
                 };
             };
 
-            callbacks.push(cb(e));
+            callbacks.push({
+                callback: cb(e),
+                type: Sequential
+            });
         }
 
         for (t in timelineEvents) {
@@ -63,9 +72,36 @@ class GameEventProcessor {
                     t.animIndex = Animate.animateCreateTick();
                 }
 
-                if (Animate.animateTick(t.animIndex, node.duration)) {
+                if (Animate.animateTick(t.animIndex, node.duration) && !node.options.continuous) {
                     node.finished = true;
-                    if (node.next) {
+                    Animate.animateReset(t.animIndex);
+                }
+
+                var actionValidated = false;
+                var actionIsRequired = false;
+                if (node.options.actionRequired != null) {
+                    actionIsRequired = node.options.actionRequired;
+                }
+
+                if (actionIsRequired && node.options.action.actionCallback != null) {
+                    actionValidated = node.options.action.actionCallback();
+
+                    if (actionValidated) {
+                        switch (node.options.action.processAction) {
+                            case Jump(ratio): {
+                                Animate.animateSetRatio(t.animIndex, ratio, node.duration);
+                            }
+                            case Pause: {
+                                
+                            }
+                        }
+                    }
+                }
+
+
+
+                if (node.finished) {
+                    if (node.next && ((actionIsRequired && actionValidated) || (!actionIsRequired))) {
                         t.nodes.shift();
                     }
                     else {
@@ -73,17 +109,20 @@ class GameEventProcessor {
                     }
                 }
 
-                if (!node.finished) {
-                    callbacks.push(function(event:GameEvent) {
-                        return function() {
-                            if (node.e.id == GameEvent.ExitApp) {
-                                Application.instance.exit();
-                                return true;
-                            }
-                            return false;
-                        };
-                    });
-                }
+                var cb = function(event:GameEvent) {
+                    return function() {
+                        if (node.e.id == GameEvent.ExitApp) {
+                            Application.instance.exit();
+                            return true;
+                        }
+                        return false;
+                    };
+                };
+
+                callbacks.push({
+                    callback: cb(node.e),
+                    type: Timeline
+                });
             }
         }
 

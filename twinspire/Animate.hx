@@ -193,6 +193,17 @@ class Animate
 	}
 
 	/**
+	* Set the ratio of an animation. Rules of `animateGetRatio` applies.
+	*
+	* @param index The index of the animation.
+	* @param ratio A percentage of the animation tick set to the seconds relative to its duration (0..1).
+	* @param duration The duration in seconds.
+	**/
+	public static function animateSetRatio(index:Int, ratio:Float, duration:Float) {
+		animateTicks[index] = duration * ratio;
+	}
+
+	/**
 	 * Returns the ratio of the animation based on the current seconds of in-game time passed.
 	 * e.g. 0.5 seconds passed / 2.0 seconds given in a *tick function = 0.25.
 	 * Make sure you use a *tick function before calling this function.
@@ -213,6 +224,13 @@ class Animate
 	public static function animateReset(index:Int)
 	{
 		animateTickReset[index] = true;
+	}
+
+	/**
+	* 
+	**/
+	public static function animatePauseIndex(index:Int) {
+
 	}
 
 }

@@ -9,6 +9,10 @@ class GameEventTimeline {
     private var _groupId:Int;
 
     /**
+    * The ID of this timeline.
+    **/
+    public var id:Id;
+    /**
     * The animation index to operate the timeline.
     **/
     public var animIndex:Int;
