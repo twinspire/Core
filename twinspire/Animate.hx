@@ -10,6 +10,8 @@ class Animate
 
 	/**
 	 * Get or set the maximum number of animations that can be used.
+	 *
+	 * Set this before starting the application with `Application.instance.start()`.
 	 */
 	public static var animateMax:Int = 1000;
 
@@ -17,6 +19,8 @@ class Animate
 	static var animateTicksDelays:Array<Float>;
 	static var animateTickReset:Array<Bool>;
 	static var animateTickLoopDir:Array<Int>;
+	static var animatePaused:Array<Bool>;
+	static var animateSpecificPause:Array<Bool>;
 	static var lastAnimateSecondsValue:Float;
 	static var animateIndex:Int = -1;
 	static var deltaTime:Float;
@@ -45,7 +49,12 @@ class Animate
 	 */
 	public static function animateCreateTick()
 	{
-		return ++animateIndex;
+		var temp = ++animateIndex;
+		if (animateIndex > animateMax) {
+			animateIndex -= 1;
+			trace('No more animations can be created. Reached limit: ${animateMax}');
+		}
+		return temp;
 	}
 
 	/**
@@ -72,6 +81,8 @@ class Animate
 		animateTickReset = [ for (i in 0...animateMax) false ];
 		animateTickLoopDir = [ for (i in 0...animateMax) 1 ];
 		animateTicksDelays = [ for (i in 0...animateMax) 0.0 ];
+		animatePaused = [ for(i in 0...animateMax) false ];
+		animateSpecificPause = [ for(i in 0...animateMax) false ];
 	}
 
 	/**
@@ -84,6 +95,10 @@ class Animate
 	public static function animateTick(index:Int, seconds:Float, ?delay:Float = 0.0)
 	{
 		var result = false;
+		if (animatePaused[index]) {
+			return result;
+		}
+
 		lastAnimateSecondsValue = seconds;
 
 		if (delay > 0.0)
@@ -153,6 +168,10 @@ class Animate
 	public static function animateTickLoop(index:Int, seconds:Float, ?delay:Float = 0.0)
 	{
 		var result = false;
+		if (animatePaused[index]) {
+			return result;
+		}
+
 		lastAnimateSecondsValue = seconds;
 
 		if (animateTickLoopDir[index] == 1)
@@ -227,10 +246,46 @@ class Animate
 	}
 
 	/**
-	* 
+	* Resume all animations. This will not resume animations that were paused using `animatePauseIndex`,
+	* unless `force` is `true`. Only use `force` if you know what you're doing and understand the
+	* consequences.
+	*
+	* @param force Force all animations to resume, regardless if specific animations were previously paused.
+	**/
+	public static function animateResumeAll(?force:Bool = false) {
+		for (i in 0...animateMax) {
+			if ((force) || (!force && !animateSpecificPause[i])) {
+				animatePaused[i] = false;
+				if (force) {
+					animateSpecificPause[i] = false;
+				}
+			}
+		}
+	}
+
+	/**
+	* Pause all animations.
+	**/
+	public static function animatePauseAll() {
+		for (i in 0...animateMax) {
+			animatePaused[i] = true;
+		}
+	}
+
+	/**
+	* Resume a specific animation index.
+	**/
+	public static function animateResumeIndex(index:Int) {
+		animatePaused[index] = false;
+		animateSpecificPause[index] = false;
+	}
+
+	/**
+	* Pause a specific animation index.
 	**/
 	public static function animatePauseIndex(index:Int) {
-
+		animatePaused[index] = true;
+		animateSpecificPause[index] = false;
 	}
 
 }

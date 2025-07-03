@@ -3,7 +3,6 @@ package twinspire.render;
 import twinspire.events.GameEventTimeline;
 import twinspire.events.GameEventTimeNode;
 import kha.System;
-import js.lib.webassembly.Global;
 import kha.math.FastVector2;
 import twinspire.Application;
 import twinspire.events.GameEventProcessingType;
@@ -55,14 +54,21 @@ class UpdateContext {
     private var _isDragEnd:Int;
     private var _containerDragIndex:Int;
 
-    private var _deltaTime:Float;
+    private static var _deltaTime:Float;
 
     // animations
     private var _moveToAnimations:Array<MoveToAnimation>;
 
 
-    public var deltaTime(get, default):Float;
-    function get_deltaTime() return _deltaTime;
+    public static var deltaTime(get, default):Float;
+    static function get_deltaTime() return _deltaTime;
+
+    /**
+    * Get the frame count per second.
+    **/
+    public static function getFrameCount() {
+        return 1 / _deltaTime;
+    }
 
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
@@ -1200,7 +1206,7 @@ class UpdateContext {
                 var menuItemDim = _gctx.dimensions[menu.indices[menu.cursorIndex]];
                 var temp = _gctx.dimensions[menu.cursorIndex].clone();
                 dimAlign(menuItemDim, temp, VALIGN_CENTRE, HALIGN_LEFT);
-                submitGameEvent(GameEvent.SetDimPosition, [ temp ]);
+                submitGameEventById(GameEvent.SetDimPosition, [ temp ]);
             }
         }
     }
@@ -1288,6 +1294,10 @@ class UpdateContext {
     * @param timelineId If adding to a timeline, this is the given timeline Id to add this game event to.
     **/
     public function submitGameEventById(id:Id, ?type:GameEventProcessingType, ?data:Array<Dynamic> = null, ?timelineId:Id) {
+        if (type == null) {
+            type = Sequential;
+        }
+
         var event = new GameEvent();
         event.id = id;
         event.data = data;
@@ -1298,7 +1308,7 @@ class UpdateContext {
             var indices = _eventProcessor.timelineEvents.whereIndices((t) -> t.id == timelineId);
             if (indices.length > 0) {
                 var node = new GameEventTimeNode(event);
-                node.duration = 0.0;
+                node.duration = Seconds(0.0);
                 _eventProcessor.timelineEvents[indices[0]].addNode(node);
             }
         }
@@ -1315,7 +1325,11 @@ class UpdateContext {
     * @param duration (Optional) The length of time (in seconds) that the event is expected to run for.
     * @param optionsCallback (Optional) A callback used to modify the created `GameEventTimeNode`.
     **/
-    public function submitGameEventToTimeline(event:GameEvent, timelineId:Id, ?duration:Float = 0.0, ?optionsCallback:(GameEventTimeNode) -> GameEventTimeNode) {
+    public function submitGameEventToTimeline(event:GameEvent, timelineId:Id, ?duration:Duration, ?optionsCallback:(GameEventTimeNode) -> GameEventTimeNode) {
+        if (duration == null) {
+            duration = Seconds(0.0);
+        }
+
         var indices = _eventProcessor.timelineEvents.whereIndices((t) -> t.id == timelineId);
         if (indices.length == 0) {
             return;

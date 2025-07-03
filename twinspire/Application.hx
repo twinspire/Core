@@ -205,7 +205,7 @@ class Application
 		Animate.animateTime(deltaTime);
 
 		@:privateAccess(UpdateContext) {
-			_updateContext._deltaTime = deltaTime;
+			UpdateContext._deltaTime = deltaTime;
 		}
 
 		if (sceneManager != null) {

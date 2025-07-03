@@ -60,7 +60,7 @@ class InputRenderer {
 
     public function update(ctx:UpdateContext) {
         var container:Container = null;
-        @:privateAccess(UpdateContent) {
+        @:privateAccess(UpdateContext) {
             if (containerIndex < ctx._gctx.containers.length) {
                 container = ctx._gctx.containers[containerIndex];
             }
@@ -76,7 +76,7 @@ class InputRenderer {
 
         var isActive = ctx.getActivatedIndex() == container.dimIndex;
         if (isActive) {
-            cursorBlinkTime += ctx.deltaTime;
+            cursorBlinkTime += UpdateContext.deltaTime;
             if (cursorBlinkTime >= 0.5) {
                 cursorVisible = !cursorVisible;
                 cursorBlinkTime = 0.0;
@@ -203,13 +203,13 @@ class InputRenderer {
             updateScroll(inputState);
         }
 
-        handleKeyWithRepeat(KeyCode.Backspace, utx.deltaTime, () -> {
+        handleKeyWithRepeat(KeyCode.Backspace, UpdateContext.deltaTime, () -> {
             inputState.inputHandler.performCommand(Backspace);
             updateLineInfo(inputState);
             updateScroll(inputState);
         });
 
-        handleKeyWithRepeat(KeyCode.Delete, utx.deltaTime, () -> {
+        handleKeyWithRepeat(KeyCode.Delete, UpdateContext.deltaTime, () -> {
             inputState.inputHandler.performCommand(Delete);
             updateLineInfo(inputState);
             updateScroll(inputState);
@@ -223,7 +223,7 @@ class InputRenderer {
             }
         }
 
-        handleKeyWithRepeat(KeyCode.Left, utx.deltaTime, () -> {
+        handleKeyWithRepeat(KeyCode.Left, UpdateContext.deltaTime, () -> {
             if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                 inputState.inputHandler.performCommand(Select_Left);
             }
@@ -235,7 +235,7 @@ class InputRenderer {
             updateScroll(inputState);
         });
 
-        handleKeyWithRepeat(KeyCode.Right, utx.deltaTime, () -> {
+        handleKeyWithRepeat(KeyCode.Right, UpdateContext.deltaTime, () -> {
             if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                 inputState.inputHandler.performCommand(Select_Right);
             }
@@ -248,7 +248,7 @@ class InputRenderer {
         });
 
         if (inputState.method != ImSingleLine) {
-            handleKeyWithRepeat(KeyCode.Up, utx.deltaTime, () -> {
+            handleKeyWithRepeat(KeyCode.Up, UpdateContext.deltaTime, () -> {
                 updateUpDownIndices(inputState);
                 if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                     inputState.inputHandler.performCommand(Select_Up);
@@ -261,7 +261,7 @@ class InputRenderer {
                 updateScroll(inputState);
             });
 
-            handleKeyWithRepeat(KeyCode.Down, utx.deltaTime, () -> {
+            handleKeyWithRepeat(KeyCode.Down, UpdateContext.deltaTime, () -> {
                 updateUpDownIndices(inputState);
                 if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
                     inputState.inputHandler.performCommand(Select_Down);

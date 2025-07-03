@@ -1,5 +1,6 @@
 package twinspire.events;
 
+import twinspire.render.UpdateContext;
 import kha.Scheduler;
 using twinspire.extensions.ArrayExtensions;
 
@@ -30,7 +31,7 @@ class GameEventProcessor {
     * Checks if this processor has events.
     **/
     public function hasEvents() {
-        return sequentialEvents.length > 0 && timelineEvents.each((t) -> t.nodes.length > 0);
+        return sequentialEvents.length > 0 || timelineEvents.each((t) -> t.nodes.length > 0);
     }
 
     /**
@@ -44,7 +45,8 @@ class GameEventProcessor {
     public function processEvents():Array<GameEventCallback> {
         var callbacks = new Array<GameEventCallback>();
 
-        for (e in sequentialEvents) {
+        for (i in 0...sequentialEvents.length) {
+            var e = sequentialEvents[i];
             var cb = function(event:GameEvent) {
                 return function() {
                     if (event.id == GameEvent.ExitApp) {
@@ -56,23 +58,30 @@ class GameEventProcessor {
             };
 
             callbacks.push({
+                index: i,
                 callback: cb(e),
                 type: Sequential
             });
         }
 
-        for (t in timelineEvents) {
+        for (i in 0...timelineEvents.length) {
+            var t = timelineEvents[i];
             if (t.nodes.length == 0) {
                 continue;
             }
 
             var node = t.nodes[0];
             if (!t.background) {
+                var duration = switch (node.duration) {
+                    case Seconds(value): value;
+                    case Frames(factor): factor * UpdateContext.getFrameCount();
+                };
+
                 if (t.animIndex == -1) {
                     t.animIndex = Animate.animateCreateTick();
                 }
 
-                if (Animate.animateTick(t.animIndex, node.duration) && !node.options.continuous) {
+                if (Animate.animateTick(t.animIndex, duration) && !node.options.continuous) {
                     node.finished = true;
                     Animate.animateReset(t.animIndex);
                 }
@@ -89,16 +98,40 @@ class GameEventProcessor {
                     if (actionValidated) {
                         switch (node.options.action.processAction) {
                             case Jump(ratio): {
-                                Animate.animateSetRatio(t.animIndex, ratio, node.duration);
+                                Animate.animateResumeIndex(t.animIndex);
+                                Animate.animateSetRatio(t.animIndex, ratio, duration);
                             }
                             case Pause: {
-                                
+                                Animate.animatePauseIndex(t.animIndex);
+                            }
+                            case Complete(skip): {
+                                node.finished = true;
+                                Animate.animateSetRatio(t.animIndex, 1, duration);
+
+                                if (skip != null) {
+                                    node.next = skip;
+                                }
+                            }
+                            case ConditionalNext(cond, wait): {
+                                var _waiting = false;
+                                if (wait != null) {
+                                    _waiting = wait;
+                                }
+
+                                if (!_waiting) {
+                                    node.next = cond();
+                                    Animate.animateSetRatio(t.animIndex, 1, duration);
+                                    node.finished = true;
+                                }
+                                else {
+                                    if (!cond()) {
+                                        continue;
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-
 
                 if (node.finished) {
                     if (node.next && ((actionIsRequired && actionValidated) || (!actionIsRequired))) {
@@ -120,6 +153,7 @@ class GameEventProcessor {
                 };
 
                 callbacks.push({
+                    index: i,
                     callback: cb(node.e),
                     type: Timeline
                 });
