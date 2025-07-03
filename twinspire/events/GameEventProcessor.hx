@@ -21,10 +21,15 @@ class GameEventProcessor {
     * A list of timeline events. These events are designed to run across more than one frame.
     **/
     public var timelineEvents:Array<GameEventTimeline>;
+    /**
+    * The last active event recently removed from timelines.
+    **/
+    public var lastEvents:Array<GameEvent>;
 
     public function new() {
         sequentialEvents = [];
         timelineEvents = [];
+        lastEvents = [];
     }
 
     /**
@@ -32,6 +37,15 @@ class GameEventProcessor {
     **/
     public function hasEvents() {
         return sequentialEvents.length > 0 || timelineEvents.each((t) -> t.nodes.length > 0);
+    }
+
+    public function getLastEvent(timelineIndex:Int) {
+        if (lastEvents[timelineIndex] != null) {
+            return lastEvents[timelineIndex];
+        }
+        else {
+            return timelineEvents[timelineIndex].nodes[0].e;
+        }
     }
 
     /**
@@ -135,9 +149,10 @@ class GameEventProcessor {
 
                 if (node.finished) {
                     if (node.next && ((actionIsRequired && actionValidated) || (!actionIsRequired))) {
-                        t.nodes.shift();
+                        lastEvents[i] = t.nodes.shift().e;
                     }
                     else {
+                        lastEvents[i] = t.nodes[0].e;
                         t.nodes.splice(0, t.nodes.length);
                     }
                 }

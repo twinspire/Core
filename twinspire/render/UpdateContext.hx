@@ -1355,6 +1355,7 @@ class UpdateContext {
         }
 
         _eventProcessor.timelineEvents.push(timeline);
+        _eventProcessor.lastEvents.push(null);
     }
 
     /**
@@ -1382,7 +1383,7 @@ class UpdateContext {
             }
             else if (e.type == Timeline) {
                 if (!e.callback()) {
-                    callback(_eventProcessor.timelineEvents[e.index].nodes[0].e);
+                    callback(_eventProcessor.getLastEvent(e.index));
                 }
             }
         }

@@ -25,6 +25,11 @@ class GameEventTimeNode {
 
     public function new(e:GameEvent) {
         this.e = e;
+        options = {
+            continuous: false,
+            userAction: false,
+            actionRequired: false,
+        };
     }
 
 }
