@@ -61,6 +61,7 @@ class Application
 	private var _ctrl:Bool;
 	private var _cutTrigger:Bool;
 	private var _lastTime:Float;
+	private var _lastClientSize:FV2;
 
 	private var _graphicsContext:GraphicsContext;
 	private var _updateContext:UpdateContext;
@@ -105,6 +106,10 @@ class Application
 	* This is called at the end of each frame for cleanup. Both the update and graphics contexts are provided if necessary.
 	**/
 	public var end:(UpdateContext, GraphicsContext) -> Void;
+	/**
+	* A resize callback used when the client resizes.
+	**/
+	public var resize:() -> Void;
 
 	/**
 	* Gets the currently polled event.
@@ -197,9 +202,22 @@ class Application
 		}
 
 		System.notifyOnFrames(app_render);
+
+		_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
 	}
 
 	private function app_render(buffers:Array<Framebuffer>) {
+		if (_lastClientSize.x != System.windowWidth() || _lastClientSize.y != System.windowHeight()) {
+			if (sceneManager != null) {
+				sceneManager.resize();
+			}
+			else {
+				resize();
+			}
+
+			_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
+		}
+
 		var g2 = buffers[0].g2;
 		var deltaTime = System.time - _lastTime;
 		Animate.animateTime(deltaTime);
