@@ -84,7 +84,25 @@ class GameEventProcessor {
                 continue;
             }
 
-            var node = t.nodes[0];
+            if (t.type == Altogether) {
+                var results = getCallbacksFromTimeline(t, t.nodes.whereIndices((_) -> true));
+                for (r in results) {
+                    callbacks.push(r);
+                }
+            }
+            else {
+                callbacks.push(getCallbacksFromTimeline(t, [ 0 ])[0]);
+            }
+        }
+
+        return callbacks;
+    }
+
+    private function getCallbacksFromTimeline(t:GameEventTimeline, nodeIndices:Array<Int>) {
+        var callbacks = new Array<GameEventCallback>();
+
+        for (i in 0...nodeIndices.length) {
+            var node = t.nodes[nodeIndices[i]];
             if (!t.background) {
                 var duration = switch (node.duration) {
                     case Seconds(value): value;
@@ -174,7 +192,6 @@ class GameEventProcessor {
                 });
             }
         }
-
         return callbacks;
     }
 

@@ -51,6 +51,8 @@ class GraphicsContext {
     private var _currentGroup:Int;
     private var _currentGroupRenderType:Id;
 
+    private var _activeDimensions:Array<Bool>;
+
     /**
     * A collection of dimensions within this context. Do not write directly.
     **/
@@ -113,6 +115,7 @@ class GraphicsContext {
         _dimTemp = [];
         _dimTempLinkTo = [];
         _dimForceChangeIndices = [];
+        _activeDimensions = [];
         _containerTemp = [];
         _ended = false;
         _currentMenu = -1;
@@ -370,8 +373,6 @@ class GraphicsContext {
     * End the current group and return the index of the group.
     **/
     public function endGroup() {
-        
-
         var temp = _currentGroup;
         _currentGroup = -1;
         return temp;
@@ -380,6 +381,28 @@ class GraphicsContext {
     private function addDimensionIndexToGroup(index:Int) {
         if (_currentGroup > -1) {
             _groups[_currentGroup].push(index);
+        }
+    }
+
+    /**
+    * Either activate or deactivate a series of dimensions. This function prevents
+    * `UpdateContext` from using these dimensions for input simulations.
+    *
+    * @param indices A collection of indices.
+    * @param active Enable or disable.
+    **/
+    public function activateDimensions(indices:Array<DimIndex>, active:Bool) {
+        for (index in indices) {
+            switch (index) {
+                case Direct(item): {
+                    _activeDimensions[item] = active;
+                }
+                case Group(group): {
+                    for (g in _groups[group]) {
+                        _activeDimensions[g] = active;
+                    }
+                }
+            }
         }
     }
 
@@ -799,6 +822,7 @@ class GraphicsContext {
         queries.push(query);
 
         activities.push([]);
+        _activeDimensions.push(true);
 
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
@@ -842,6 +866,7 @@ class GraphicsContext {
         queries.push(query);
 
         activities.push([]);
+        _activeDimensions.push(true);
 
         if (_currentMenu > -1) {
             _menus[_currentMenu].indices.push(index);
@@ -889,6 +914,7 @@ class GraphicsContext {
         queries.push(query);
 
         activities.push([]);
+        _activeDimensions.push(true);
 
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);

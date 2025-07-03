@@ -199,6 +199,12 @@ class UpdateContext {
             }
 
             for (i in 0..._gctx.dimensions.length) {
+                @:privateAccess(GraphicsContext) {
+                    if (!_gctx._activeDimensions[i]) {
+                        continue;
+                    }
+                }
+
                 var query = _gctx.queries[i];
                 var actualDim = _gctx.getClientDimensionsAtIndex(Direct(i))[0];
 
