@@ -11,7 +11,7 @@ class SceneChangeEvent extends GameEvent {
 
     public function new(from:Int, to:Int, duration:Float) {
         if (SceneChangeEvent.ID == null) {
-            SceneChangeEvent.ID = new Id();
+            SceneChangeEvent.ID = Application.createId();
         }
         super();
 

@@ -768,27 +768,6 @@ class GraphicsContext {
         }
     }
 
-    private function setupTrackingObject(index:DimIndex, renderType:Id, data:Dynamic) {
-        if (useTracker &&
-            AutoTrackInfo.updateTracks.exists(renderType) &&
-            AutoTrackInfo.renderTracks.exists(renderType) &&
-            AutoTrackInfo.endTracks.exists(renderType) &&
-            AutoTrackInfo.initTracks.exists(renderType)) {
-            var type = _currentGroupRenderType ?? renderType;
-            var object = AutoTrackInfo.initTracks[type](this, data);
-            if (Reflect.isObject(data)) {
-                for (f in Reflect.fields(data)) {
-                    object.data[f] = Reflect.field(data, f);
-                }
-            }
-
-            object.update = AutoTrackInfo.updateTracks[type];
-            object.render = AutoTrackInfo.renderTracks[type];
-            object.end = AutoTrackInfo.endTracks[type];
-            tracker[index] = object;
-        }
-    }
-
     /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
@@ -827,10 +806,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
-        if (_currentGroup == -1) {
-            setupTrackingObject(result, renderType, data ?? {});
-        }
+        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
         return result;
     }
 
@@ -875,10 +851,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
-        if (_currentGroup == -1) {
-            setupTrackingObject(result, renderType, data ?? {});
-        }
+        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
         return result;
     }
 
@@ -919,10 +892,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup) : DimIndex.Direct(index);
-        if (_currentGroup == -1) {
-            setupTrackingObject(result, renderType, data ?? {});
-        }
+        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
         return result;
     }
 

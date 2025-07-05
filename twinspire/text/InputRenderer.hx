@@ -22,7 +22,7 @@ typedef KeyRepeatInfo = {
 
 class InputRenderer {
     
-    public static var RenderId:Id = new Id();
+    public static var RenderId:Id;
     
     public var keyRepeatStates:Map<KeyCode, KeyRepeatInfo>;
 

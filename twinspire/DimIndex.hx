@@ -1,14 +1,16 @@
 package twinspire;
 
+import twinspire.Id;
+
 enum DimIndex {
     /**
     * Specifies to obtain a direct index from the main dimension stack.
     **/
-    Direct(index:Int);
+    Direct(index:Int, ?render:Id);
     /**
     * Specifies to obtain a group index from the dimension groups.
     **/
-    Group(index:Int);
+    Group(index:Int, ?render:Id);
 }
 
 class DimIndexUtils {

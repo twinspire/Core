@@ -1,5 +1,7 @@
 package twinspire;
 
+import twinspire.text.InputRenderer;
+import twinspire.events.GameEvent;
 import twinspire.ISceneManager;
 import twinspire.geom.Dim;
 import js.lib.webassembly.Global;
@@ -9,6 +11,7 @@ import js.Browser;
 #end
 
 import twinspire.render.AutoTrackInfo;
+import twinspire.render.TrackingObject;
 import twinspire.render.UpdateContext;
 import twinspire.render.GraphicsContext;
 import twinspire.GlobalEvents;
@@ -1065,6 +1068,8 @@ class Application
 	*/
 	public static function create(options:SystemOptions, callback:Void -> Void)
 	{
+		IdAssoc.assoc = [];
+
 		System.start(options, (window:Window) ->
 		{
 			if (preloader == 0)
@@ -1075,6 +1080,8 @@ class Application
 			
 			System.notifyOnFrames(loader.render);
 			GlobalEvents.init();
+			GameEvent.init();
+			InputRenderer.RenderId = createId();
 
 			if (!noAssetLoading)
 			{
@@ -1096,6 +1103,20 @@ class Application
 				callback();
 			}
 		});
+	}
+
+	/**
+	* Create an ID.
+	**/
+	public static function createId(createAssoc:Bool = false):Id {
+		if (createAssoc) {
+            IdAssoc.assoc.push(new TrackingObject());
+        }
+        else {
+            IdAssoc.assoc.push(null);
+        }
+
+		return new Id();
 	}
 
 }

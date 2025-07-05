@@ -1,5 +1,8 @@
 package twinspire.render;
 
+import twinspire.scenes.SceneObject;
+import twinspire.geom.Dim;
+
 class TrackingObject {
     
     /**
@@ -7,20 +10,25 @@ class TrackingObject {
     **/
     public var data:Map<String, Dynamic>;
     /**
+    * The init callback for this tracking object.
+    **/
+    public var init:(GraphicsContext, SceneObject) -> SceneObject;
+    /**
     * The update callback for this tracking object.
     **/
-    public var update:(UpdateContext, DimIndex) -> Void;
+    public var update:(UpdateContext, SceneObject) -> Void;
     /**
     * The render callback for this tracking object.
     **/
-    public var render:(GraphicsContext, DimIndex) -> Void;
+    public var render:(GraphicsContext, SceneObject) -> Void;
     /**
     * The end callback for this tracking object.
     **/
-    public var end:(GraphicsContext, UpdateContext, DimIndex) -> Void;
+    public var end:(GraphicsContext, UpdateContext, SceneObject) -> Void;
 
     public function new() {
         data = [];
+        init = null;
         update = null;
         render = null;
         end = null;

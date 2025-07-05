@@ -1131,7 +1131,11 @@ class UpdateContext {
     *
     * @return Returns `true` if the data matches, `false` otherwise. Returns `false` if there is no data.
     **/
-    public function hasActivityData(index:Int, type:ActivityType, data:...Dynamic) {
+    public function hasActivityData(index:Null<Int>, type:ActivityType, data:...Dynamic) {
+        if (index == null) {
+            return false;
+        }
+
         var array = getActivity(index, type);
         if (array == null) {
             return false;

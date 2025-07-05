@@ -1,20 +1,28 @@
 package twinspire.scenes;
 
-import twinspire.text.TextInputState;
-import twinspire.render.Container;
-import twinspire.render.RenderQuery;
+import twinspire.geom.Dim;
 
-typedef SceneObject = {
+/**
+* The base class for objects to contain custom data related to
+* a render state.
+**/
+class SceneObject {
+
     /**
-    * The query of this object.
+    * The render type.
     **/
-    var query:RenderQuery;
+    public var type:Id;
     /**
-    * The container of this object, if any.
+    * The resulting index for this object.
     **/
-    var ?container:Container;
+    public var index:DimIndex;
     /**
-    * The text input state of this object, if any.
+    * The initial target container when this object is first created.
     **/
-    var ?textInput:TextInputState;
+    public var targetContainer:Dim;
+    
+    public function new() {
+
+    }
+
 }
