@@ -8,5 +8,5 @@ interface ISceneManager {
     function resize():Void;
     function render(ctx:GraphicsContext):Void;
     function update(ctx:UpdateContext):Void;
-    function end(uctx:UpdateContext, gctx:GraphicsContext):Void;
+    function end(gtx:GraphicsContext, utx:UpdateContext):Void;
 }

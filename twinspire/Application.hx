@@ -108,7 +108,7 @@ class Application
 	*
 	* This is called at the end of each frame for cleanup. Both the update and graphics contexts are provided if necessary.
 	**/
-	public var end:(UpdateContext, GraphicsContext) -> Void;
+	public var end:(GraphicsContext, UpdateContext) -> Void;
 	/**
 	* A resize callback used when the client resizes.
 	**/
@@ -256,10 +256,10 @@ class Application
 		}
 
 		if (sceneManager != null) {
-			sceneManager.end(_updateContext, _graphicsContext);
+			sceneManager.end(_graphicsContext, _updateContext);
 		}
 		else {
-			end(_updateContext, _graphicsContext);
+			end(_graphicsContext, _updateContext);
 		}
 
 		g2.end();
