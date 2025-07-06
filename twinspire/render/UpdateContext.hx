@@ -1136,6 +1136,10 @@ class UpdateContext {
             return false;
         }
 
+        if (!_gctx.isDimIndexValid(Direct(index))) {
+            return false;
+        }
+
         var array = getActivity(index, type);
         if (array == null) {
             return false;

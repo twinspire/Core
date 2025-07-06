@@ -35,7 +35,7 @@ Not all features in Twinspire Core are complete, but the features in the list ab
  3. Physics and Maths implementations
  4. Custom scripting support with interoperability between both Haxe and ODIN.
 
-## Installation
+## Quick Start
 
 ### Haxe
 You will require `Git` to install Twinspire on your computer. It is recommended to use it in conjunction with Haxelib for easier updating:
@@ -44,13 +44,19 @@ You will require `Git` to install Twinspire on your computer. It is recommended 
 
 Alternatively, you can use `git clone` but you will have to setup a `haxelib dev` environment yourself.
 
+You can now use the recently added Twinspire Core CLI tool to create new projects and setup a quick example:
+
+    haxelib run twinspire-core create "My Project"
+
+Use the CLI `help` command for more information, or omit the `create` command for CLI documentation.
+
 ### ODIN
 It is not currently recommended to use ODIN. It is expected to have better support when the Haxe version is updated.
 
 ## How to Use Twinspire
 The [WIKI page](https://github.com/twinspire/Core/wiki) contains tutorials and information on how you can get started with using Twinspire.
 
-It is not recommended to use the new context system until it is ready for production purposes. There is currently no documentation for it as of yet.
+Most of the WIKI is up-to-date but some information may be missing. In most cases, the API is well documented and you should be able to find most of the information you need when building applications there. A detailed [Quick Start]() guide is also available, but only describes basic concepts. Invariably, Twinspire Core is generally quite simple for what it does and most things should be self-explanatory, but feel free to write an Issue for help. The Haxe forums or Discord may also provide help.
 
 ## Support
 If you find a bug or an issue, please use the issue tracker here.
