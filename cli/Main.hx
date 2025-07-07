@@ -14,6 +14,24 @@ enum abstract Command(Int) {
     var Help;
 }
 
+enum abstract ProjectType(String) {
+    var Basic;
+    var Module;
+}
+
+typedef Component = {
+    var name:String;
+    var path:String;
+}
+
+typedef Project = {
+    var type:String;
+    var template:String;
+    var componentPath:String;
+    var setupPath:String;
+    var components:Array<Component>;
+}
+
 class Main {
     
     static var command:Command;
@@ -353,6 +371,42 @@ class SceneManager {
                 Sys.println('Error copying file: ${ex.message}');
             }
         }
+    }
+
+    static function generateIdCode(name:String) {
+        return '
+        public static var ${name.toLowerCase()}:Id;
+        '.trim();
+    }
+
+    static function generateIdAssocCode(name:String) {
+        return '
+        ${name.toLowerCase()} = Application.createId(true);
+        IdAssoc.assoc[${name.toLowerCase()}].init = ${name}.init;
+        IdAssoc.assoc[${name.toLowerCase()}].update = ${name}.update;
+        IdAssoc.assoc[${name.toLowerCase()}].render = ${name}.render;
+        IdAssoc.assoc[${name.toLowerCase()}].end = ${name}.end;
+        '.trim();
+    }
+
+    static function generateIdEntriesClass(entries:Array<String>, assocs:Array<String>) {
+        return '
+        package;
+
+        import twinspire.Application;
+        import twinspire.IdAssoc;
+        import twinspire.Id;
+
+        class IdEntries {
+
+            ${entries.join("\r\n")}
+
+            public static function init() {
+                ${assocs.join("\r\n")}
+            }
+
+        }
+        '.trim();
     }
 
 }
