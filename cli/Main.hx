@@ -1,5 +1,6 @@
 package;
 
+import haxe.Json;
 import sys.io.File;
 import sys.FileSystem;
 
@@ -12,9 +13,10 @@ enum abstract Command(Int) {
     var None;
     var Create;
     var Help;
+    var AddComponent;
 }
 
-enum abstract ProjectType(String) {
+enum abstract ProjectType(String) to String {
     var Basic;
     var Module;
 }
@@ -25,11 +27,11 @@ typedef Component = {
 }
 
 typedef Project = {
-    var type:String;
-    var template:String;
-    var componentPath:String;
-    var setupPath:String;
-    var components:Array<Component>;
+    var ?type:ProjectType;
+    var ?template:String;
+    var ?componentPath:String;
+    var ?setupPath:String;
+    var ?components:Array<Component>;
 }
 
 class Main {
@@ -71,6 +73,9 @@ class Main {
                     }
                     case "help": {
                         command = Help;
+                    }
+                    case "add": {
+                        command = AddComponent;
                     }
                 }
             }
@@ -164,6 +169,38 @@ class Main {
                 }
                 
                 copyDirectory(templatePath, dir, data);
+            }
+            case AddComponent: {
+                final projectFile = "tsproj.json";
+                final projectFilePath = Path.join([ dir, projectFile ]);
+                if (!FileSystem.exists(projectFilePath)) {
+                    Sys.println("There is no project file. 'tsproj.json' file is missing.");
+                    return;
+                }
+
+                var projectContent:String = "";
+                var project:Project = {};
+                try {
+                    projectContent = File.getContent(projectFilePath);
+                    project = Json.parse(projectContent);
+                }
+                catch (ex) {
+                    Sys.println('There was an error attempting to open and read the project file:');
+                    Sys.println('  ${ex.message}');
+                    return;
+                }
+
+                if (!(commands.length >= 1 && commands.length < 3)) {
+                    Sys.println('Too many or not enough parameters for "add" command.');
+                }
+
+                var name = commands[0];
+                var pack = project.componentPath.replace("/", ".");
+                if (commands.length == 2) {
+                    pack = commands[1];
+
+                    
+                }
             }
             default: {
 
@@ -278,10 +315,14 @@ class SceneManager {
                 Sys.println('           This command expects the following arguments:');
                 Sys.println('               projectName - Give the name for the project.');
                 Sys.println('               start - (Optional) Specify the start template. "quick-start" is default.');
+                Sys.println('  add    - Add a component to the current project.');
+                Sys.println('           This command expects the following arguments:');
+                Sys.println('               name - A Haxe class name representing the class and ID types to generate.');
+                Sys.println('               pack - (Optional) The package (if different from component path).');
                 Sys.println('');
-                Sys.println('  help - Displays this help.');
-                Sys.println('         To see more detailed help, check out the following commands:');
-                Sys.println('             flags, options, start-templates');
+                Sys.println('  help   - Displays this help.');
+                Sys.println('           To see more detailed help, check out the following commands:');
+                Sys.println('               flags, options, start-templates');
             }
         }
     }
@@ -403,6 +444,40 @@ class SceneManager {
 
             public static function init() {
                 ${assocs.join("\r\n")}
+            }
+
+        }
+        '.trim();
+    }
+
+    static function generateClass(name:String, pack:String) {
+        return '
+        package ${pack};
+
+        import twinspire.render.GraphicsContext;
+        import twinspire.render.UpdateContext;
+        import twinspire.scenes.SceneObject;
+
+        class ${name} extends SceneObject {
+        
+            public function new() {
+                super();
+            }
+
+            public static function init(gtx:GraphicsContext, obj:SceneObject):SceneObject {
+
+            }
+
+            public static function update(utx:UpdateContext, obj:SceneObject) {
+
+            }
+
+            public static function render(gtx:UpdateContext, obj:SceneObject) {
+
+            }
+
+            public static function end(gtx:GraphicsContex, utx:UpdateContext, obj:SceneObject) {
+
             }
 
         }

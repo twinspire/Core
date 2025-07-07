@@ -1,0 +1,7 @@
+{
+    "type": "Basic",
+    "template": "quick-start",
+    "componentPath": "widgets",
+    "setupPath": "Sources",
+    "components": []
+}
