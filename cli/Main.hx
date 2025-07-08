@@ -31,6 +31,7 @@ typedef Project = {
     var ?template:String;
     var ?componentPath:String;
     var ?setupPath:String;
+    var ?startPack:String;
     var ?components:Array<Component>;
 }
 
@@ -205,9 +206,13 @@ class Main {
                 }
 
                 var name = commands[0];
-                var pack = project.componentPath.replace("/", ".").replace("\\", ".");
+                var startPack = project.startPack;
+                if (project.startPack != "") {
+                    startPack += ".";
+                }
+                var pack = startPack + project.componentPath.replace("/", ".").replace("\\", ".");
                 if (commands.length == 2) {
-                    pack = commands[1].toLowerCase();
+                    pack = startPack + commands[1].toLowerCase();
                 }
 
                 if (project.components.filter((c) -> c.name == name).length > 0) {
@@ -248,7 +253,7 @@ class Main {
 
                 // update id entries file
                 var idFilePath = Path.join([ dir, project.setupPath, "IdEntries.hx" ]);
-                var idFileContent = generateIdEntriesClass(entries, assocs);
+                var idFileContent = generateIdEntriesClass(project.startPack, entries, assocs);
                 File.saveContent(idFilePath, idFileContent);
 
                 // update project file
@@ -483,9 +488,9 @@ public static var ${name.toLowerCase()}:Id;
         '.trim();
     }
 
-    static function generateIdEntriesClass(entries:Array<String>, assocs:Array<String>) {
+    static function generateIdEntriesClass(startPack:String, entries:Array<String>, assocs:Array<String>) {
         return '
-package;
+package $startPack;
 
 import twinspire.Application;
 import twinspire.IdAssoc;

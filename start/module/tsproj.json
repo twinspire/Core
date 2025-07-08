@@ -3,5 +3,6 @@
     "template": "module",
     "componentPath": "widgets",
     "setupPath": "",
+    "startPack": "",
     "components": []
 }

@@ -3,5 +3,6 @@
     "template": "quick-start",
     "componentPath": "widgets",
     "setupPath": "Sources",
+    "startPack": "",
     "components": []
 }
