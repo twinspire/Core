@@ -47,6 +47,10 @@ class Sprite {
     * [INTERNAL] Specifies the current frame being drawn. Handled internally by Twinspire.
     **/
     public var currentFrame:Int;
+    /**
+    * [INTERNAL] Specifies which direction frame animates in. Handled internally by Twinspire.
+    **/
+    public var animDir:Int;
 
     public function new() {
         states = [];
@@ -54,6 +58,7 @@ class Sprite {
         animated = false;
         duration = 0.0;
         sizingMethod = Stretch;
+        animDir = 1;
     }
 
     /**
