@@ -530,7 +530,7 @@ class ${name} extends SceneObject {
 
     }
 
-    public static function render(gtx:UpdateContext, obj:SceneObject) {
+    public static function render(gtx:GraphicsContext, obj:SceneObject) {
 
     }
 
