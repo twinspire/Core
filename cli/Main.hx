@@ -464,7 +464,7 @@ class SceneManager {
 
     static function generateIdCode(name:String) {
         return '
-        public static var ${name.toLowerCase()}:Id;
+public static var ${name.toLowerCase()}:Id;
         '.trim();
     }
 
@@ -480,55 +480,55 @@ class SceneManager {
 
     static function generateIdEntriesClass(entries:Array<String>, assocs:Array<String>) {
         return '
-        package;
+package;
 
-        import twinspire.Application;
-        import twinspire.IdAssoc;
-        import twinspire.Id;
+import twinspire.Application;
+import twinspire.IdAssoc;
+import twinspire.Id;
 
-        class IdEntries {
+class IdEntries {
 
-            ${entries.join("\r\n\t")}
+    ${entries.join("\r\n\t")}
 
-            public static function init() {
-                ${assocs.join("\r\n\t\t")}
-            }
+    public static function init() {
+        ${assocs.join("\r\n\t\t")}
+    }
 
-        }
+}
         '.trim();
     }
 
     static function generateClass(name:String, pack:String) {
         return '
-        package ${pack};
+package ${pack};
 
-        import twinspire.render.GraphicsContext;
-        import twinspire.render.UpdateContext;
-        import twinspire.scenes.SceneObject;
+import twinspire.render.GraphicsContext;
+import twinspire.render.UpdateContext;
+import twinspire.scenes.SceneObject;
 
-        class ${name} extends SceneObject {
-        
-            public function new() {
-                super();
-            }
+class ${name} extends SceneObject {
 
-            public static function init(gtx:GraphicsContext, obj:SceneObject):SceneObject {
+    public function new() {
+        super();
+    }
 
-            }
+    public static function init(gtx:GraphicsContext, obj:SceneObject):SceneObject {
 
-            public static function update(utx:UpdateContext, obj:SceneObject) {
+    }
 
-            }
+    public static function update(utx:UpdateContext, obj:SceneObject) {
 
-            public static function render(gtx:UpdateContext, obj:SceneObject) {
+    }
 
-            }
+    public static function render(gtx:UpdateContext, obj:SceneObject) {
 
-            public static function end(gtx:GraphicsContex, utx:UpdateContext, obj:SceneObject) {
+    }
 
-            }
+    public static function end(gtx:GraphicsContex, utx:UpdateContext, obj:SceneObject) {
 
-        }
+    }
+
+}
         '.trim();
     }
 
