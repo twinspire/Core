@@ -42,6 +42,8 @@ class Main {
     static var projectName:String;
     static var isVerbose:Bool;
 
+    static var sharedPath:String;
+
     static var flags:Array<String>;
     static var options:Map<String, String>;
     static var commands:Array<String>;
@@ -49,6 +51,11 @@ class Main {
     public static function main() {
         var twinspireDir = Sys.programPath();
         twinspireDir = twinspireDir.substr(0, twinspireDir.length - "run.n".length);
+
+        sharedPath = Path.join([ twinspireDir, "shared" ]);
+        if (!FileSystem.exists(sharedPath)) {
+            FileSystem.createDirectory(sharedPath);
+        }
 
         command = None;
 
@@ -100,6 +107,9 @@ class Main {
                             commands.push(arg);
                         }
                         case Help: {
+                            commands.push(arg);
+                        }
+                        case AddComponent: {
                             commands.push(arg);
                         }
                         default: {
@@ -195,12 +205,50 @@ class Main {
                 }
 
                 var name = commands[0];
-                var pack = project.componentPath.replace("/", ".");
+                var pack = project.componentPath.replace("/", ".").replace("\\", ".");
                 if (commands.length == 2) {
-                    pack = commands[1];
-
-                    
+                    pack = commands[1].toLowerCase();
                 }
+
+                var component:Component = {
+                    name: name,
+                    path: pack
+                };
+
+                project.components.push(component);
+
+                var entries = [];
+                var assocs = [];
+                for (i in 0...project.components.length) {
+                    var comp = project.components[i];
+
+                    var componentsPath = Path.join([ dir, project.setupPath, Path.normalize(project.componentPath) ]);
+                    if (!FileSystem.exists(componentsPath)) {
+                        Sys.println('The component path $componentsPath does not exist.');
+                        return;
+                    }
+
+                    entries.push(generateIdCode(comp.name));
+                    assocs.push(generateIdAssocCode(comp.name));
+
+                    var clsFilePath = Path.join([ componentsPath, comp.name + ".hx" ]);
+                    if (FileSystem.exists(clsFilePath)) {
+                        continue;
+                    }
+
+                    // save new class file if it doesn't exist yet
+                    var clsFileContent = generateClass(comp.name, pack);
+                    File.saveContent(clsFilePath, clsFileContent);
+                }
+
+                // update id entries file
+                var idFilePath = Path.join([ dir, project.setupPath, "IdEntries.hx" ]);
+                var idFileContent = generateIdEntriesClass(entries, assocs);
+                File.saveContent(idFilePath, idFileContent);
+
+                // update project file
+                projectContent = Json.stringify(project);
+                File.saveContent(projectFilePath, projectContent);
             }
             default: {
 
@@ -440,10 +488,10 @@ class SceneManager {
 
         class IdEntries {
 
-            ${entries.join("\r\n")}
+            ${entries.join("\r\n\t")}
 
             public static function init() {
-                ${assocs.join("\r\n")}
+                ${assocs.join("\r\n\t\t")}
             }
 
         }
