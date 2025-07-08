@@ -210,6 +210,11 @@ class Main {
                     pack = commands[1].toLowerCase();
                 }
 
+                if (project.components.filter((c) -> c.name == name).length > 0) {
+                    Sys.println('Component name ${name} already exists.');
+                    return;
+                }
+
                 var component:Component = {
                     name: name,
                     path: pack
