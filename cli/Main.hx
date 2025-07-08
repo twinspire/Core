@@ -229,8 +229,12 @@ class Main {
 
                 var entries = [];
                 var assocs = [];
+                var imports = [];
+
                 for (i in 0...project.components.length) {
                     var comp = project.components[i];
+
+                    imports.push(comp.path + "." + comp.name + ";");
 
                     var componentsPath = Path.join([ dir, project.setupPath, Path.normalize(project.componentPath) ]);
                     if (!FileSystem.exists(componentsPath)) {
@@ -253,7 +257,7 @@ class Main {
 
                 // update id entries file
                 var idFilePath = Path.join([ dir, project.setupPath, "IdEntries.hx" ]);
-                var idFileContent = generateIdEntriesClass(project.startPack, entries, assocs);
+                var idFileContent = generateIdEntriesClass(project.startPack, entries, assocs, imports);
                 File.saveContent(idFilePath, idFileContent);
 
                 // update project file
@@ -488,9 +492,11 @@ public static var ${name.toLowerCase()}:Id;
         '.trim();
     }
 
-    static function generateIdEntriesClass(startPack:String, entries:Array<String>, assocs:Array<String>) {
+    static function generateIdEntriesClass(startPack:String, entries:Array<String>, assocs:Array<String>, imports:Array<String>) {
         return '
 package $startPack;
+
+${imports.join("\r\n")}
 
 import twinspire.Application;
 import twinspire.IdAssoc;
@@ -534,7 +540,7 @@ class ${name} extends SceneObject {
 
     }
 
-    public static function end(gtx:GraphicsContex, utx:UpdateContext, obj:SceneObject) {
+    public static function end(gtx:GraphicsContext, utx:UpdateContext, obj:SceneObject) {
 
     }
 
