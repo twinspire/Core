@@ -177,7 +177,7 @@ class GraphicsContext {
     * @param index The position of the dimension when it is added into permanent storage.
     **/
     public function getTemporaryDimAtNewIndex(index:Int) {
-        var resolvedIndex = index - (dimensions.length - 1);
+        var resolvedIndex = index - dimensions.length;
         return _dimTemp[resolvedIndex];
     }
 

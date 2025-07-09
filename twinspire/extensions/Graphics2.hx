@@ -487,7 +487,7 @@ class Graphics2
 				return result;
 			}
 
-			indexRange = spriteState.groups[state];
+			indexRange = spriteState.groups.get(group);
 			if (spriteState.animationLoop.exists(group)) {
 				animationLoop = spriteState.animationLoop[group];
 			}
@@ -563,7 +563,7 @@ class Graphics2
 			var groupIndices = state.groups.get(group);
 			var dest = dim;
 			if (sprite.size.x > 0 && sprite.size.y > 0) {
-				var destination = state.getDestinationDims()[animStateIndex];
+				var destination = state.getDestinationDims()[animateIndex];
 				dest = new Dim(dim.x + destination.x, dim.y + destination.y, sprite.size.x, sprite.size.y);
 			}
 
