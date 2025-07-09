@@ -234,7 +234,7 @@ class Main {
                 for (i in 0...project.components.length) {
                     var comp = project.components[i];
 
-                    imports.push(comp.path + "." + comp.name + ";");
+                    imports.push("import " + comp.path + "." + comp.name + ";");
 
                     var componentsPath = Path.join([ dir, project.setupPath, Path.normalize(project.componentPath) ]);
                     if (!FileSystem.exists(componentsPath)) {
