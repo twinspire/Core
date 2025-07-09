@@ -466,19 +466,84 @@ class Graphics2
 		g2.scissor(cast dim.x, cast dim.y, cast dim.width, cast dim.height);
 	}
 
+	static function getAnimateSpriteFrameIndex(sprite:Sprite, ?stateIndex:Int, ?group:String) {
+		var result = 0;
+
+		var state = sprite.currentFrame;
+		if (stateIndex != null) {
+			state = stateIndex;
+		}
+
+		if (sprite.states.length == 0) {
+			return -1;
+		}
+
+		var indexRange = [];
+		var spriteState = sprite.states[state];
+		var animationLoop = sprite.animationLoop;
+
+		if (group != null) {
+			if (!spriteState.groups.exists(group)) {
+				return result;
+			}
+
+			indexRange = spriteState.groups[state];
+			if (spriteState.animationLoop.exists(group)) {
+				animationLoop = spriteState.animationLoop[group];
+			}
+		}
+		else {
+			indexRange = [ for (i in 0...spriteState.patches.length) i ];
+		}
+
+		var frameComplete = Animate.animateTickLoop(sprite.animIndex, sprite.duration);
+
+		switch (animationLoop) {
+			case None: {
+				if (frameComplete && sprite.currentFrame < indexRange.length) {
+					sprite.currentFrame += 1;
+				}
+			}
+			case Repeat: {
+				if (frameComplete && sprite.currentFrame < indexRange.length) {
+					sprite.currentFrame += 1;
+				}
+				else {
+					sprite.currentFrame = 0;
+				}
+			}
+			case RepeatInverse: {
+				if (frameComplete && sprite.currentFrame < indexRange.length) {
+					sprite.currentFrame += sprite.animDir;
+				}
+				else {
+					sprite.animDir = -sprite.animDir;
+					sprite.currentFrame += sprite.animDir;
+				}
+			}
+		}
+
+		return result;
+	}
+
 	public static function drawSprite(g2:Graphics, sprite:Sprite, index:Int, dim:Dim) {
 		var state = sprite.states[index];
 		if (state.patches.length == 0) {
 			drawScaledImageDim(g2, state.image, dim);
 		}
 		else {
+			var animStateIndex = 0;
+			if (sprite.animated) {
+				animStateIndex = getAnimateSpriteFrameIndex(sprite, index);
+			}
+
+			var dest = dim;
 			if (sprite.size.x > 0 && sprite.size.y > 0) {
-				var destination = state.getDestinationDims()[0];
-				drawPatchedImage(g2, state.image, state.patches[0], new Dim(dim.x + destination.x, dim.y + destination.y, destination.width, destination.height));
+				var destination = state.getDestinationDims()[animStateIndex];
+				dest = new Dim(dim.x + destination.x, dim.y + destination.y, sprite.size.x, sprite.size.y);
 			}
-			else {
-				drawPatchedImage(g2, state.image, state.patches[0], dim);
-			}
+
+			drawPatchedImage(g2, state.image, state.patches[animStateIndex], dim);
 		}
 	}
 
@@ -490,8 +555,19 @@ class Graphics2
 	public static function drawSpriteGroup(g2:Graphics, sprite:Sprite, index:Int, group:String, dim:Dim) {
 		var state = sprite.states[index];
 		if (state.groups.exists(group)) {
+			var animateIndex = 0;
+			if (sprite.animated) {
+				animateIndex = getAnimateSpriteFrameIndex(sprite, index, group);
+			}
+
 			var groupIndices = state.groups.get(group);
-			drawPatchedImage(g2, state.image, state.patches[groupIndices[0]], dim);
+			var dest = dim;
+			if (sprite.size.x > 0 && sprite.size.y > 0) {
+				var destination = state.getDestinationDims()[animStateIndex];
+				dest = new Dim(dim.x + destination.x, dim.y + destination.y, sprite.size.x, sprite.size.y);
+			}
+
+			drawPatchedImage(g2, state.image, state.patches[groupIndices[animateIndex]], dest);
 		}
 	}
 
