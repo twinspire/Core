@@ -172,13 +172,27 @@ class GraphicsContext {
 
     /**
     * Returns the dimension in temporary storage in the current frame at the index
-    * it would be at once added into permanent storage.
+    * it would be once added into permanent storage.
     *
     * @param index The position of the dimension when it is added into permanent storage.
     **/
     public function getTemporaryDimAtNewIndex(index:Int) {
         var resolvedIndex = index - dimensions.length;
         return _dimTemp[resolvedIndex];
+    }
+
+    /**
+    * Returns the current or temporary dimension.
+    *
+    * @param index The position of the dimension.
+    **/
+    public function getTempOrCurrentDimAtIndex(index:Int) {
+        if (index >= dimensions.length - 1) {
+            return getTemporaryDimAtNewIndex(index);
+        }
+        else {
+            return dimensions[index];
+        }
     }
 
     /**
