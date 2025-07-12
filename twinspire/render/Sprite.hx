@@ -53,12 +53,17 @@ class Sprite {
     public var animDir:Int;
 
     public function new() {
+        currentFrame = 0;
         states = [];
         animIndex = -1;
         animated = false;
         duration = 0.0;
         sizingMethod = Stretch;
+        fillBaseline = 0.0;
+        fillAnchor = AnchorNone;
+        animationLoop = None;
         animDir = 1;
+        size = new FastVector2();
     }
 
     /**

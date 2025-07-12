@@ -467,8 +467,6 @@ class Graphics2
 	}
 
 	static function getAnimateSpriteFrameIndex(sprite:Sprite, ?stateIndex:Int, ?group:String) {
-		var result = 0;
-
 		var state = sprite.currentFrame;
 		if (stateIndex != null) {
 			state = stateIndex;
@@ -484,7 +482,7 @@ class Graphics2
 
 		if (group != null) {
 			if (!spriteState.groups.exists(group)) {
-				return result;
+				return -1;
 			}
 
 			indexRange = spriteState.groups.get(group);
@@ -500,30 +498,34 @@ class Graphics2
 
 		switch (animationLoop) {
 			case None: {
-				if (frameComplete && sprite.currentFrame < indexRange.length) {
-					sprite.currentFrame += 1;
+				if (frameComplete) {
+					if (sprite.currentFrame < indexRange.length - 1) {
+						sprite.currentFrame += 1;
+					}
 				}
 			}
 			case Repeat: {
-				if (frameComplete && sprite.currentFrame < indexRange.length) {
-					sprite.currentFrame += 1;
-				}
-				else {
-					sprite.currentFrame = 0;
+				if (frameComplete) {
+					if (sprite.currentFrame < indexRange.length - 1) {
+						sprite.currentFrame += 1;
+					}
+					else {
+						sprite.currentFrame = 0;
+					}
 				}
 			}
 			case RepeatInverse: {
-				if (frameComplete && sprite.currentFrame < indexRange.length) {
+				if (frameComplete) {
 					sprite.currentFrame += sprite.animDir;
-				}
-				else {
-					sprite.animDir = -sprite.animDir;
-					sprite.currentFrame += sprite.animDir;
+					var isEnd = sprite.animDir == 1 ? sprite.currentFrame == indexRange.length - 1 : sprite.currentFrame == 0;
+					if (isEnd) {
+						sprite.animDir = -sprite.animDir;
+					}
 				}
 			}
 		}
 
-		return result;
+		return sprite.currentFrame;
 	}
 
 	public static function drawSprite(g2:Graphics, sprite:Sprite, index:Int, dim:Dim) {
@@ -534,7 +536,8 @@ class Graphics2
 		else {
 			var animStateIndex = 0;
 			if (sprite.animated) {
-				animStateIndex = getAnimateSpriteFrameIndex(sprite, index);
+				var temp = getAnimateSpriteFrameIndex(sprite, index);
+				animStateIndex = temp > -1 ? temp : 0;
 			}
 
 			var dest = dim;
@@ -557,7 +560,8 @@ class Graphics2
 		if (state.groups.exists(group)) {
 			var animateIndex = 0;
 			if (sprite.animated) {
-				animateIndex = getAnimateSpriteFrameIndex(sprite, index, group);
+				var temp = getAnimateSpriteFrameIndex(sprite, index, group);
+				animateIndex = temp > -1 ? temp : 0;
 			}
 
 			var groupIndices = state.groups.get(group);

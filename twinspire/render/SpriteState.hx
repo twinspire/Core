@@ -31,6 +31,7 @@ class SpriteState {
         patches = [];
         groups = [];
         animationLoop = [];
+        _destinationDims = [];
     }
 
     /**
