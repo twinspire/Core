@@ -34,7 +34,13 @@ class Reader {
             return;
         }
 
-        trace(tokenizer.tokens);
+        var parser = new Parser(tokenizer);
+        parser.parseTokens();
+        for (d in parser.dims) {
+            for (k => v in d.data) {
+                trace('$k: $v');
+            }
+        }
     }
 
 }
