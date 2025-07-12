@@ -37,9 +37,17 @@ class Reader {
         var parser = new Parser(tokenizer);
         parser.parseTokens();
         for (d in parser.dims) {
-            for (k => v in d.data) {
-                trace('$k: $v');
-            }
+            printDimStruct(d);
+        }
+    }
+
+    private static function printDimStruct(d:DimStruct) {
+        for (k => v in d.data) {
+            trace('$k: $v');
+        }
+
+        for (s in d.structs) {
+            printDimStruct(s);
         }
     }
 

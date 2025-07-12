@@ -46,7 +46,15 @@ class Parser {
                 break;
             }
 
-            while (token != TPipe && token != null) {
+            var createStruct = false;
+            while (token != TPipe && token != TCloseBracket && token != null) {
+                // is there an open bracket before we parse properties?
+                if (token == TOpenBracket) {
+                    createStruct = true;
+                    token = getNextToken();
+                    break;
+                }
+                
                 var key = switch (token) {
                     case TIdent(value): value;
                     default: "";
@@ -83,6 +91,23 @@ class Parser {
 
                 skipWhitespace();
                 token = tokenizer.tokens[currentToken];
+
+                // is there an open bracket after we parse a property?
+                if (token == TOpenBracket) {
+                    createStruct = true;
+                    token = getNextToken();
+                    break;
+                }
+            }
+
+            if (token == null) {
+                break;
+            }
+
+            if (createStruct) {
+                var struct = parseDimStruct();
+                result.structs.push(struct);
+                createStruct = false;
             }
 
             token = getNextToken();
@@ -135,7 +160,10 @@ class Parser {
                     ident += ".";
                 }
                 case TSpace: {
-                    result.push(ident);
+                    if (ident != "") {
+                        result.push(ident);
+                    }
+
                     ident = "";
                 }
                 case TDoubleQuote | TSingleQuote: {
