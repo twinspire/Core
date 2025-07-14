@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.geom.Box;
 import twinspire.geom.Dim;
 import twinspire.geom.DimCellSize;
 import twinspire.geom.DimCellSize.DimCellSizing;
@@ -55,6 +56,24 @@ enum abstract ContainerMethods(Int) from Int to Int
 {
     var FLOW_FIXED      =   0;
     var FLOW_VARIABLE   =   1;
+}
+
+enum DimAlignment {
+    None;
+    DimAlign(valign:VerticalAlign, halign:HorizontalAlign);
+}
+
+enum FlowSpacing {
+    SpaceBetween;
+    SpaceAround;
+    SpaceEqual(space:Float);
+}
+
+enum DimFlow {
+    FlowNone;
+    FlowVertical(?maxWidth:Float, ?span:Bool, ?inverse:Bool, ?spacing:FlowSpacing);
+    FlowHorizontal(?maxHeight:Float, ?span:Bool, ?inverse:Bool, ?spacing:FlowSpacing);
+    FlowGrid(columns:Int, rows:Int, width:Float, height:Float);
 }
 
 class Dimensions
@@ -293,6 +312,92 @@ class Dimensions
     public static function simulateDimGroups()
     {
 
+    }
+
+    /**
+    * Construct a series of dimensions from a `DimMap`, represented by a `Map<String, DimObject>`. All
+    * positions and sizes are automatically calculated and an object of `Map<String, DimObjectResult>` is returned
+    * with the resulting `DimIndex` values.
+    **/
+    public static function construct(items:DimMap, startPos:FastVector2) {
+        for (k => v in obj) {
+            
+        }
+    }
+
+    static function calculate(item:DimObject, pos:FastVector2, order:Int = 0) {
+        var padding = item.padding ?? new Box(0);
+        var margin = item.margin ?? new Box(0);
+
+        var size = item.size ?? { width: 0, height: 0 };
+
+        var textSize:Dim = null;
+        if (item.text != null && item.font != null && item.fontSize != null) {
+            textSize = getTextDim(item.font, item.fontSize, item.text);
+        }
+
+        var growToTextSize = item.growToTextSize ?? false;
+        if (growToTextSize && textSize != null) {
+            size.width = textSize.width + padding.left + padding.right;
+            size.height = textSize.height + padding.top + padding.bottom;
+        }
+        else {
+            if (item.width != null) {
+                size.width = item.width + padding.left + padding.right;
+            }
+
+            if (item.height != null) {
+                size.height = item.height + padding.top + padding.bottom;
+            }
+        }
+
+        var parentDim = new Dim(pos.x, pos.y, size.width, size.height, order + 1);
+
+        if (item.items != null) {
+            var childSizes = new Map<String, Dim>();
+            for (k => i in item.items) {
+                childSizes[k] = calculate(i, pos, order + 1);
+            }
+
+            for (k => child in childSizes) {
+                var alignTo = item.items[k].alignTo ?? "";
+                // check intermediate children with alignment to parent
+                if (alignTo == "") {
+                    var alignment = item.items[k].align ?? None;
+                    var offset = item.items[k].alignOffset ?? new FastVector2();
+                    switch (alignment) {
+                        case DimAlign(valign, halign): {
+                            var child = new Dim(childSizes[k].x, childSizes[k].y, childSizes[k].width, childSizes[k].height, childSizes[k].order);
+                            dimAlignOffset(parentDim, child, halign, valign, offset.x, offset.y);
+                            childSizes[k] = child;
+                        }
+                        default: {
+
+                        }
+                    }
+                }
+            }
+
+            for (k => child in childSizes) {
+                var alignTo = item.items[k].alignTo ?? "";
+                // check children aligning to other children
+                if (alignTo != "" && alignTo != "screen") {
+                    var alignment = item.items[k].align ?? None;
+                    var offset = item.items[k].alignOffset ?? new FastVector2();
+                    var alignToDim = childSizes[alignTo];
+                    switch (alignment) {
+                        case DimAlign(valign, halign): {
+                            dimAlignOffset(alignToDim, child, halign, valign, offset.x, offset.y);
+                        }
+                        default: {
+
+                        }
+                    }
+                }
+            }
+        }
+
+        return parentDim;
     }
 
     /**
