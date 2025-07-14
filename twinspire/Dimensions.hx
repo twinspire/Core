@@ -320,7 +320,7 @@ class Dimensions
     * with the resulting `DimIndex` values.
     **/
     public static function construct(items:DimMap, startPos:FastVector2) {
-        for (k => v in obj) {
+        for (k => v in items) {
             
         }
     }
