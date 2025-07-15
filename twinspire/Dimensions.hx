@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.DimSize;
 import twinspire.geom.Box;
 import twinspire.geom.Dim;
 import twinspire.geom.DimCellSize;
@@ -15,24 +16,28 @@ import kha.Font;
 import Assertion.*;
 #end
 
-enum abstract HorizontalAlign(Int) from Int to Int
-{
+enum abstract HorizontalAlign(Int) from Int to Int {
 	var HALIGN_NONE				=	0;
 	var HALIGN_LEFT				=	1;
 	var HALIGN_MIDDLE			=	2;
 	var HALIGN_RIGHT			=	3;
 }
 
-enum abstract VerticalAlign(Int) from Int to Int
-{
+enum abstract VerticalAlign(Int) from Int to Int {
 	var VALIGN_NONE				=	0;
 	var VALIGN_TOP				=	1;
 	var VALIGN_CENTRE			=	2;
 	var VALIGN_BOTTOM			=	3;
 }
 
-enum abstract DimBehaviourFlags(Int) from Int to Int
-{
+enum abstract Direction(Int) {
+    var Up;
+    var Down;
+    var Left;
+    var Right;
+}
+
+enum abstract DimBehaviourFlags(Int) from Int to Int {
     /**
      * A dimension behaviour which specifies no events are to be handled by the simulation engine.
      */
@@ -52,14 +57,15 @@ typedef DimIndexResult = {
     var groupIndex:Int;
 }
 
-enum abstract ContainerMethods(Int) from Int to Int
-{
+enum abstract ContainerMethods(Int) from Int to Int {
     var FLOW_FIXED      =   0;
     var FLOW_VARIABLE   =   1;
 }
 
 enum DimAlignment {
     None;
+    DimVAlign(valign:VerticalAlign);
+    DimHAlign(halign:HorizontalAlign);
     DimAlign(valign:VerticalAlign, halign:HorizontalAlign);
 }
 
@@ -76,8 +82,40 @@ enum DimFlow {
     FlowGrid(columns:Int, rows:Int, width:Float, height:Float);
 }
 
-class Dimensions
-{
+enum DimInitCommand {
+    CreateEmpty(then:Array<DimCommand>);
+    CreateOnInit(dim:Dim, init:DimInitCommand);
+    CentreScreenY(width:Float, height:Float, offsetY:Float, inside:Array<DimInitCommand>);
+    CentreScreenX(width:Float, height:Float, offsetX:Float, inside:Array<DimInitCommand>);
+    CentreScreenFromSize(width:Float, height:Float, inside:Array<DimInitCommand>);
+    CreateDimAlignScreen(width:Float, height:Float, align:DimAlignment, offset:FastVector2, inside:Array<DimInitCommand>);
+    CreateFromOffset(offset:FastVector2, inside:Array<DimInitCommand>);
+    CreateGridEquals(columns:Int, rows:Int, items:Array<DimInitCommand>);
+    CreateGridFloats(columns:Array<Float>, rows:Array<Float>, items:Array<DimInitCommand>);
+    CreateGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>, items:Array<DimInitCommand>);
+    CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>);
+    CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>);
+    CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>);
+}
+
+enum DimCommand {
+    ScreenAlign(align:DimAlignment, offset:FastVector2);
+    Align(align:DimAlignment, offset:FastVector2);
+    MeasureText(text:String, font:Font, fontSize:Int);
+    AddSpacingAround(space:Float);
+    AddSpacing(space:Float, dir:Float);
+    Scale(scale:Float);
+    ScaleX(scale:Float);
+    ScaleY(scale:Float);
+    Shrink(value:Float);
+    ShrinkW(value:Float);
+    ShrinkH(value:Float);
+    Grow(value:Float);
+    GrowW(value:Float);
+    GrowH(value:Float);
+}
+
+class Dimensions {
 
     static var dimTypes:Array<String>;
     static var dimTypesBehaviours:Array<Int>;
@@ -319,13 +357,26 @@ class Dimensions
     * positions and sizes are automatically calculated and an object of `Map<String, DimObjectResult>` is returned
     * with the resulting `DimIndex` values.
     **/
-    public static function construct(items:DimMap, startPos:FastVector2) {
+    public static function construct(items:DimMap, startPos:FastVector2, order:Int = -1) {
+        var results:Map<String, DimObjectResult> = [];
         for (k => v in items) {
-            
+            var data = calculate(v, startPos, order);
+            for (childK => childV in data) {
+                var childName = '/${childK}';
+                if (childK == "parent") {
+                    childName = "";
+                }
+
+                var name = '${k}${childK}';
+                results[name] = childV;
+            }
         }
+        return results;
     }
 
-    static function calculate(item:DimObject, pos:FastVector2, order:Int = 0) {
+    static function calculate(item:DimObject, pos:FastVector2, order:Int = 0):Map<String, DimObjectResult> {
+        var results:Map<String, DimObjectResult> = [];
+
         var padding = item.padding ?? new Box(0);
         var margin = item.margin ?? new Box(0);
 
@@ -356,9 +407,37 @@ class Dimensions
         if (item.items != null) {
             var childSizes = new Map<String, Dim>();
             for (k => i in item.items) {
-                childSizes[k] = calculate(i, pos, order + 1);
+                var calculated = calculate(i, pos, order);
+                for (innerK => innerV in calculated) {
+                    var childName = "/" + innerK;
+                    if (innerK == "parent") {
+                        childName = "";
+                    }
+
+                    var name = '${k}${childName}';
+                    results[name] = innerV;
+                    childSizes[k] = innerV.dim;
+                }
             }
 
+            var autoSize = item.autoSize ?? false;
+
+            if (autoSize) {
+                // finally, calculate the likely size of the container, including padding
+                for (k => child in childSizes) {
+                    var relX = child.x - pos.x;
+                    var relY = child.y - pos.y;
+
+                    parentDim.width = Math.max(relX + child.width, parentDim.width);
+                    parentDim.height = Math.max(relX + child.height, parentDim.height);
+                }
+
+                parentDim.width += padding.left + padding.right;
+                parentDim.height += padding.top + padding.bottom;
+            }
+
+            // one for loop to check for children aligned to the parent
+            // because we need to work out parent alignment first
             for (k => child in childSizes) {
                 var alignTo = item.items[k].alignTo ?? "";
                 // check intermediate children with alignment to parent
@@ -367,17 +446,30 @@ class Dimensions
                     var offset = item.items[k].alignOffset ?? new FastVector2();
                     switch (alignment) {
                         case DimAlign(valign, halign): {
-                            var child = new Dim(childSizes[k].x, childSizes[k].y, childSizes[k].width, childSizes[k].height, childSizes[k].order);
-                            dimAlignOffset(parentDim, child, halign, valign, offset.x, offset.y);
-                            childSizes[k] = child;
+                            if (autoSize) {
+                                parentDim.width += child.width;
+                                parentDim.height += child.height;
+                            }
+                            else {
+                                var child = new Dim(childSizes[k].x, childSizes[k].y, childSizes[k].width, childSizes[k].height, childSizes[k].order);
+                                dimAlignOffset(parentDim, child, halign, valign, offset.x, offset.y);
+                                childSizes[k] = child;
+                            }
                         }
                         default: {
+                            // children without alignment
+                            var x = item.items[k].x ?? 0;
+                            var y = item.items[k].y ?? 0;
 
+                            childSizes[k].x = x + pos.x;
+                            childSizes[k].y = y + pos.y;
                         }
                     }
                 }
             }
 
+            // one loop to check if there are children aligned to other
+            // children that have already been aligned to the parent.
             for (k => child in childSizes) {
                 var alignTo = item.items[k].alignTo ?? "";
                 // check children aligning to other children
@@ -397,7 +489,13 @@ class Dimensions
             }
         }
 
-        return parentDim;
+        results["parent"] = {
+            type: item.id,
+            dim: parentDim,
+            originalObject: item
+        };
+
+        return results;
     }
 
     /**

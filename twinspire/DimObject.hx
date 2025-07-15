@@ -13,15 +13,20 @@ typedef DimObject = {
     var ?scope:DimScope;
     var ?asGroup:Bool;
 
+    var ?autoSize:Bool;
     var ?alignTo:String;
     var ?align:DimAlignment;
     var ?alignOffset:FastVector2;
     var ?flow:DimFlow;
+
     var ?padding:Box;
     var ?margin:Box;
+    
     var ?width:Float;
     var ?height:Float;
     var ?size:DimSize;
+    var ?x:Float;
+    var ?y:Float;
 
     var ?text:String;
     var ?font:Font;
