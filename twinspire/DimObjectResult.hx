@@ -6,7 +6,7 @@ import twinspire.geom.Dim;
 import twinspire.DimIndex;
 
 typedef DimObjectResult = {
-    var ?type:Id;
     var ?dim:Dim;
-    var ?originalObject:DimObject;
+    var ?autoSize:Bool;
+    var ?clipped:Bool;
 }

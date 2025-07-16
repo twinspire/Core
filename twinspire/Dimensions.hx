@@ -100,10 +100,10 @@ enum DimInitCommand {
 
 enum DimCommand {
     ScreenAlign(align:DimAlignment, offset:FastVector2);
-    Align(align:DimAlignment, offset:FastVector2);
+    Align(against:Int, align:DimAlignment, ?offset:FastVector2);
     MeasureText(text:String, font:Font, fontSize:Int);
     AddSpacingAround(space:Float);
-    AddSpacing(space:Float, dir:Float);
+    AddSpacing(space:Float, dir:Direction);
     Scale(scale:Float);
     ScaleX(scale:Float);
     ScaleY(scale:Float);
@@ -352,151 +352,177 @@ class Dimensions {
 
     }
 
+    static var dimCommandStack:Array<Array<DimObjectResult>>;
+
     /**
-    * Construct a series of dimensions from a `DimMap`, represented by a `Map<String, DimObject>`. All
-    * positions and sizes are automatically calculated and an object of `Map<String, DimObjectResult>` is returned
-    * with the resulting `DimIndex` values.
+    * 
     **/
-    public static function construct(items:DimMap, startPos:FastVector2, order:Int = -1) {
-        var results:Map<String, DimObjectResult> = [];
-        for (k => v in items) {
-            var data = calculate(v, startPos, order);
-            for (childK => childV in data) {
-                var childName = '/${childK}';
-                if (childK == "parent") {
-                    childName = "";
-                }
+    public static function construct(command:DimInitCommand) {
+        if (dimCommandStack == null) {
+            dimCommandStack = [];
+        }
 
-                var name = '${k}${childK}';
-                results[name] = childV;
+        switch (command) {
+            case CreateEmpty(then): {
+                var dim = new Dim(0, 0, 0, 0);
+                dimCommandStack.push([ { dim: dim, autoSize: true, clipped: false } ]);
+                calculateDimFromCommands(then);
+            }
+            case CreateOnInit(dim, init): {
+
+            }
+            case CentreScreenY(width, height, offsetY, inside): {
+                var wrapper = centreScreenY(width, height, offsetY);
+                dimCommandStack.push([ { dim: wrapper, autoSize: false, clipped: false } ]);
+                
             }
         }
-        return results;
     }
 
-    static function calculate(item:DimObject, pos:FastVector2, order:Int = 0):Map<String, DimObjectResult> {
-        var results:Map<String, DimObjectResult> = [];
-
-        var padding = item.padding ?? new Box(0);
-        var margin = item.margin ?? new Box(0);
-
-        var size = item.size ?? { width: 0, height: 0 };
-
-        var textSize:Dim = null;
-        if (item.text != null && item.font != null && item.fontSize != null) {
-            textSize = getTextDim(item.font, item.fontSize, item.text);
+    static function calculateDimFromCommands(commands:Array<DimCommand>) {
+        var lastItem = dimCommandStack[dimCommandStack.length - 1][dimCommandStack[dimCommandStack.length - 1].length - 1];
+        for (command in commands) {
+            processDimCommand(lastItem.dim, command);
         }
 
-        var growToTextSize = item.growToTextSize ?? false;
-        if (growToTextSize && textSize != null) {
-            size.width = textSize.width + padding.left + padding.right;
-            size.height = textSize.height + padding.top + padding.bottom;
+        if (dimCommandStack.length - 1 > 0) {
+            calculateParentDim(dimCommandStack.length - 1);
         }
-        else {
-            if (item.width != null) {
-                size.width = item.width + padding.left + padding.right;
-            }
-
-            if (item.height != null) {
-                size.height = item.height + padding.top + padding.bottom;
-            }
-        }
-
-        var parentDim = new Dim(pos.x, pos.y, size.width, size.height, order + 1);
-
-        if (item.items != null) {
-            var childSizes = new Map<String, Dim>();
-            for (k => i in item.items) {
-                var calculated = calculate(i, pos, order);
-                for (innerK => innerV in calculated) {
-                    var childName = "/" + innerK;
-                    if (innerK == "parent") {
-                        childName = "";
-                    }
-
-                    var name = '${k}${childName}';
-                    results[name] = innerV;
-                    childSizes[k] = innerV.dim;
-                }
-            }
-
-            var autoSize = item.autoSize ?? false;
-
-            if (autoSize) {
-                // finally, calculate the likely size of the container, including padding
-                for (k => child in childSizes) {
-                    var relX = child.x - pos.x;
-                    var relY = child.y - pos.y;
-
-                    parentDim.width = Math.max(relX + child.width, parentDim.width);
-                    parentDim.height = Math.max(relX + child.height, parentDim.height);
-                }
-
-                parentDim.width += padding.left + padding.right;
-                parentDim.height += padding.top + padding.bottom;
-            }
-
-            // one for loop to check for children aligned to the parent
-            // because we need to work out parent alignment first
-            for (k => child in childSizes) {
-                var alignTo = item.items[k].alignTo ?? "";
-                // check intermediate children with alignment to parent
-                if (alignTo == "") {
-                    var alignment = item.items[k].align ?? None;
-                    var offset = item.items[k].alignOffset ?? new FastVector2();
-                    switch (alignment) {
-                        case DimAlign(valign, halign): {
-                            if (autoSize) {
-                                parentDim.width += child.width;
-                                parentDim.height += child.height;
-                            }
-                            else {
-                                var child = new Dim(childSizes[k].x, childSizes[k].y, childSizes[k].width, childSizes[k].height, childSizes[k].order);
-                                dimAlignOffset(parentDim, child, halign, valign, offset.x, offset.y);
-                                childSizes[k] = child;
-                            }
-                        }
-                        default: {
-                            // children without alignment
-                            var x = item.items[k].x ?? 0;
-                            var y = item.items[k].y ?? 0;
-
-                            childSizes[k].x = x + pos.x;
-                            childSizes[k].y = y + pos.y;
-                        }
-                    }
-                }
-            }
-
-            // one loop to check if there are children aligned to other
-            // children that have already been aligned to the parent.
-            for (k => child in childSizes) {
-                var alignTo = item.items[k].alignTo ?? "";
-                // check children aligning to other children
-                if (alignTo != "" && alignTo != "screen") {
-                    var alignment = item.items[k].align ?? None;
-                    var offset = item.items[k].alignOffset ?? new FastVector2();
-                    var alignToDim = childSizes[alignTo];
-                    switch (alignment) {
-                        case DimAlign(valign, halign): {
-                            dimAlignOffset(alignToDim, child, halign, valign, offset.x, offset.y);
-                        }
-                        default: {
-
-                        }
-                    }
-                }
-            }
-        }
-
-        results["parent"] = {
-            type: item.id,
-            dim: parentDim,
-            originalObject: item
-        };
-
-        return results;
     }
+
+    static inline function processDimCommand(dim:Dim, command:DimCommand) {
+        switch (command) {
+            case MeasureText(text, font, fontSize): {
+                var textSize = getTextDim(font, fontSize, text);
+                dim.width += textSize.width;
+                dim.height += textSize.height;
+            }
+            case AddSpacingAround(space): {
+                dim.x += space;
+                dim.y += space;
+                dim.width -= space;
+                dim.height -= space;
+            }
+            case AddSpacing(space, dir): {
+                switch (dir) {
+                    case Down: {
+                        dim.height -= space;
+                    }
+                    case Left: {
+                        dim.x += space;
+                    }
+                    case Right: {
+                        dim.width -= space;
+                    }
+                    case Up: {
+                        dim.y += space;
+                    }
+                }
+            }
+            case Scale(scale): {
+                dimScale(dim, scale, scale);
+            }
+            case ScaleX(scale): {
+                dimScaleX(dim, scale);
+            }
+            case ScaleY(scale): {
+                dimScaleY(dim, scale);
+            }
+            case Shrink(value): {
+                dimShrink(dim, value);
+            }
+            case ShrinkW(value): {
+                dimShrinkW(dim, value);
+            }
+            case ShrinkH(value): {
+                dimShrinkH(dim, value);
+            }
+            case Grow(value): {
+                dimGrow(dim, value);
+            }
+            case GrowW(value): {
+                dimGrowW(dim, value);
+            }
+            case GrowH(value): {
+                dimGrowH(dim, value);
+            }
+            case Align(against, align, offset): {
+                var dimItems = dimCommandStack[dimCommandStack.length - 1];
+                if (against < 0 || against > dimItems.length - 1) {
+                    return;
+                }
+
+                var againstDim = dimItems[against];
+                var isOffset = offset != null;
+
+                
+                switch (align) {
+                    case DimVAlign(valign): {
+                        if (isOffset) {
+                            dimVAlignOffset(againstDim.dim, dim, valign, offset.y);
+                        }
+                        else {
+                            dimVAlign(againstDim.dim, dim, valign);
+                        }
+                    }
+                    case DimHAlign(halign): {
+                        if (isOffset) {
+                            dimHAlignOffset(againstDim.dim, dim, halign, offset.x);
+                        }
+                        else {
+                            dimHAlign(againstDim.dim, dim, halign);
+                        }
+                    }
+                    case DimAlign(valign, halign): {
+                        if (isOffset) {
+                            dimAlignOffset(againstDim.dim, dim, halign, valign, offset.x, offset.y);
+                        }
+                        else {
+                            dimAlign(againstDim.dim, dim, valign, halign);
+                        }
+                    }
+                    default: {
+
+                    }
+                }
+            }
+            case ScreenAlign(align, offset): {
+                switch (align) {
+                    case DimVAlign(valign): {
+                        screenAlignY(dim, valign, offset);
+                    }
+                    case DimHAlign(halign): {
+                        screenAlignX(dim, halign, offset);
+                    }
+                    case DimAlign(valign, halign): {
+                        dim = createDimAlignScreen(dim.width, dim.height, valign, halign, offset.x, offset.y);
+                    }
+                    default: {
+
+                    }
+                }
+            }
+        }
+    }
+
+    static function calculateParentDim(level:Int) {
+        if (level < 1 || level > dimCommandStack.length - 1) {
+            return;
+        }
+
+        var parent = dimCommandStack[level - 1][0];
+        while (level > 0 && parent.autoSize) {
+            for (item in dimCommandStack[level]) {
+                parent.dim.width = Math.max(parent.dim.width, item.dim.x + item.dim.width);
+                parent.dim.height = Math.max(parent.dim.height, item.dim.y + item.dim.height);
+            }
+
+            level -= 1;
+            parent = dimCommandStack[level - 1][0];
+        }
+    }
+
+    
 
     /**
 	 * Create a dimension block from the given width and height, centering in the middle of the screen.
