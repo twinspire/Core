@@ -10,4 +10,5 @@ typedef DimObjectResult = {
     var ?autoSize:Bool;
     var ?clipped:Bool;
     var ?id:Id;
+    var ?textInput:Bool;
 }

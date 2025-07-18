@@ -355,7 +355,16 @@ class Dimensions {
 
     }
 
+    /**
+    * command stack
+    * - first index = the parent of a series of children, effectively the hierarchy
+    * - second index = the children results
+    **/
     static var dimCommandStack:Array<Array<DimObjectResult>>;
+    /**
+    * refers to the child index within a parent of the command stack, i.e.
+    * [length - 1][currentParents[length - 1]] = parent of the current child
+    **/ 
     static var currentParents:Array<Int>;
 
     /**
@@ -579,7 +588,6 @@ class Dimensions {
 
                 var againstDim = dimItems[against];
                 var isOffset = offset != null;
-
                 
                 switch (align) {
                     case DimVAlign(valign): {
@@ -625,6 +633,20 @@ class Dimensions {
                     default: {
 
                     }
+                }
+            }
+            case SpanParentWidth: {
+                if (currentParents.length > 0) {
+                    var parent = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                    dim.x = parent.dim.x;
+                    dim.width = parent.dim.width;
+                }
+            }
+            case SpanParentHeight: {
+                if (currentParents.length > 0) {
+                    var parent = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                    dim.y = parent.dim.y;
+                    dim.height = parent.dim.height;
                 }
             }
         }

@@ -18,6 +18,7 @@ import kha.Image;
 typedef ContainerResult = {
     var dimIndex:DimIndex;
     var containerIndex:Int;
+    var ?reference:Int;
 }
 
 typedef TextInputResult = {
@@ -908,6 +909,50 @@ class GraphicsContext {
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
         return result;
+    }
+
+    /**
+    * Add into the dimension stack a complex structure created from `Dimensions.construct`. To pass in the results
+    * of this data, use `Dimensions.getDimConstructData`. This function implies UI, so uses `addUI` function under the hood.
+    *
+    * This function returns `ComplexResult`, returning the final `DimIndex` values of all the added dimensions, container indices,
+    * text input indices, and more options.
+    **/
+    public function addComplex(data:Array<Array<DimObjectResult>>) {
+        var results = new ComplexResult(this);
+        var complexToAdd = new Array<ComplexAddition>();
+
+        for (i in 0...data.length) {
+            var container = data[i];
+            for (j in 0...container.length) {
+                var child = container[j];
+
+                complexToAdd.push({ index: Direct(-1), parent: i, child: j, requiresContainer: i + 1 < data.length, requiresInput: child.textInput });
+            }
+        }
+
+        var containers = new Array<ContainerResult>();
+        var inputs = new Array<TextInputResult>();
+
+        for (i in complexToAdd.length...0) {
+            var add = complexToAdd[i];
+            
+            if (add.requiresInput && inputs.findIndex((input) -> input.reference == add.parent * add.child + add.child) == -1) {
+                var child = data[add.parent][add.child];
+                var result = addTextInput(child.dim, add.textInputMethod);
+                result.reference = add.parent * add.child + add.child;
+                inputs.push(result);
+            }
+            else if (add.requiresContainer && containers.findIndex((c) -> c.reference == add.parent * add.child + add.child) == -1) {
+                var child = data[add.parent][add.child];
+                var result = addContainer(child.dim, child.id);
+                result.reference = add.parent * add.child + add.child;
+                containers.push(result);
+            }
+            else {
+
+            }
+        }
     }
 
     /**
