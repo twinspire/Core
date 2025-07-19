@@ -1,6 +1,5 @@
 package twinspire;
 
-import twinspire.DimObject;
 import twinspire.Id;
 import twinspire.geom.Dim;
 import twinspire.DimIndex;
