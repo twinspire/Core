@@ -912,6 +912,8 @@ class GraphicsContext {
     }
 
     /**
+    * [TODO] - Do not use this function.
+    *
     * Add into the dimension stack a complex structure created from `Dimensions.construct`. To pass in the results
     * of this data, use `Dimensions.getDimConstructData`. This function implies UI, so uses `addUI` function under the hood.
     *
@@ -919,6 +921,8 @@ class GraphicsContext {
     * text input indices, and more options.
     **/
     public function addComplex(data:Array<Array<DimObjectResult>>) {
+        // not expected to work yet - not tested
+
         var results = new ComplexResult(this);
         var complexToAdd = new Array<ComplexAddition>();
 
@@ -927,7 +931,7 @@ class GraphicsContext {
             for (j in 0...container.length) {
                 var child = container[j];
 
-                complexToAdd.push({ index: Direct(-1), parent: i, child: j, requiresContainer: i + 1 < data.length, requiresInput: child.textInput });
+                complexToAdd.push({ index: Direct(-1), parent: i, child: j, requiresContainer: i + 1 < data.length, requiresInput: child.textInput, textInputMethod: ImSingleLine });
             }
         }
 
@@ -942,17 +946,23 @@ class GraphicsContext {
                 var result = addTextInput(child.dim, add.textInputMethod);
                 result.reference = add.parent * add.child + add.child;
                 inputs.push(result);
+                results.indices.push(result.dimIndex);
             }
             else if (add.requiresContainer && containers.findIndex((c) -> c.reference == add.parent * add.child + add.child) == -1) {
                 var child = data[add.parent][add.child];
                 var result = addContainer(child.dim, child.id);
                 result.reference = add.parent * add.child + add.child;
                 containers.push(result);
+                results.indices.push(result.dimIndex);
             }
             else {
-
+                var child = data[add.parent][add.child];
+                var result = addUI(child.dim, child.id);
+                results.indices.push(result);
             }
         }
+
+        return results;
     }
 
     /**

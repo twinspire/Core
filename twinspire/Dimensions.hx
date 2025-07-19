@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.DimObjectResult.DimObjectOptions;
 import twinspire.Id;
 import twinspire.DimSize;
 import twinspire.geom.Box;
@@ -7,6 +8,7 @@ import twinspire.geom.Dim;
 import twinspire.geom.DimCellSize;
 import twinspire.geom.DimCellSize.DimCellSizing;
 import twinspire.Application;
+using twinspire.extensions.ArrayExtensions;
 
 import kha.graphics2.Graphics;
 import kha.math.FastVector2;
@@ -84,19 +86,19 @@ enum DimFlow {
 }
 
 enum DimInitCommand {
-    CreateEmpty(then:Array<DimCommand>, ?id:Id);
-    CreateOnInit(dim:Dim, init:DimInitCommand, ?id:Id);
-    CentreScreenY(width:Float, height:Float, offsetY:Float, inside:Array<DimInitCommand>, ?id:Id);
-    CentreScreenX(width:Float, height:Float, offsetX:Float, inside:Array<DimInitCommand>, ?id:Id);
-    CentreScreenFromSize(width:Float, height:Float, inside:Array<DimInitCommand>, ?id:Id);
-    CreateDimAlignScreen(width:Float, height:Float, align:DimAlignment, offset:FastVector2, inside:Array<DimInitCommand>, ?id:Id);
-    CreateFromOffset(offset:FastVector2, inside:Array<DimInitCommand>, ?id:Id);
-    CreateGridEquals(columns:Int, rows:Int, items:Array<DimInitCommand>, ?id:Id);
-    CreateGridFloats(columns:Array<Float>, rows:Array<Float>, items:Array<DimInitCommand>, ?id:Id);
-    CreateGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>, items:Array<DimInitCommand>, ?id:Id);
-    CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>, ?id:Id);
-    CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>, ?id:Id);
-    CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>, ?id:Id);
+    CreateEmpty(then:Array<DimCommand>, ?ident:String, ?id:Id);
+    CreateOnInit(dim:Dim, init:DimInitCommand, ?ident:String, ?id:Id);
+    CentreScreenY(width:Float, height:Float, offsetY:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CentreScreenX(width:Float, height:Float, offsetX:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CentreScreenFromSize(width:Float, height:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateDimAlignScreen(width:Float, height:Float, align:DimAlignment, offset:FastVector2, inside:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateFromOffset(offset:FastVector2, inside:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateGridEquals(columns:Int, rows:Int, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateGridFloats(columns:Array<Float>, rows:Array<Float>, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
 }
 
 enum DimCommand {
@@ -370,78 +372,78 @@ class Dimensions {
     /**
     * 
     **/
-    public static function construct(command:DimInitCommand, level:Int = 0) {
+    public static function construct(command:DimInitCommand, level:Int = 0, ?options:DimObjectOptions) {
         if (dimCommandStack == null) {
             dimCommandStack = [];
             currentParents = [];
         }
 
         switch (command) {
-            case CreateEmpty(then, id): {
+            case CreateEmpty(then, ident, id): {
                 var dim = new Dim(0, 0, 0, 0);
                 if (level >= dimCommandStack.length - 1) {
-                    dimCommandStack.push([ { dim: dim, autoSize: true, clipped: false, id: id } ]);
                     currentParents.push(0);
+                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ dim: dim, autoSize: true, clipped: false, id: id });
-                    currentParents.push(dimCommandStack[level].length - 1);
+                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 calculateDimFromCommands(then);
             }
-            case CreateOnInit(dim, init, id): {
-                dimCommandStack.push([ { dim: dim, autoSize: false, clipped: false, id: id } ]);
+            case CreateOnInit(dim, init, ident, id): {
                 currentParents.push(0);
+                dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
 
                 construct(init, dimCommandStack.length - 1);
             }
-            case CentreScreenY(width, height, offsetY, inside, id): {
+            case CentreScreenY(width, height, offsetY, inside, ident, id): {
                 var wrapper = centreScreenY(width, height, offsetY);
                 if (level >= dimCommandStack.length - 1) {
-                    dimCommandStack.push([ { dim: wrapper, autoSize: false, clipped: false, id: id } ]);
                     currentParents.push(0);
+                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ dim: wrapper, autoSize: false, clipped: false, id: id });
-                    currentParents.push(dimCommandStack[level].length - 1);
+                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
                     construct(o, level + 1);
                 }
             }
-            case CentreScreenX(width, height, offsetX, inside, id): {
+            case CentreScreenX(width, height, offsetX, inside, ident, id): {
                 var wrapper = centreScreenX(width, height, offsetX);
                 if (level >= dimCommandStack.length - 1) {
-                    dimCommandStack.push([ { dim: wrapper, autoSize: false, clipped: false, id: id } ]);
                     currentParents.push(0);
+                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ dim: wrapper, autoSize: false, clipped: false, id: id });
-                    currentParents.push(dimCommandStack[level].length - 1);
+                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
                     construct(o, level + 1);
                 }
             }
-            case CentreScreenFromSize(width, height, inside, id): {
+            case CentreScreenFromSize(width, height, inside, ident, id): {
                 var wrapper = centreScreenFromSize(width, height);
                 if (level >= dimCommandStack.length - 1) {
-                    dimCommandStack.push([ { dim: wrapper, autoSize: false, clipped: false, id: id } ]);
                     currentParents.push(0);
+                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ dim: wrapper, autoSize: false, clipped: false, id: id });
-                    currentParents.push(dimCommandStack[level].length - 1);
+                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
                     construct(o, level + 1);
                 }
             }
-            case CreateDimAlignScreen(width, height, align, offset, inside, id): {
+            case CreateDimAlignScreen(width, height, align, offset, inside, ident, id): {
                 var wrapper:Dim = null;
                 switch (align) {
                     case None: {
@@ -449,11 +451,11 @@ class Dimensions {
                     }
                     case DimVAlign(valign): {
                         wrapper = new Dim(0, 0, width, height);
-                        wrapper = screenAlignY(wrapper, valign, offset);
+                        screenAlignY(wrapper, valign, offset);
                     }
                     case DimHAlign(halign): {
                         wrapper = new Dim(0, 0, width, height);
-                        wrapper = screenAlignX(wrapper, halign, offset);
+                        screenAlignX(wrapper, halign, offset);
                     }
                     case DimAlign(valign, halign): {
                         wrapper = createDimAlignScreen(width, height, valign, halign, offset.x, offset.y);
@@ -461,30 +463,30 @@ class Dimensions {
                 }
 
                 if (level >= dimCommandStack.length - 1) {
-                    dimCommandStack.push([ { dim: wrapper, autoSize: false, clipped: false, id: id } ]);
                     currentParents.push(0);
+                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ dim: wrapper, autoSize: false, clipped: false, id: id });
-                    currentParents.push(dimCommandStack[level].length - 1);
+                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
                     construct(o, level + 1);
                 }
             }
-            case CreateFromOffset(offset, inside, id): {
+            case CreateFromOffset(offset, inside, ident, id): {
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
 
                 var wrapper = createFromOffset(lastItem.dim, offset);
-                dimCommandStack[dimCommandStack.length - 1].push({ dim: wrapper, autoSize: false, clipped: false, id: id });
+                dimCommandStack[dimCommandStack.length - 1].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                 currentParents[dimCommandStack.length - 1] += 1;
                 
                 for (o in inside) {
                     construct(o, level + 1);
                 }
             }
-            case CreateGridEquals(columns, rows, items, id): {
+            case CreateGridEquals(columns, rows, items, ident, id): {
                 // var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
 
                 // var gridCells = dimGridEquals(lastItem.dim, columns, rows);
@@ -506,11 +508,83 @@ class Dimensions {
         
     }
 
-    public static function getDimConstructData() {
-        var temp = dimCommandStack.copy();
-        dimCommandStack = [];
-        currentParents = [];
-        return temp;
+    static var _lookupParent:Int;
+    static var _lookupChild:Int;
+
+    /**
+    * Begin collecting dim object results by resetting the lookup position to zero.
+    **/
+    public static function begin() {
+        _lookupParent = 0;
+        _lookupChild = 0;
+    }
+
+    /**
+    * Advance the position to the next dim object result.
+    *
+    * @return Returns `false` if there is no more to advance.
+    **/
+    public static function next() {
+        if (dimCommandStack.length == 0) {
+            return false;
+        }
+
+        if (dimCommandStack[_lookupParent].length > 0 && _lookupChild + 1 < dimCommandStack[_lookupParent].length) {
+            _lookupChild += 1;
+            return true;
+        }
+        else {
+            if (_lookupParent + 1 >= dimCommandStack[_lookupParent].length) {
+                _lookupParent = 0;
+                _lookupChild = 0;
+                return false;
+            }
+            else {
+                _lookupParent += 1;
+                _lookupChild = 0;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+    * Gets the current lookup item.
+    **/
+    public static function getLookupItem() {
+        return dimCommandStack[_lookupParent][_lookupChild];
+    }
+
+    public static function findItemByName(name:String) {
+        var splitted = name.split("/");
+        var indexFinds = new Array<Int>();
+        var found = true;
+        for (i in 0...splitted.length) {
+            var name = splitted[i];
+            var value = dimCommandStack[i].findIndex((dc) -> {
+                if (indexFinds.length > 0) {
+                    return dc.ident == name && indexFinds[indexFinds.length - 1] == dc.parentIndex;
+                }
+                else {
+                    return dc.ident == name;
+                }
+            });
+
+            if (value > -1) {
+                indexFinds.push(value);
+            }
+            else {
+                found = false;
+                break;
+            }
+        }
+
+        if (found) {
+            
+        }
+
+        return null;
     }
 
     static function calculateDimFromCommands(commands:Array<DimCommand>, ?level:Int) {
@@ -581,37 +655,37 @@ class Dimensions {
                 dimGrowH(dim, value);
             }
             case Align(against, align, offset): {
-                var dimItems = dimCommandStack[dimCommandStack.length - 1];
-                if (against < 0 || against > dimItems.length - 1) {
+                var dimItems = dimCommandStack[currentParents[currentParents.length - 1]];
+                if (against > dimItems.length - 1) {
                     return;
                 }
 
-                var againstDim = dimItems[against];
+                var againstDim:Dim = getParentDim();
                 var isOffset = offset != null;
                 
                 switch (align) {
                     case DimVAlign(valign): {
                         if (isOffset) {
-                            dimVAlignOffset(againstDim.dim, dim, valign, offset.y);
+                            dimVAlignOffset(againstDim, dim, valign, offset.y);
                         }
                         else {
-                            dimVAlign(againstDim.dim, dim, valign);
+                            dimVAlign(againstDim, dim, valign);
                         }
                     }
                     case DimHAlign(halign): {
                         if (isOffset) {
-                            dimHAlignOffset(againstDim.dim, dim, halign, offset.x);
+                            dimHAlignOffset(againstDim, dim, halign, offset.x);
                         }
                         else {
-                            dimHAlign(againstDim.dim, dim, halign);
+                            dimHAlign(againstDim, dim, halign);
                         }
                     }
                     case DimAlign(valign, halign): {
                         if (isOffset) {
-                            dimAlignOffset(againstDim.dim, dim, halign, valign, offset.x, offset.y);
+                            dimAlignOffset(againstDim, dim, halign, valign, offset.x, offset.y);
                         }
                         else {
-                            dimAlign(againstDim.dim, dim, valign, halign);
+                            dimAlign(againstDim, dim, valign, halign);
                         }
                     }
                     default: {
@@ -671,6 +745,28 @@ class Dimensions {
 
             parent = dimCommandStack[level - 1][currentParents[level - 1]];
         }
+    }
+
+    static function getParentDim() {
+        var parent = getParent();
+        return parent?.dim;
+    }
+
+    static function getParent() {
+        if (currentParents.length > 1) {
+            return dimCommandStack[dimCommandStack.length - 2][currentParents[currentParents.length - 2]];
+        }
+        else {
+            return null;
+        }
+    }
+
+    static function getParentIndex() {
+        if (currentParents.length > 1) {
+            return currentParents[currentParents.length - 2];
+        }
+
+        return -1;
     }
 
     
