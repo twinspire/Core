@@ -373,6 +373,10 @@ class Dimensions {
     * 
     **/
     public static function construct(command:DimInitCommand, level:Int = 0, ?options:DimObjectOptions) {
+        if (options == null) {
+            options = {};
+        }
+
         if (dimCommandStack == null) {
             dimCommandStack = [];
             currentParents = [];
@@ -560,31 +564,44 @@ class Dimensions {
         var splitted = name.split("/");
         var indexFinds = new Array<Int>();
         var found = true;
+        var currentParentIndex = -1;
+        var currentParent:DimObjectResult = null;
         for (i in 0...splitted.length) {
             var name = splitted[i];
-            var value = dimCommandStack[i].findIndex((dc) -> {
-                if (indexFinds.length > 0) {
-                    return dc.ident == name && indexFinds[indexFinds.length - 1] == dc.parentIndex;
-                }
-                else {
-                    return dc.ident == name;
-                }
-            });
-
-            if (value > -1) {
-                indexFinds.push(value);
+            var index = getChildIndexFromParent(name, i, currentParentIndex);
+            if (index > -1) {
+                currentParent = dimCommandStack[i][index];
+                currentParentIndex = index;
             }
-            else {
+
+            if (currentParentIndex == -1) {
                 found = false;
                 break;
             }
-        }
 
-        if (found) {
-            
+            if (i == splitted.length - 1) {
+                return currentParent;
+            }
         }
 
         return null;
+    }
+
+    static function childExists(name:String, level:Int) {
+        if (level < 0 || level > dimCommandStack.length - 1) {
+            return false;
+        }
+
+        return dimCommandStack[level].findIndex((dc) -> dc.ident == name) > -1;
+    }
+
+    static function getChildIndexFromParent(name:String, level:Int, parent:Int) {
+        var result = childExists(name, level);
+        if (result) {
+            return dimCommandStack[level].findIndex((dc) -> dc.parentIndex == parent);
+        }
+
+        return -1;
     }
 
     static function calculateDimFromCommands(commands:Array<DimCommand>, ?level:Int) {
@@ -598,7 +615,7 @@ class Dimensions {
         }
     }
 
-    static inline function processDimCommand(dim:Dim, command:DimCommand) {
+    static function processDimCommand(dim:Dim, command:DimCommand) {
         switch (command) {
             case MeasureText(text, font, fontSize): {
                 var textSize = getTextDim(font, fontSize, text);
@@ -710,18 +727,14 @@ class Dimensions {
                 }
             }
             case SpanParentWidth: {
-                if (currentParents.length > 0) {
-                    var parent = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
-                    dim.x = parent.dim.x;
-                    dim.width = parent.dim.width;
-                }
+                var parent = getParentDim();
+                dim.x = parent?.x;
+                dim.width = parent?.width;
             }
             case SpanParentHeight: {
-                if (currentParents.length > 0) {
-                    var parent = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
-                    dim.y = parent.dim.y;
-                    dim.height = parent.dim.height;
-                }
+                var parent = getParentDim();
+                dim.y = parent.y;
+                dim.height = parent.height;
             }
         }
     }
@@ -776,8 +789,7 @@ class Dimensions {
 	 * @param width The width of the object to centre.
 	 * @param height The height of the object to centre.
 	 */
-	public static function centreScreenFromSize(width:Float, height:Float)
-    {
+	public static function centreScreenFromSize(width:Float, height:Float) {
         var x = (System.windowWidth() - width) / 2;
         var y = (System.windowHeight() - height) / 2;
         return new Dim(x, y, width, height);
@@ -789,8 +801,7 @@ class Dimensions {
      * @param height The height of the object.
      * @param offsetY The offset from the top of the screen.
      */
-    public static function centreScreenY(width:Float, height:Float, offsetY:Float)
-    {
+    public static function centreScreenY(width:Float, height:Float, offsetY:Float) {
         var x = (System.windowWidth() - width) / 2;
         return new Dim(x, offsetY, width, height);
     }
@@ -801,8 +812,7 @@ class Dimensions {
      * @param height The height of the object.
      * @param offsetX The offset from the left of the screen.
      */
-    public static function centreScreenX(width:Float, height:Float, offsetX:Float)
-    {
+    public static function centreScreenX(width:Float, height:Float, offsetX:Float) {
         var y = (System.windowHeight() - height) / 2;
         return new Dim(offsetX, y, width, height);
     }
@@ -814,8 +824,7 @@ class Dimensions {
      * @param offsetX 
      * @param offsetY 
      */
-    public static function createDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offsetX:Float, offsetY:Float)
-    {
+    public static function createDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offsetX:Float, offsetY:Float) {
         var x = 0.0;
         var y = 0.0;
         if (valign == VALIGN_TOP)
@@ -867,8 +876,7 @@ class Dimensions {
      * @param height The height of the object.
      * @param offsetY The offset from the top of the screen.
      */
-    public static function centreBufferY(width:Float, height:Float, offsetY:Float)
-    {
+    public static function centreBufferY(width:Float, height:Float, offsetY:Float) {
         var x = (Application.getBufferSize().x - width) / 2;
         return new Dim(x, offsetY, width, height);
     }
@@ -879,8 +887,7 @@ class Dimensions {
      * @param halign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    public static inline function screenAlignX(a:Dim, halign:Int, offset:FastVector2)
-    {
+    public static inline function screenAlignX(a:Dim, halign:Int, offset:FastVector2) {
         if (halign == HALIGN_LEFT)
         {
             a.x = offset.x;
@@ -904,8 +911,7 @@ class Dimensions {
      * @param valign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    public static inline function screenAlignY(a:Dim, valign:Int, offset:FastVector2)
-    {
+    public static inline function screenAlignY(a:Dim, valign:Int, offset:FastVector2) {
         if (valign == VALIGN_TOP)
         {
             a.x = offset.x;
@@ -928,8 +934,7 @@ class Dimensions {
      * @param halign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    public static inline function bufferAlignX(a:Dim, halign:Int, offset:FastVector2)
-    {
+    public static inline function bufferAlignX(a:Dim, halign:Int, offset:FastVector2) {
         if (halign == HALIGN_LEFT)
         {
             a.x = offset.x;
@@ -953,8 +958,7 @@ class Dimensions {
      * @param valign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    public static inline function bufferAlignY(a:Dim, valign:Int, offset:FastVector2)
-    {
+    public static inline function bufferAlignY(a:Dim, valign:Int, offset:FastVector2) {
         if (valign == VALIGN_TOP)
         {
             a.x = offset.x;
@@ -978,8 +982,7 @@ class Dimensions {
      * @param columns The number of equally sized columns.
      * @param rows The number of equally sized rows.
      */
-    public static function dimGridEquals(container:Dim, columns:Int, rows:Int):Array<Dim>
-    {
+    public static function dimGridEquals(container:Dim, columns:Int, rows:Int):Array<Dim> {
         var cellWidth = container.width / columns;
         var cellHeight = container.height / rows;
         var results = [];
@@ -1001,8 +1004,7 @@ class Dimensions {
      * @param columns An array representing the ratios for the columns in the grid.
      * @param rows An array representing the ratios for the rows in the grid.
      */
-    public static function dimGridFloats(container:Dim, columns:Array<Float>, rows:Array<Float>):Array<Dim>
-    {
+    public static function dimGridFloats(container:Dim, columns:Array<Float>, rows:Array<Float>):Array<Dim> {
         var results = [];
         var startY = 0.0;
         for (r in 0...rows.length)
@@ -1030,8 +1032,7 @@ class Dimensions {
      * @param columns An array of column sizes.
      * @param rows An array of row sizes.
      */
-    public static function dimGrid(container:Dim, columns:Array<DimCellSize>, rows:Array<DimCellSize>):Array<Dim>
-    {
+    public static function dimGrid(container:Dim, columns:Array<DimCellSize>, rows:Array<DimCellSize>):Array<Dim> {
         var totalPreciseWidth = 0.0;
         var totalPreciseHeight = 0.0;
         for (c in columns)
@@ -1113,8 +1114,7 @@ class Dimensions {
         return results;
     }
 
-    public static function dimMultiCellSize(cellSize:DimCellSize, count:Int):Array<DimCellSize>
-    {
+    public static function dimMultiCellSize(cellSize:DimCellSize, count:Int):Array<DimCellSize> {
         var results = [];
         for (i in 0...count)
             results.push({ value: cellSize.value, sizing: cellSize.sizing });
@@ -1134,8 +1134,7 @@ class Dimensions {
      * @param size The dim of each cell.
      * @param direction 1 for up, 2 for down, 3 for left, 4 for right
      */
-    public static function dimFixedFlow(container:Dim, size:Dim, direction:Int)
-    {
+    public static function dimFixedFlow(container:Dim, size:Dim, direction:Int) {
         containerColumnOrRow = container;
         containerCellSize = size;
         containerDirection = direction;
@@ -1149,8 +1148,7 @@ class Dimensions {
      * @param height The height of each row.
      * @param direction 1 for up, 2 for down, 3 for left, 4 for right
      */
-    public static function dimVariableFlow(container:Dim, direction:Int)
-    {
+    public static function dimVariableFlow(container:Dim, direction:Int) {
         containerColumnOrRow = container;
         containerDirection = direction;
         containerMethod = FLOW_VARIABLE;
@@ -1158,14 +1156,12 @@ class Dimensions {
         containerCell = 0;
     }
 
-    public static function dimVariableSetNextDim(dim:Dim)
-    {
+    public static function dimVariableSetNextDim(dim:Dim) {
         if (containerMethod == FLOW_VARIABLE)
             containerCellSize = dim.clone();
     }
 
-    public static function getNewDim(padding:Float = 0)
-    {
+    public static function getNewDim(padding:Float = 0) {
         if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize != null)
         {
             var x = containerColumnOrRow.getX();
@@ -1222,8 +1218,7 @@ class Dimensions {
      * @param height The height of the object.
      * @param offsetX The offset from the top of the screen.
      */
-    public static function centreBufferX(width:Float, height:Float, offsetX:Float)
-    {
+    public static function centreBufferX(width:Float, height:Float, offsetX:Float) {
         var y = (Application.getBufferSize().y - height) / 2;
         return new Dim(offsetX, y, width, height);
     }
@@ -1235,8 +1230,7 @@ class Dimensions {
      * @param a The current dimension to use.
      * @param offsetX The value to offset the new dimension.
      */
-    public static function dimOffsetX(a:Dim, offsetX:Float)
-    {
+    public static function dimOffsetX(a:Dim, offsetX:Float) {
         if (offsetX >= 0)
             return new Dim(a.x + a.width + offsetX, a.y, a.width, a.height);
         else if (offsetX < 0)
@@ -1252,8 +1246,7 @@ class Dimensions {
      * @param a The current dimension to use.
      * @param offsetY The value to offset the new dimension.
      */
-    public static function dimOffsetY(a:Dim, offsetY:Float)
-    {
+    public static function dimOffsetY(a:Dim, offsetY:Float) {
         if (offsetY >= 0)
             return new Dim(a.x, a.y + a.height + offsetY, a.width, a.height);
         else if (offsetY < 0)
@@ -1269,8 +1262,7 @@ class Dimensions {
      * @param valign The vertical alignment `b` should be to `a`.
      * @param halign The horizontal alignment `b` should be to `a`.
      */
-    public static inline function dimAlign(a:Dim, b:Dim, valign:Int, halign:Int)
-    {
+    public static inline function dimAlign(a:Dim, b:Dim, valign:Int, halign:Int) {
         dimVAlign(a, b, valign);
         dimHAlign(a, b, halign);
     }
@@ -1281,8 +1273,7 @@ class Dimensions {
      * @param b The second dimension.
      * @param valign The vertical alignment `b` should be to `a`.
      */
-    public static inline function dimVAlign(a:Dim, b:Dim, valign:Int)
-    {
+    public static inline function dimVAlign(a:Dim, b:Dim, valign:Int) {
         if (valign == VALIGN_TOP)
         {
             b.y = a.y;
@@ -1303,8 +1294,7 @@ class Dimensions {
      * @param b The second dimension.
      * @param valign The horizontal alignment `b` should be to `a`.
      */
-    public static inline function dimHAlign(a:Dim, b:Dim, halign:Int)
-    {
+    public static inline function dimHAlign(a:Dim, b:Dim, halign:Int) {
         if (halign == HALIGN_LEFT)
         {
             b.x = a.x;
@@ -1319,14 +1309,12 @@ class Dimensions {
         }
     }
 
-    public static inline function dimAlignOffset(a:Dim, b:Dim, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0)
-    {
+    public static inline function dimAlignOffset(a:Dim, b:Dim, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0) {
         dimVAlignOffset(a, b, valign, voffset);
         dimHAlignOffset(a, b, halign, hoffset);
     }
 
-    public static inline function dimVAlignOffset(a:Dim, b:Dim, valign:Int, offset:Float = 0.0)
-    {
+    public static inline function dimVAlignOffset(a:Dim, b:Dim, valign:Int, offset:Float = 0.0) {
         if (valign == VALIGN_TOP)
         {
             b.y = a.y - b.height - offset;
@@ -1341,8 +1329,7 @@ class Dimensions {
         }
     }
 
-    public static inline function dimHAlignOffset(a:Dim, b:Dim, halign:Int, offset:Float = 0.0)
-    {
+    public static inline function dimHAlignOffset(a:Dim, b:Dim, halign:Int, offset:Float = 0.0) {
         if (halign == HALIGN_LEFT)
         {
             b.x = a.x - b.width - offset;
@@ -1363,13 +1350,15 @@ class Dimensions {
      * @param scaleX How much to scale, as a percentage (0-1), along the X-Axis.
      * @param scaleY How much to scale, as a percentage (0-1), along the Y-Axis.
      */
-    public static function dimScale(a:Dim, scaleX:Float, scaleY:Float)
-    {
+    public static inline function dimScale(a:Dim, scaleX:Float, scaleY:Float) {
         var ratioWidth = a.width * scaleX;
         var ratioX = a.x + ((a.width - ratioWidth) / 2);
         var ratioHeight = a.height * scaleY;
         var ratioY = a.y + ((a.height - ratioHeight) / 2);
-        return new Dim(ratioX, ratioY, ratioWidth, ratioHeight);
+        a.x = ratioX;
+        a.y = ratioY;
+        a.width = ratioWidth;
+        a.height = ratioHeight;
     }
 
     /**
@@ -1377,11 +1366,11 @@ class Dimensions {
      * @param a The dimension to scale.
      * @param scaleX How much to scale, as a percentage (0-1), along the X-Axis.
      */
-    public static function dimScaleX(a:Dim, scaleX:Float)
-    {
+    public static inline function dimScaleX(a:Dim, scaleX:Float) {
         var ratioWidth = a.width * scaleX;
         var ratioX = a.x + ((a.width - ratioWidth) / 2);
-        return new Dim(ratioX, a.y, ratioWidth, a.height);
+        a.x = ratioX;
+        a.width = ratioWidth;
     }
 
     /**
@@ -1389,53 +1378,55 @@ class Dimensions {
      * @param a The dimension to scale.
      * @param scaleY How much to scale, as a percentage (0-1), along the Y-Axis.
      */
-    public static function dimScaleY(a:Dim, scaleY:Float)
-    {
+    public static inline function dimScaleY(a:Dim, scaleY:Float) {
         var ratioHeight = a.height * scaleY;
         var ratioY = a.y + ((a.height - ratioHeight) / 2);
-        return new Dim(a.x, ratioY, a.width, ratioHeight);
+        a.y = ratioY;
+        a.height = ratioHeight;
     }
 
     /**
     * Shrink the given dimension by an `amount` in pixels.
     **/
-    public static function dimShrink(a:Dim, amount:Float) {
-        return new Dim(a.x + amount / 2, a.y + amount / 2, a.width - amount, a.height - amount);
+    public static inline function dimShrink(a:Dim, amount:Float) {
+        a.width = a.width - amount;
+        a.height = a.height - amount;
     }
 
     /**
     * Shrink the width of a given dimension by an `amount` in pixels.
     **/
-    public static function dimShrinkW(a:Dim, amount:Float) {
-        return new Dim(a.x + amount / 2, a.y, a.width - amount, a.height);
+    public static inline function dimShrinkW(a:Dim, amount:Float) {
+        a.width = a.width - amount;
     }
 
     /**
     * Shrink the height of a given dimension by an `amount` in pixels.
     **/
-    public static function dimShrinkH(a:Dim, amount:Float) {
-        return new Dim(a.x, a.y + amount / 2, a.width, a.height - amount);
+    public static inline function dimShrinkH(a:Dim, amount:Float) {
+        a.height = a.height - amount;
     }
 
     /**
     * Grow the given dimension by an `amount` in pixels.
     **/
-    public static function dimGrow(a:Dim, amount:Float) {
-        return new Dim(a.x - amount / 2, a.y - amount / 2, a.width + amount, a.height + amount);
+    public static inline function dimGrow(a:Dim, amount:Float) {
+        a.width = a.width + amount;
+        a.height = a.height + amount;
     }
 
     /**
     * Grow the width of a given dimension by an `amount` in pixels.
     **/
-    public static function dimGrowW(a:Dim, amount:Float) {
-        return new Dim(a.x - amount / 2, a.y, a.width + amount, a.height);
+    public static inline function dimGrowW(a:Dim, amount:Float) {
+        a.width = a.width + amount;
     }
 
     /**
     * Grow the height of a given dimension by an `amount` in pixels.
     **/
-    public static function dimGrowH(a:Dim, amount:Float) {
-        return new Dim(a.x, a.y - amount / 2, a.width, a.height + amount);
+    public static inline function dimGrowH(a:Dim, amount:Float) {
+        a.height = a.height + amount;
     }
 
     /**
