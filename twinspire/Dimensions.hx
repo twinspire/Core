@@ -370,7 +370,25 @@ class Dimensions {
     static var currentParents:Array<Int>;
 
     /**
-    * 
+    * Reset the current hierarchy and clear all data.
+    **/
+    public static function resetConstruct() {
+        dimCommandStack = [];
+        currentParents = [];
+    }
+
+    /**
+    * Create a hierarchy of dimensions from a single `DimInitCommand`, in which its children
+    * represent a structured group of dimensions. This is particularly useful for creating
+    * reusable components for complex interfaces.
+    *
+    * `construct` on its own just initialises a structure. To use the results of this function, `addComplex` 
+    * of the `GraphicsContext` takes the constructed hierarchy and adds dimensions into the dimension stack.
+    *
+    * @param command The `DimInitCommand` representing the wrapping interface to contain all sub-dimensions
+    * and interfaces.
+    * @param level The level (or parent index) within the dimension hierarchy to begin adding dimensions to.
+    * @param options (Optional) Add options specifying additional parameters for this command. 
     **/
     public static function construct(command:DimInitCommand, level:Int = 0, ?options:DimObjectOptions) {
         if (options == null) {
@@ -560,6 +578,14 @@ class Dimensions {
         return dimCommandStack[_lookupParent][_lookupChild];
     }
 
+    /**
+    * Finds an item by a given name. To lookup items in the hierarchy, use `/` to separate
+    * each level within the hierarchy.
+    *
+    * @param name The name or path of an item to find in the constructed hierarchy.
+    *
+    * @return A `DimObjectResult` of the found item. `null` otherwise.
+    **/
     public static function findItemByName(name:String) {
         var splitted = name.split("/");
         var indexFinds = new Array<Int>();
@@ -585,6 +611,36 @@ class Dimensions {
         }
 
         return null;
+    }
+
+    /**
+    * Gets a collection of items where the given name contains children
+    * within the dimension hierarchy.
+    *
+    * @param name The name or path of an item to find in the constructed hierarchy.
+    *
+    * @return An `Array<DimObjectResult>` or `null`.
+    **/
+    public static function findItemsByParentName(name:String) {
+        var item = findItemByName(name);
+        if (item != null) {
+            return dimCommandStack[item.parentIndex];
+        }
+
+        return null;
+    }
+
+    /**
+    * Find an item by name within a collection of items from the given `parentIndex`.
+    *
+    * @param parentIndex The parent index to search.
+    * @param name The name or path to find.
+    *
+    * @return The `DimObjectResult` or `null`.
+    **/
+    public static function findInItemsByName(parentIndex:Int, name:String) {
+        var item = dimCommandStack[parentIndex].find((fc) -> fc.ident == name);
+        return item;
     }
 
     static function childExists(name:String, level:Int) {

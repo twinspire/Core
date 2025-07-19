@@ -912,54 +912,51 @@ class GraphicsContext {
     }
 
     /**
-    * [TODO] - Do not use this function.
-    *
-    * Add into the dimension stack a complex structure created from `Dimensions.construct`. To pass in the results
-    * of this data, use `Dimensions.getDimConstructData`. This function implies UI, so uses `addUI` function under the hood.
+    * Add into the dimension stack a complex structure created from `Dimensions.construct`.
+    * This function implies UI, so uses `addUI` function under the hood.
     *
     * This function returns `ComplexResult`, returning the final `DimIndex` values of all the added dimensions, container indices,
     * text input indices, and more options.
     **/
-    public function addComplex(data:Array<Array<DimObjectResult>>) {
-        // not expected to work yet - not tested
-
+    public function addComplex() {
         var results = new ComplexResult(this);
-        var complexToAdd = new Array<ComplexAddition>();
+        
+        var currentContainer:ContainerResult = null;
 
-        for (i in 0...data.length) {
-            var container = data[i];
-            for (j in 0...container.length) {
-                var child = container[j];
-
-                complexToAdd.push({ index: Direct(-1), parent: i, child: j, requiresContainer: i + 1 < data.length, requiresInput: child.textInput, textInputMethod: ImSingleLine });
+        Dimensions.begin();
+        var next = true;
+        while (next) {
+            var item = Dimensions.getLookupItem();
+            var resultIndex:DimIndex = Direct(-1);
+            if (item.textInput) {
+                var textInputResult = addTextInput(item.dim, ImSingleLine);
+                resultIndex = textInputResult.dimIndex;
+                results.textInputIndices.push(textInputResult.textInputIndex);
+                results.containerIndices.push(textInputResult.containerIndex);
+                results.indices.push(textInputResult.dimIndex);
             }
-        }
-
-        var containers = new Array<ContainerResult>();
-        var inputs = new Array<TextInputResult>();
-
-        for (i in complexToAdd.length...0) {
-            var add = complexToAdd[i];
-            
-            if (add.requiresInput && inputs.findIndex((input) -> input.reference == add.parent * add.child + add.child) == -1) {
-                var child = data[add.parent][add.child];
-                var result = addTextInput(child.dim, add.textInputMethod);
-                result.reference = add.parent * add.child + add.child;
-                inputs.push(result);
-                results.indices.push(result.dimIndex);
-            }
-            else if (add.requiresContainer && containers.findIndex((c) -> c.reference == add.parent * add.child + add.child) == -1) {
-                var child = data[add.parent][add.child];
-                var result = addContainer(child.dim, child.id);
-                result.reference = add.parent * add.child + add.child;
-                containers.push(result);
-                results.indices.push(result.dimIndex);
+            else if (item.requestedContainer) {
+                currentContainer = addContainer(item.dim, item.id);
+                resultIndex = currentContainer.dimIndex;
+                results.containerIndices.push(currentContainer.containerIndex);
+                results.indices.push(currentContainer.dimIndex);
             }
             else {
-                var child = data[add.parent][add.child];
-                var result = addUI(child.dim, child.id);
+                var index = -1;
+                if (currentContainer != null) {
+                    index = switch(currentContainer.dimIndex) {
+                        case Direct(i): i;
+                        default: -1;
+                    };
+                }
+                var result = addUI(item.dim, item.id, index);
+                resultIndex = result;
                 results.indices.push(result);
             }
+
+            item.resultIndex = resultIndex;
+
+            next = Dimensions.next();
         }
 
         return results;

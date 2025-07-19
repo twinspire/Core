@@ -13,6 +13,7 @@ typedef DimObjectResult = {
     var ?textInput:Bool;
     var ?requestedContainer:Bool;
     var ?parentIndex:Int;
+    var ?resultIndex:DimIndex;
 }
 
 typedef DimObjectOptions = {
