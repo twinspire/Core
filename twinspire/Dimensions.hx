@@ -1,5 +1,8 @@
 package twinspire;
 
+import twinspire.render.GraphicsContext;
+import twinspire.render.ComplexResult;
+import twinspire.DimObjectResult;
 import twinspire.DimObjectResult.DimObjectOptions;
 import twinspire.Id;
 import twinspire.DimSize;
@@ -7,6 +10,8 @@ import twinspire.geom.Box;
 import twinspire.geom.Dim;
 import twinspire.geom.DimCellSize;
 import twinspire.geom.DimCellSize.DimCellSizing;
+import twinspire.scenes.Scene;
+import twinspire.scenes.SceneObject;
 import twinspire.Application;
 using twinspire.extensions.ArrayExtensions;
 
@@ -99,6 +104,7 @@ enum DimInitCommand {
     CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
     CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
     CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>, ?ident:String, ?id:Id);
+    Reference(id:Id);
 }
 
 enum DimCommand {
@@ -118,6 +124,11 @@ enum DimCommand {
     GrowH(value:Float);
     SpanParentWidth;
     SpanParentHeight;
+}
+
+typedef SceneMap = {
+    var ?stack:Array<Array<DimObjectResult>>;
+    var ?objects:Array<SceneObject>;
 }
 
 class Dimensions {
@@ -401,6 +412,11 @@ class Dimensions {
         }
 
         switch (command) {
+            case Reference(id): {
+                if (mappedObjects.exists(id)) {
+                    construct(mappedObjects[id]);
+                }
+            }
             case CreateEmpty(then, ident, id): {
                 var dim = new Dim(0, 0, 0, 0);
                 if (level >= dimCommandStack.length - 1) {
@@ -526,9 +542,56 @@ class Dimensions {
 
             }
         }
-
-        
     }
+
+    static var mappedScenes:Map<String, SceneMap>;
+    static var mappedObjects:Map<Id, DimInitCommand>;
+
+    public static function setObjectDimInit(id:Id, init:DimInitCommand) {
+        if (mappedObjects == null) {
+            mappedObjects = [];
+        }
+
+        if (!mappedObjects.exists(id)) {
+            mappedObjects[id] = init;
+        }
+    }
+
+    public static function mapToScene(scene:Scene) {
+        if (init == null) {
+            return;
+        }
+
+        mappedScenes[scene.name] = {
+            stack: dimCommandStack.copy()                
+        };
+    }
+
+    public static function initScene(scene:Scene) {
+        if (!mappedScenes.exists(scene.name)) {
+            throw "initScene being used without using mapToScene first.";
+        }
+
+        var stack = mappedScenes[scene.name].stack;
+        var objects = new Array<DimObject>();
+        for (i in 0...stack.length) {
+            for (j in 0...stack[i].length) {
+                var obj = new DimObject();
+                obj.index = stack[i][j].resultIndex;
+                obj.type = stack[i][j].id;
+                obj.targetContainer = stack[i][j].dim;
+                if (mappedObjects.exists(obj.type)) {
+                    obj.initCommand = mappedObjects[obj.type];
+                }
+                obj.dimObjectResult = stack[i][j];
+
+                objects.push(obj);
+            }
+        }
+
+        scene.init(Application.instance.graphicsCtx, objects);
+    }
+
 
     static var _lookupParent:Int;
     static var _lookupChild:Int;
@@ -556,7 +619,7 @@ class Dimensions {
             return true;
         }
         else {
-            if (_lookupParent + 1 >= dimCommandStack[_lookupParent].length) {
+            if (_lookupParent + 1 >= dimCommandStack.length) {
                 _lookupParent = 0;
                 _lookupChild = 0;
                 return false;

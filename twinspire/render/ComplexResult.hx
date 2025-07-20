@@ -12,6 +12,10 @@ class ComplexResult {
 
     public function new(gtx:GraphicsContext) {
         _gtx = gtx;
+
+        indices = [];
+        containerIndices = [];
+        textInputIndices = [];
     }
 
     /**
