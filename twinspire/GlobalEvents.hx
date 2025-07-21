@@ -272,6 +272,10 @@ class GlobalEvents
 		return new Vector2(mouseX, mouseY);
 	}
 
+	function getCurrentMouseButton():Int {
+		return mouseButton;
+	}
+
 	/**
 	 * Get a value determining if the given mouse button has been pressed.
 	 * 

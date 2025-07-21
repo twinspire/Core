@@ -40,6 +40,7 @@ class UpdateContext {
     private var _mouseIsScrolling:Int;
     private var _mouseScrollValue:Int;
     private var _mouseIsReleased:Int;
+    private var _mouseButtons:Buttons;
     private var _keysUp:Array<Int>;
     private var _keysDown:Array<Int>;
     private var _charString:String;
@@ -352,6 +353,7 @@ class UpdateContext {
                 _drag.childIndex = -1;
                 _drag.scrollIndex = -1;
                 _drag.firstMousePosition = new FastVector2(-1, -1);
+                _mouseButtons = BUTTON_NONE;
             }
 
             if (GlobalEvents.isAnyMouseButtonDown()) {
@@ -360,6 +362,7 @@ class UpdateContext {
                 }
                 else {
                     _mouseIsDown = index;
+                    _mouseButtons = GlobalEvents.getCurrentMouseButton();
                 }
             }
 
@@ -512,9 +515,9 @@ class UpdateContext {
     }
 
     /**
-    * Get the currently focused index.
+    * Get the index the mouse is pointing at.
     **/
-    public function getFocusedIndex() {
+    public function getMouseIndex() {
         return _mouseFocusIndexUI;
     }
     
