@@ -421,10 +421,10 @@ class Dimensions {
                 var dim = new Dim(0, 0, 0, 0);
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
+                    dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    dimCommandStack[level].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
@@ -432,7 +432,7 @@ class Dimensions {
             }
             case CreateOnInit(dim, init, ident, id): {
                 currentParents.push(0);
-                dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
+                dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
 
                 construct(init, dimCommandStack.length - 1);
             }
@@ -440,10 +440,10 @@ class Dimensions {
                 var wrapper = centreScreenY(width, height, offsetY);
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
+                    dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    dimCommandStack[level].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
@@ -455,10 +455,10 @@ class Dimensions {
                 var wrapper = centreScreenX(width, height, offsetX);
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
+                    dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    dimCommandStack[level].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
@@ -470,10 +470,10 @@ class Dimensions {
                 var wrapper = centreScreenFromSize(width, height);
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
+                    dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    dimCommandStack[level].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
@@ -502,10 +502,10 @@ class Dimensions {
 
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
+                    dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                    dimCommandStack[level].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
@@ -517,7 +517,7 @@ class Dimensions {
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
 
                 var wrapper = createFromOffset(lastItem.dim, offset);
-                dimCommandStack[dimCommandStack.length - 1].push({ parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
+                dimCommandStack[dimCommandStack.length - 1].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                 currentParents[dimCommandStack.length - 1] += 1;
                 
                 for (o in inside) {
@@ -558,8 +558,8 @@ class Dimensions {
     }
 
     public static function mapToScene(scene:Scene) {
-        if (init == null) {
-            return;
+        if (mappedScenes == null) {
+            mappedScenes = [];
         }
 
         mappedScenes[scene.name] = {
@@ -568,12 +568,16 @@ class Dimensions {
     }
 
     public static function initScene(scene:Scene) {
+        if (mappedObjects == null) {
+            mappedObjects = [];
+        }
+
         if (!mappedScenes.exists(scene.name)) {
             throw "initScene being used without using mapToScene first.";
         }
 
         var stack = mappedScenes[scene.name].stack;
-        var objects = new Array<DimObject>();
+        var objects = new Array<SceneObject>();
         for (i in 0...stack.length) {
             for (j in 0...stack[i].length) {
                 var obj = new DimObject();
@@ -583,12 +587,17 @@ class Dimensions {
                 if (mappedObjects.exists(obj.type)) {
                     obj.initCommand = mappedObjects[obj.type];
                 }
+                else {
+                    obj.initCommand = stack[i][j].originalCommand;
+                }
+
                 obj.dimObjectResult = stack[i][j];
 
                 objects.push(obj);
             }
         }
 
+        mappedScenes[scene.name].objects = objects;
         scene.init(Application.instance.graphicsCtx, objects);
     }
 

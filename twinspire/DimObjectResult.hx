@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.Dimensions.DimInitCommand;
 import twinspire.Id;
 import twinspire.geom.Dim;
 import twinspire.DimIndex;
@@ -14,6 +15,7 @@ typedef DimObjectResult = {
     var ?requestedContainer:Bool;
     var ?parentIndex:Int;
     var ?resultIndex:DimIndex;
+    var ?originalCommand:DimInitCommand;
 }
 
 typedef DimObjectOptions = {
