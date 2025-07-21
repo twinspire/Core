@@ -16,6 +16,7 @@ typedef DimObjectResult = {
     var ?parentIndex:Int;
     var ?resultIndex:DimIndex;
     var ?originalCommand:DimInitCommand;
+    var ?textDim:Dim;
 }
 
 typedef DimObjectOptions = {

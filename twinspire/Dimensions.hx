@@ -414,11 +414,11 @@ class Dimensions {
         switch (command) {
             case Reference(id): {
                 if (mappedObjects.exists(id)) {
-                    construct(mappedObjects[id]);
+                    construct(mappedObjects[id], level);
                 }
             }
             case CreateEmpty(then, ident, id): {
-                var dim = new Dim(0, 0, 0, 0);
+                var dim = new Dim(0, 0, 0, 0, level);
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
@@ -431,6 +431,7 @@ class Dimensions {
                 calculateDimFromCommands(then);
             }
             case CreateOnInit(dim, init, ident, id): {
+                dim.order = level;
                 currentParents.push(0);
                 dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
 
@@ -438,6 +439,7 @@ class Dimensions {
             }
             case CentreScreenY(width, height, offsetY, inside, ident, id): {
                 var wrapper = centreScreenY(width, height, offsetY);
+                wrapper.order = level;
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
@@ -453,6 +455,7 @@ class Dimensions {
             }
             case CentreScreenX(width, height, offsetX, inside, ident, id): {
                 var wrapper = centreScreenX(width, height, offsetX);
+                wrapper.order = level;
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
@@ -468,6 +471,7 @@ class Dimensions {
             }
             case CentreScreenFromSize(width, height, inside, ident, id): {
                 var wrapper = centreScreenFromSize(width, height);
+                wrapper.order = level;
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
@@ -500,6 +504,8 @@ class Dimensions {
                     }
                 }
 
+                wrapper.order = level;
+
                 if (level >= dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false } ]);
@@ -517,6 +523,7 @@ class Dimensions {
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
 
                 var wrapper = createFromOffset(lastItem.dim, offset);
+                wrapper.order = level;
                 dimCommandStack[dimCommandStack.length - 1].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false });
                 currentParents[dimCommandStack.length - 1] += 1;
                 
@@ -545,7 +552,7 @@ class Dimensions {
     }
 
     static var mappedScenes:Map<String, SceneMap>;
-    static var mappedObjects:Map<Id, DimInitCommand>;
+    public static var mappedObjects:Map<Id, DimInitCommand>;
 
     public static function setObjectDimInit(id:Id, init:DimInitCommand) {
         if (mappedObjects == null) {
@@ -735,7 +742,7 @@ class Dimensions {
     static function calculateDimFromCommands(commands:Array<DimCommand>, ?level:Int) {
         var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? dimCommandStack.length - 1]];
         for (command in commands) {
-            processDimCommand(lastItem.dim, command);
+            processDimCommand(lastItem.dim, command, level);
         }
 
         if (dimCommandStack.length - 1 > 0) {
@@ -743,14 +750,25 @@ class Dimensions {
         }
     }
 
-    static function processDimCommand(dim:Dim, command:DimCommand) {
+    static function processDimCommand(dim:Dim, command:DimCommand, ?level:Int) {
+        var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? dimCommandStack.length - 1]];
+
         switch (command) {
             case MeasureText(text, font, fontSize): {
                 var textSize = getTextDim(font, fontSize, text);
+                lastItem.textDim = textSize;
+
                 dim.width += textSize.width;
                 dim.height += textSize.height;
             }
             case AddSpacingAround(space): {
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.x += space;
+                    lastItem.textDim.y += space;
+                    lastItem.textDim.width -= space;
+                    lastItem.textDim.height -= space;
+                }
+
                 dim.x += space;
                 dim.y += space;
                 dim.width -= space;
@@ -759,44 +777,103 @@ class Dimensions {
             case AddSpacing(space, dir): {
                 switch (dir) {
                     case Down: {
+                        if (lastItem.textDim != null) {
+                            lastItem.textDim.height -= space;
+                        }
+                        
                         dim.height -= space;
                     }
                     case Left: {
+                        if (lastItem.textDim != null) {
+                            lastItem.textDim.x += space;
+                        }
+
                         dim.x += space;
                     }
                     case Right: {
+                        if (lastItem.textDim != null) {
+                            lastItem.textDim.width -= space;
+                        }
+
                         dim.width -= space;
                     }
                     case Up: {
+                        if (lastItem.textDim != null) {
+                            lastItem.textDim.y += space;
+                        }
+
                         dim.y += space;
                     }
                 }
             }
             case Scale(scale): {
                 dimScale(dim, scale, scale);
+                if (lastItem.textDim != null) {
+                    dimScale(lastItem.textDim, scale, scale);
+                }
             }
             case ScaleX(scale): {
                 dimScaleX(dim, scale);
+                if (lastItem.textDim != null) {
+                    dimScaleX(lastItem.textDim, scale);
+                }
             }
             case ScaleY(scale): {
                 dimScaleY(dim, scale);
+                if (lastItem.textDim != null) {
+                    dimScaleY(lastItem.textDim, scale);
+                }
             }
             case Shrink(value): {
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.x = dim.x;
+                    lastItem.textDim.y = dim.y;
+                    lastItem.textDim.x -= dim.x + value / 2;   
+                    lastItem.textDim.y -= dim.y + value / 2;
+                }
+
                 dimShrink(dim, value);
             }
             case ShrinkW(value): {
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.x = dim.x;
+                    lastItem.textDim.x -= dim.x + value / 2;   
+                }
+
                 dimShrinkW(dim, value);
             }
             case ShrinkH(value): {
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.y = dim.y;
+                    lastItem.textDim.y -= dim.y + value / 2;
+                }
+
                 dimShrinkH(dim, value);
             }
             case Grow(value): {
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.x = dim.x;
+                    lastItem.textDim.y = dim.y;
+                    lastItem.textDim.x += dim.x + value / 2;   
+                    lastItem.textDim.y += dim.y + value / 2;
+                }
+
                 dimGrow(dim, value);
             }
             case GrowW(value): {
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.x = dim.x;
+                    lastItem.textDim.x += dim.x + value / 2;   
+                }
+
                 dimGrowW(dim, value);
             }
             case GrowH(value): {
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.y = dim.y;
+                    lastItem.textDim.y += dim.y + value / 2;
+                }
+
                 dimGrowH(dim, value);
             }
             case Align(against, align, offset): {
@@ -812,25 +889,43 @@ class Dimensions {
                     case DimVAlign(valign): {
                         if (isOffset) {
                             dimVAlignOffset(againstDim, dim, valign, offset.y);
+                            if (lastItem.textDim != null) {
+                                dimVAlignOffset(againstDim, lastItem.textDim, valign, offset.y);
+                            }
                         }
                         else {
                             dimVAlign(againstDim, dim, valign);
+                            if (lastItem.textDim != null) {
+                                dimVAlign(againstDim, lastItem.textDim, valign);
+                            }
                         }
                     }
                     case DimHAlign(halign): {
                         if (isOffset) {
                             dimHAlignOffset(againstDim, dim, halign, offset.x);
+                            if (lastItem.textDim != null) {
+                                dimHAlignOffset(againstDim, lastItem.textDim, halign, offset.x);
+                            }
                         }
                         else {
                             dimHAlign(againstDim, dim, halign);
+                            if (lastItem.textDim != null) {
+                                dimHAlign(againstDim, lastItem.textDim, halign);
+                            }
                         }
                     }
                     case DimAlign(valign, halign): {
                         if (isOffset) {
                             dimAlignOffset(againstDim, dim, halign, valign, offset.x, offset.y);
+                            if (lastItem.textDim != null) {
+                                dimAlignOffset(againstDim, lastItem.textDim, halign, valign, offset.x, offset.y);
+                            }
                         }
                         else {
                             dimAlign(againstDim, dim, valign, halign);
+                            if (lastItem.textDim != null) {
+                                dimAlign(againstDim, lastItem.textDim, valign, halign);
+                            }
                         }
                     }
                     default: {
