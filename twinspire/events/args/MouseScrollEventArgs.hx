@@ -1,13 +1,12 @@
 package twinspire.events.args;
 
-class KeyEventArgs extends EventArgs {
+class MouseScrollEventArgs extends EventArgs {
     
-    public var keys:Array<Int>;
+    public var delta:Int;
 
     public function new() {
         super();
-
-        keys = [];
+        
     }
 
 }

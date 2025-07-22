@@ -1,21 +1,20 @@
 package twinspire.render;
 
-import twinspire.events.GameEventTimeline;
-import twinspire.events.GameEventTimeNode;
-import kha.System;
-import kha.math.FastVector2;
-import twinspire.Application;
 import twinspire.events.GameEventProcessingType;
 import twinspire.events.GameEventProcessor;
+import twinspire.events.GameEventTimeline;
+import twinspire.events.GameEventTimeNode;
 import twinspire.events.GameEvent;
 import twinspire.events.Buttons;
-import twinspire.GlobalEvents;
+import twinspire.events.EventDispatcher;
 import twinspire.render.GraphicsContext;
 import twinspire.render.RenderQuery;
 import twinspire.render.QueryType;
 import twinspire.render.MouseScrollValue;
 import twinspire.render.ActivityType;
 import twinspire.geom.Dim;
+import twinspire.Application;
+import twinspire.GlobalEvents;
 import twinspire.Dimensions.VerticalAlign;
 import twinspire.Dimensions.HorizontalAlign;
 import twinspire.Dimensions.*;
@@ -23,6 +22,8 @@ using twinspire.extensions.ArrayExtensions;
 using twinspire.utils.ArrayUtils;
 
 import kha.input.KeyCode;
+import kha.math.FastVector2;
+import kha.System;
 
 @:allow(Application)
 class UpdateContext {
@@ -30,6 +31,7 @@ class UpdateContext {
     private var _gctx:GraphicsContext;
     private var _events:Array<GameEvent>;
     private var _eventProcessor:GameEventProcessor;
+    private var _eventDispatcher:EventDispatcher;
 
     // UI stuff
     private var _tempUI:Array<Int>;
@@ -75,6 +77,7 @@ class UpdateContext {
         _gctx = gctx;
         _events = [];
         _eventProcessor = new GameEventProcessor();
+        _eventDispatcher = new EventDispatcher();
         _retainedMouseDown = [];
         _moveToAnimations = [];
 
@@ -559,6 +562,11 @@ class UpdateContext {
             if (parentIndex > -1 && !partOfGroup) {
                 var activity = new Activity();
                 activity.type = ACTIVITY_MOUSE_OVER;
+
+                activity.data.push(GlobalEvents.getMousePosition());
+                var parentDim = _gctx.getClientDimensionsAtIndex(Direct(parentIndex))[0];
+                activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - parentDim.x, GlobalEvents.getMousePosition().y - parentDim.y));
+
                 _gctx.activities[parentIndex].push(activity);
             }
 
@@ -567,6 +575,11 @@ class UpdateContext {
                     if (!allGroup) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_MOUSE_OVER;
+
+                        activity.data.push(GlobalEvents.getMousePosition());
+                        var currentDim = _gctx.getClientDimensionsAtIndex(Direct(actualIndex))[0];
+                        activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                         _gctx.activities[actualIndex].push(activity);
                         return result;
                     }
@@ -574,12 +587,22 @@ class UpdateContext {
                     for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_MOUSE_OVER;
-                        _gctx.activities[child].push(activity);    
+
+                        activity.data.push(GlobalEvents.getMousePosition());
+                        var currentDim = _gctx.getClientDimensionsAtIndex(Direct(child))[0];
+                        activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
+                        _gctx.activities[child].push(activity);
                     }
                 }
                 default: {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_OVER;
+
+                    activity.data.push(GlobalEvents.getMousePosition());
+                    var currentDim = _gctx.getClientDimensionsAtIndex(Direct(actualIndex))[0];
+                    activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                     _gctx.activities[actualIndex].push(activity);
                 }
             }
@@ -627,6 +650,12 @@ class UpdateContext {
             if (parentIndex > -1 && !partOfGroup) {
                 var activity = new Activity();
                 activity.type = ACTIVITY_MOUSE_DOWN;
+
+                activity.data.push(GlobalEvents.getCurrentMouseButton());
+                activity.data.push(GlobalEvents.getMousePosition());
+                var parentDim = _gctx.getClientDimensionsAtIndex(Direct(parentIndex))[0];
+                activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - parentDim.x, GlobalEvents.getMousePosition().y - parentDim.y));
+
                 _gctx.activities[parentIndex].push(activity);
             }
 
@@ -635,6 +664,12 @@ class UpdateContext {
                     if (!allGroup) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_MOUSE_DOWN;
+
+                        activity.data.push(GlobalEvents.getCurrentMouseButton());
+                        activity.data.push(GlobalEvents.getMousePosition());
+                        var currentDim = _gctx.getClientDimensionsAtIndex(Direct(actualIndex))[0];
+                        activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                         _gctx.activities[actualIndex].push(activity);
                         return result;
                     }
@@ -642,12 +677,23 @@ class UpdateContext {
                     for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_MOUSE_DOWN;
+
+                        activity.data.push(GlobalEvents.getCurrentMouseButton());
+                        activity.data.push(GlobalEvents.getMousePosition());
+                        var currentDim = _gctx.getClientDimensionsAtIndex(Direct(child))[0];
+                        activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                         _gctx.activities[child].push(activity);    
                     }
                 }
                 default: {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_DOWN;
+
+                    activity.data.push(GlobalEvents.getMousePosition());
+                    var currentDim = _gctx.getClientDimensionsAtIndex(Direct(actualIndex))[0];
+                    activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                     _gctx.activities[actualIndex].push(activity);
                 }
             }
@@ -690,6 +736,12 @@ class UpdateContext {
             if (parentIndex > -1 && !partOfGroup) {
                 var activity = new Activity();
                 activity.type = ACTIVITY_MOUSE_CLICKED;
+
+                activity.data.push(GlobalEvents.getCurrentMouseButton());
+                activity.data.push(GlobalEvents.getMousePosition());
+                var parentDim = _gctx.getClientDimensionsAtIndex(Direct(parentIndex))[0];
+                activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - parentDim.x, GlobalEvents.getMousePosition().y - parentDim.y));
+
                 _gctx.activities[parentIndex].push(activity);
             }
 
@@ -698,6 +750,12 @@ class UpdateContext {
                     if (!allGroup) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_MOUSE_CLICKED;
+
+                        activity.data.push(GlobalEvents.getCurrentMouseButton());
+                        activity.data.push(GlobalEvents.getMousePosition());
+                        var currentDim = _gctx.getClientDimensionsAtIndex(Direct(actualIndex))[0];
+                        activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                         _gctx.activities[actualIndex].push(activity);
                         return result;
                     }
@@ -705,12 +763,24 @@ class UpdateContext {
                     for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_MOUSE_CLICKED;
+
+                        activity.data.push(GlobalEvents.getCurrentMouseButton());
+                        activity.data.push(GlobalEvents.getMousePosition());
+                        var currentDim = _gctx.getClientDimensionsAtIndex(Direct(child))[0];
+                        activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                         _gctx.activities[child].push(activity);    
                     }
                 }
                 default: {
                     var activity = new Activity();
                     activity.type = ACTIVITY_MOUSE_CLICKED;
+
+                    activity.data.push(GlobalEvents.getCurrentMouseButton());
+                    activity.data.push(GlobalEvents.getMousePosition());
+                    var currentDim = _gctx.getClientDimensionsAtIndex(Direct(actualIndex))[0];
+                    activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, GlobalEvents.getMousePosition().y - currentDim.y));
+
                     _gctx.activities[actualIndex].push(activity);
                 }
             }
@@ -805,7 +875,9 @@ class UpdateContext {
             if (activatedOnly && _activatedIndex > -1) {
                 var activity = new Activity();
                 activity.type = ACTIVITY_KEY_UP;
-                activity.data.push(_keysUp);
+                for (key in _keysUp) {
+                    activity.data.push(key);
+                }
                 _gctx.activities[_activatedIndex].push(activity);
                 return result;
             }
@@ -817,14 +889,18 @@ class UpdateContext {
                 case Direct(item): {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_UP;
-                    activity.data.push(_keysUp);
+                    for (key in _keysUp) {
+                        activity.data.push(key);
+                    }
                     _gctx.activities[item].push(activity);
                 }
                 case Group(item): {
                     for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_KEY_UP;
-                        activity.data.push(_keysUp);
+                        for (key in _keysUp) {
+                            activity.data.push(key);
+                        }
                         _gctx.activities[child].push(activity);
                     }
                 }
@@ -851,7 +927,9 @@ class UpdateContext {
             if (activatedOnly && _activatedIndex > -1) {
                 var activity = new Activity();
                 activity.type = ACTIVITY_KEY_DOWN;
-                activity.data.push(_keysDown);
+                for (key in _keysDown) {
+                    activity.data.push(key);
+                }
                 _gctx.activities[_activatedIndex].push(activity);
                 return result;
             }
@@ -863,14 +941,18 @@ class UpdateContext {
                 case Direct(item): {
                     var activity = new Activity();
                     activity.type = ACTIVITY_KEY_DOWN;
-                    activity.data.push(_keysDown);
+                    for (key in _keysDown) {
+                        activity.data.push(key);
+                    }
                     _gctx.activities[item].push(activity);
                 }
                 case Group(item): {
                     for (child in _gctx.getDimIndicesAtGroupIndex(item)) {
                         var activity = new Activity();
                         activity.type = ACTIVITY_KEY_DOWN;
-                        activity.data.push(_keysDown);
+                        for (key in _keysDown) {
+                            activity.data.push(key);
+                        }
                         _gctx.activities[child].push(activity);
                     }
                 }
