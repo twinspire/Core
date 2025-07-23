@@ -34,6 +34,16 @@ class EventDispatcher {
         callbacks.push(listener);
     }
 
+    public function removeEventListener(target:Int, type:ActivityType) {
+        var index = handlers.findIndex((h) -> h.target == target && h.type == type);
+        if (index == -1) {
+            return;
+        }
+
+        handlers.splice(index, 1);
+        callbacks.splice(index, 1);
+    }
+
     public function dispatch(utx:UpdateContext) {
         var index = utx.getMouseIndex();
         var activated = utx.getActivatedIndex();

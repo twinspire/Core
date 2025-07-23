@@ -77,6 +77,12 @@ class Application
 	function get_graphicsCtx() return _graphicsContext;
 
 	/**
+	* Get the current update context.
+	**/
+	public var updateCtx(get, default):UpdateContext;
+	function get_updateCtx() return _updateContext;
+
+	/**
 	* An instance of a scene manager.
 	**/
 	public var sceneManager:ISceneManager;

@@ -59,6 +59,8 @@ class UpdateContext {
 
     private static var _deltaTime:Float;
 
+    private var _toggles:Map<DimIndex, Bool>;
+
     // animations
     private var _moveToAnimations:Array<MoveToAnimation>;
 
@@ -80,6 +82,7 @@ class UpdateContext {
         _eventDispatcher = new EventDispatcher();
         _retainedMouseDown = [];
         _moveToAnimations = [];
+        _toggles = [];
 
         _mouseFocusIndexUI = -1;
         _activatedIndex = -1;
@@ -95,6 +98,51 @@ class UpdateContext {
 
         _isDragStart = -1;
         _isDragEnd = -1;
+    }
+
+    /**
+    * A high-level function for adding a callback or listener to an event triggered at a given target index.
+    * This is typically used for user interface elements and not recommended for frame-to-frame event scenarios.
+    * Consider the `GameEvent` system for real-time events.
+    * 
+    * @param target The target dimension index. The first item of a `Group` index is used if the target is a `Group`.
+    * @param type The activity type to listen for.
+    * @param listener The callback function to execute when the target receives the activity type.
+    **/
+    public function addEventListener(target:DimIndex, type:ActivityType, listener:(EventArgs) -> Void) {
+        var actualIndex = -1;
+        switch (target) {
+            case Direct(index): {
+                actualIndex = index;
+            }
+            case Group(index): {
+                @:privateAccess(GraphicsContext) {
+                    actualIndex = _gctx._groups[index][0];
+                }
+            }
+        }
+
+        if (actualIndex > -1) {
+            _eventDispatcher.addEventListener(actualIndex, type, listener);
+        }
+    }
+
+    public function removeEventListener(target:DimIndex, type:ActivityType) {
+        var actualIndex = -1;
+        switch (target) {
+            case Direct(index): {
+                actualIndex = index;
+            }
+            case Group(index): {
+                @:privateAccess(GraphicsContext) {
+                    actualIndex = _gctx._groups[index][0];
+                }
+            }
+        }
+
+        if (actualIndex > -1) {
+            _eventDispatcher.removeEventListener(actualIndex, type);
+        }
     }
 
     /**
@@ -1180,6 +1228,43 @@ class UpdateContext {
     }
 
     /**
+    * Toggle visibility of the given `target` dimension reference based on whether the given
+    * `on` dimension reference is receiving an event.
+    *
+    * @param on The dim reference to check.
+    * @param target The target dim reference to toggle if `on` receives an event.
+    * @param activity The activity type referring to the user input event to check.
+    **/
+    public function toggleVisibilityOn(on:DimIndex, target:DimIndex, activity:ActivityType) {
+        var actualIndex = switch (on) {
+            case Direct(index): index;
+            case Group(index): @:privateAccess(GraphicsContext) { _gctx._groups[index][0] }
+        };
+
+        var result = hasActivityData(actualIndex, activity);
+        if (result) {
+            if (!_toggles.exists(on)) {
+                _toggles[on] = true;
+            }
+            else {
+                _toggles[on] = !_toggles[on];
+            }
+        }
+
+        switch (target) {
+            case Direct(index): {
+                _gctx.dimensions[index].visible = _toggles[on];
+            }
+            case Group(index): {
+                var dims = _gctx.getDimIndicesAtGroupIndex(index);
+                for (d in dims) {
+                    _gctx.dimensions[d].visible = _toggles[on];
+                }
+            }
+        }
+    }
+
+    /**
     * Gets the activity data for a given activity type at the specified dimension index.
     * Returns `null` if no activity is found for that type or an event was never received.
     *
@@ -1314,6 +1399,8 @@ class UpdateContext {
     * End event context and complete the final simulations.
     **/
     public function end() {
+        _eventDispatcher.dispatch(this);
+
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
         _keysDown = [];
@@ -1486,86 +1573,5 @@ class UpdateContext {
                 }
             }
         }
-
-        // for (i in 0..._events.length) {
-        //     var e = _events.pop();
-        //     if (e.id == GameEvent.ExitApp) {
-        //         if (exitCallback != null) {
-        //             exitCallback();
-        //         }
-        //     }
-
-        //     if (cast(e.id, Int) > GameEvent.maximum) {
-        //         callback(e);
-        //     }
-        //     else {
-        //         if (e.id == GameEvent.SetDimPosition) {
-        //             if (e.data.length != 2) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var firstArgIndex = Std.isOfType(e.data[0], Int);
-        //             if (!firstArgIndex) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var secondArgDim = Std.isOfType(e.data[1], Dim);
-        //             if (!secondArgDim) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var index = cast(e.data[0], Int);
-        //             var dim = cast(e.data[1], Dim);
-        //             trace(index);
-        //             _gctx.dimensions[index] = dim.clone();
-        //         }
-        //         else if (e.id == GameEvent.MoveDim) {
-        //             if (e.data.length != 4) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var firstArgDim = Std.isOfType(e.data[0], Dim);
-        //             if (!firstArgDim) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var secondArgDim = Std.isOfType(e.data[1], Dim);
-        //             if (!secondArgDim) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var thirdArgSeconds = Std.isOfType(e.data[2], Float);
-        //             if (!thirdArgSeconds) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var fourthArgContextIndex = Std.isOfType(e.data[3], Int);
-        //             if (!fourthArgContextIndex) {
-        //                 // TODO: Log error
-        //                 continue;
-        //             }
-
-        //             var moveTo = new MoveToAnimation();
-        //             moveTo.start = cast (e.data[0], Dim);
-        //             moveTo.end = cast (e.data[1], Dim);
-        //             moveTo.duration = cast (e.data[2], Float);
-        //             moveTo.animIndex = Animate.animateCreateTick();
-        //             moveTo.contextIndex = cast (e.data[3], Int);
-
-        //             _moveToAnimations.push(moveTo);
-        //         }
-        //     }
-        // }
     }
-
-    
-
-
 }

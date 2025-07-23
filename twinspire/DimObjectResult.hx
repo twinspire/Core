@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.events.DimBindingOptions;
 import twinspire.Dimensions.DimInitCommand;
 import twinspire.Id;
 import twinspire.geom.Dim;
@@ -17,9 +18,11 @@ typedef DimObjectResult = {
     var ?resultIndex:DimIndex;
     var ?originalCommand:DimInitCommand;
     var ?textDim:Dim;
+    var ?bindings:DimBindingOptions;
 }
 
 typedef DimObjectOptions = {
     var ?forceClipping:Bool;
     var ?makeContainer:Bool;
+    var ?bindings:DimBindingOptions;
 }
