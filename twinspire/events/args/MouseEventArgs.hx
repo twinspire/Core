@@ -1,5 +1,6 @@
 package twinspire.events.args;
 
+import kha.math.Vector2;
 import kha.math.FastVector2;
 
 class MouseEventArgs extends EventArgs {
@@ -15,7 +16,7 @@ class MouseEventArgs extends EventArgs {
     /**
     * The cursor's position relative to the client.
     **/
-    public var clientPosition:FastVector2;
+    public var clientPosition:Vector2;
 
     public function new() {
         super();

@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import twinspire.events.EventArgs;
 import twinspire.events.GameEventProcessingType;
 import twinspire.events.GameEventProcessor;
 import twinspire.events.GameEventTimeline;
@@ -1238,7 +1239,7 @@ class UpdateContext {
     public function toggleVisibilityOn(on:DimIndex, target:DimIndex, activity:ActivityType) {
         var actualIndex = switch (on) {
             case Direct(index): index;
-            case Group(index): @:privateAccess(GraphicsContext) { _gctx._groups[index][0] }
+            case Group(index): @:privateAccess(GraphicsContext) { _gctx._groups[index][0]; };
         };
 
         var result = hasActivityData(actualIndex, activity);
@@ -1259,6 +1260,25 @@ class UpdateContext {
                 var dims = _gctx.getDimIndicesAtGroupIndex(index);
                 for (d in dims) {
                     _gctx.dimensions[d].visible = _toggles[on];
+                }
+            }
+        }
+    }
+
+    /**
+    * Toggle the visibility of a dimension reference.
+    *
+    * @param target The target dim reference to toggle.
+    **/
+    public function toggleVisibility(target:DimIndex) {
+        switch (target) {
+            case Direct(index): {
+                _gctx.dimensions[index].visible = !_gctx.dimensions[index].visible;
+            }
+            case Group(index): {
+                var dims = _gctx.getDimIndicesAtGroupIndex(index);
+                for (d in dims) {
+                    _gctx.dimensions[d].visible = !_gctx.dimensions[d].visible;
                 }
             }
         }

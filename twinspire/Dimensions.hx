@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.events.EventArgs;
 import twinspire.events.DimBindingOptions;
 import twinspire.render.GraphicsContext;
 import twinspire.render.ComplexResult;
@@ -624,9 +625,16 @@ class Dimensions {
                     }
 
                     if (obj.dimObjectResult.bindings.onClick != null) {
-                        
-
-                        updateCtx.addEventListener(obj.index, ACTIVITY_MOUSE_CLICKED, obj.dimObjectResult.bindings.onMouseOver);
+                        if (obj.dimObjectResult.bindings.togglePath != null) {
+                            var pathObject = findItemByName(obj.dimObjectResult.bindings.togglePath);
+                            updateCtx.addEventListener(obj.index, ACTIVITY_MOUSE_CLICKED, function(e:EventArgs) {
+                                updateCtx.toggleVisibility(pathObject.resultIndex);
+                                obj.dimObjectResult.bindings.onClick(e);
+                            });
+                        }
+                        else {
+                            updateCtx.addEventListener(obj.index, ACTIVITY_MOUSE_CLICKED, obj.dimObjectResult.bindings.onClick);
+                        }
                     }
                 }
 
