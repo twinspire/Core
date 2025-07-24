@@ -94,6 +94,7 @@ enum DimFlow {
 
 enum DimInitCommand {
     CreateEmpty(then:Array<DimCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+    CreateWrapper(inside:Array<DimInitCommand>, then:Array<DimCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
     CreateOnInit(dim:Dim, init:DimInitCommand, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
     CentreScreenY(width:Float, height:Float, offsetY:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
     CentreScreenX(width:Float, height:Float, offsetX:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
@@ -431,6 +432,24 @@ class Dimensions {
                 }
 
                 calculateDimFromCommands(then);
+            }
+            case CreateWrapper(inside, then, ident, id, bindings): {
+                var dim = new Dim(0, 0, 0, 0, level);
+
+                if (level >= dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                    dimCommandStack.push([ { originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                }
+                else {
+                    dimCommandStack[level].push({ originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                    currentParents[level] = dimCommandStack[level].length - 1;
+                }
+
+                calculateDimFromCommands(then);
+
+                for (i in inside) {
+                    construct(i, level + 1);
+                }
             }
             case CreateOnInit(dim, init, ident, id, bindings): {
                 dim.order = level;

@@ -36,6 +36,9 @@ class DimObject extends SceneObject {
         var text = "";
 
         switch (init) {
+            case CreateWrapper(_, then): {
+                text = findText(then);
+            }
             case CreateEmpty(then): {
                 text = findText(then);
             }

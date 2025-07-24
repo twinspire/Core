@@ -105,6 +105,8 @@ class Scene {
     * Initialise this scene with starting objects.
     **/
     public function init(gtx:GraphicsContext, objects:Array<SceneObject>) {
+        // TODO: filter and copy only objects that have a type value
+
         this.objects = objects.copy();
 
         for (o in this.objects) {
