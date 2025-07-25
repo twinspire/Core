@@ -105,9 +105,12 @@ class Scene {
     * Initialise this scene with starting objects.
     **/
     public function init(gtx:GraphicsContext, objects:Array<SceneObject>) {
-        // TODO: filter and copy only objects that have a type value
-
-        this.objects = objects.copy();
+        this.objects = [];
+        for (o in objects) {
+            if (o.type != null) {
+                this.objects.push(o);
+            }
+        }
 
         for (o in this.objects) {
             IdAssoc.assoc[o.type].init(gtx, o);

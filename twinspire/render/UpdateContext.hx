@@ -146,6 +146,14 @@ class UpdateContext {
         }
     }
 
+    public function addCustomEvent(name:String) {
+        return _eventDispatcher.addCustomEvent(name);
+    }
+
+    public function triggerEvent(target:Int, name:String, args:EventArgs) {
+        _eventDispatcher.triggerEvent(target, name, args);
+    }
+
     /**
     * Gets a copy of a dimension at the given index.
     **/

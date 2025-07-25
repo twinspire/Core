@@ -19,6 +19,7 @@ typedef DimObjectResult = {
     var ?originalCommand:DimInitCommand;
     var ?textDim:Dim;
     var ?bindings:DimBindingOptions;
+    var ?path:String;
 }
 
 typedef DimObjectOptions = {

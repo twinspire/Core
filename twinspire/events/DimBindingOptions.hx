@@ -14,5 +14,13 @@ typedef DimBindingOptions = {
     var ?onKeyUp:(EventArgs) -> Void;
     var ?onKeyDown:(EventArgs) -> Void;
     var ?onKeyPress:(EventArgs) -> Void;
-    var ?togglePath:String;
+    var ?toggler:Toggler;
+    var ?customEvents:Array<String>;
+}
+
+typedef Toggler = {
+    var ?triggers:String;
+    var ?path:String;
+    var ?triggeredBy:Int;
+    var ?initialVisibility:Bool;
 }
