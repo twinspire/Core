@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.DimIndex.DimIndexUtils;
 import haxe.io.Path;
 import twinspire.events.EventArgs;
 import twinspire.events.DimBindingOptions;
@@ -705,8 +706,8 @@ class Dimensions {
                     }
 
                     if (obj.dimObjectResult.bindings.onClick != null) {
-                        if (obj.dimObjectResult.bindings.togglePath != null) {
-                            var pathObject = findItemByName(obj.dimObjectResult.bindings.togglePath);
+                        if (obj.dimObjectResult.bindings.toggler != null) {
+                            var pathObject = findItemByName(obj.dimObjectResult.bindings.toggler.path);
                             updateCtx.addEventListener(obj.index, ACTIVITY_MOUSE_CLICKED, function(e:EventArgs) {
                                 updateCtx.toggleVisibility(pathObject.resultIndex);
                                 obj.dimObjectResult.bindings.onClick(e);
@@ -721,7 +722,7 @@ class Dimensions {
                             var toggler = obj.dimObjectResult.bindings.toggler;
                             var fullPath = Path.join([ obj.dimObjectResult.path, toggler.path ]);
                             var pathObject = findItemByName(fullPath);
-                            Application.instance.graphicsCtx.getDimensionsAtIndex(obj.dimObjectResult.resultIndex)[0].visible = toggler.initialVisibility;
+                            Application.instance.graphicsCtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(obj.dimObjectResult.resultIndex)).visible = toggler.initialVisibility;
                             
                             updateCtx.addEventListener(obj.index, toggler.triggeredBy, function(e:EventArgs) {
                                 updateCtx.toggleVisibility(obj.dimObjectResult.resultIndex);

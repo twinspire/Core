@@ -101,7 +101,7 @@ class EventDispatcher {
         // universal handlers
         var indices = handlers.whereIndices((h) -> h.target == index);
         for (i in indices) {
-            var e:EventArgs;
+            var e:EventArgs = null;
 
             switch (handlers[i].type) {
                 case ACTIVITY_DRAGGING: {
@@ -177,7 +177,7 @@ class EventDispatcher {
 
             if (e != null) {
                 if (e.triggerCustom != null) {
-                    triggerEvent(handlers[active].target, e.triggerCustom, e);
+                    triggerEvent(handlers[i].target, e.triggerCustom, e);
                 }
             }
         }
@@ -185,7 +185,7 @@ class EventDispatcher {
         // handlers for activated dimensions
         var activeIndices = handlers.whereIndices((h) -> h.target == activated);
         for (active in activeIndices) {
-            var e:EventArgs;
+            var e:EventArgs = null;
 
             switch (handlers[active].type) {
                 case ACTIVITY_KEY_DOWN: {
