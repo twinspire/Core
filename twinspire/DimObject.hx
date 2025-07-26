@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.geom.Dim;
 import twinspire.Dimensions.DimCommand;
 import twinspire.Dimensions.DimInitCommand;
 import twinspire.scenes.SceneObject;
@@ -13,9 +14,12 @@ class DimObject extends SceneObject {
     
     public var dimObjectResult:DimObjectResult;
     public var initCommand:DimInitCommand;
+    public var resultingDimensions:Map<String, Dim>;
 
     public function new() {
         super();
+
+        resultingDimensions = [];
     }
 
     /**

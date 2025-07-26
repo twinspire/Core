@@ -387,20 +387,26 @@ class Dimensions {
     /**
     * refers to the path by given identifiers.
     **/
-    static var currentPath:String;
+    static var currentPath:String = "";
 
     static function appendPath(value:String) {
         if (currentPath != "") {
             currentPath += "/";
         }
 
-        currentPath += value;
+        if (value != null) {
+            currentPath += value;
+        }
+        else {
+            var pathName = "child" + currentParents[currentParents.length - 1];
+            currentPath += pathName;
+        }
     }
 
     static function trimPath() {
         var lastSlash = currentPath.lastIndexOf("/");
         if (lastSlash > -1) {
-            currentPath = currentPath.substr(0, lastSlash - 1);
+            currentPath = currentPath.substr(0, lastSlash);
         }
         else {
             currentPath = "";
@@ -450,7 +456,7 @@ class Dimensions {
 
                 appendPath(ident);
 
-                if (level >= dimCommandStack.length - 1) {
+                if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
                 }
@@ -467,7 +473,7 @@ class Dimensions {
 
                 appendPath(ident);
 
-                if (level >= dimCommandStack.length - 1) {
+                if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
                 }
@@ -502,7 +508,7 @@ class Dimensions {
 
                 appendPath(ident);
 
-                if (level >= dimCommandStack.length - 1) {
+                if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
                 }
@@ -523,7 +529,7 @@ class Dimensions {
 
                 appendPath(ident);
 
-                if (level >= dimCommandStack.length - 1) {
+                if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
                 }
@@ -544,7 +550,7 @@ class Dimensions {
 
                 appendPath(ident);
 
-                if (level >= dimCommandStack.length - 1) {
+                if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
                 }
@@ -582,7 +588,7 @@ class Dimensions {
 
                 appendPath(ident);
 
-                if (level >= dimCommandStack.length - 1) {
+                if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
                     dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
                 }
@@ -642,7 +648,7 @@ class Dimensions {
         }
 
         mappedScenes[scene.name] = {
-            stack: dimCommandStack.copy()                
+            stack: dimCommandStack.copy()             
         };
     }
 
@@ -657,8 +663,17 @@ class Dimensions {
 
         var stack = mappedScenes[scene.name].stack;
         var objects = new Array<SceneObject>();
+        var ignoreChildrenOf = new Array<String>();
         for (i in 0...stack.length) {
             for (j in 0...stack[i].length) {
+                if (ignoreChildrenOf.findIndex((child) -> stack[i][j].path.indexOf(child) != -1) != -1) {
+                    continue;
+                }
+
+                if (stack[i][j].bindings?.noChildObjects) {
+                    ignoreChildrenOf.push(stack[i][j].path);
+                }
+
                 var obj = new DimObject();
                 obj.index = stack[i][j].resultIndex;
                 obj.type = stack[i][j].id;
@@ -671,6 +686,16 @@ class Dimensions {
                 }
 
                 obj.dimObjectResult = stack[i][j];
+                var items = findItemsByParentName(stack[i][j].path);
+                if (items != null) {
+                    for (dimItem in items) {
+                        var slash = stack[i][j].path.length + 1;
+                        var childPath = dimItem.path.substr(slash);
+                        obj.resultingDimensions[childPath] = dimItem.dim;
+                    }
+                    trace(obj.resultingDimensions);
+                }
+
                 if (obj.dimObjectResult.bindings != null) {
                     var updateCtx = Application.instance.updateCtx;
                     if (obj.dimObjectResult.bindings.onBeginDrag != null) {
@@ -865,7 +890,12 @@ class Dimensions {
     public static function findItemsByParentName(name:String) {
         var item = findItemByName(name);
         if (item != null && item?.parentIndex > -1) {
-            return dimCommandStack[item.parentIndex];
+            if (item.parentIndex + 2 > dimCommandStack.length - 1) {
+                return null;
+            }
+
+            var results = dimCommandStack[item.parentIndex + 2].filter((o) -> o.path.indexOf(name) != -1);
+            return results;
         }
 
         return null;
@@ -1161,7 +1191,7 @@ class Dimensions {
 
     static function getParentIndex() {
         if (currentParents.length > 1) {
-            return currentParents[currentParents.length - 2];
+            return currentParents[currentParents.length - 2] ?? -1;
         }
 
         return -1;
