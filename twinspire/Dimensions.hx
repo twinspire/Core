@@ -858,8 +858,8 @@ class Dimensions {
         var currentParentIndex = -1;
         var currentParent:DimObjectResult = null;
         for (i in 0...splitted.length) {
-            var name = splitted[i];
-            var index = getChildIndexFromParent(name, i, currentParentIndex);
+            var path = splitted[i];
+            var index = getChildIndexFromParent(path, i, currentParentIndex);
             if (index > -1) {
                 currentParent = dimCommandStack[i][index];
                 currentParentIndex = index;
@@ -924,7 +924,7 @@ class Dimensions {
     static function getChildIndexFromParent(name:String, level:Int, parent:Int) {
         var result = childExists(name, level);
         if (result) {
-            return dimCommandStack[level].findIndex((dc) -> dc.parentIndex == parent);
+            return dimCommandStack[level].findIndex((dc) -> dc.ident == name);
         }
 
         return -1;
@@ -1073,7 +1073,7 @@ class Dimensions {
                     return;
                 }
 
-                var againstDim:Dim = getParentDim();
+                var againstDim:Dim = getParentDim(lastItem);
                 var isOffset = offset != null;
                 
                 switch (align) {
@@ -1141,12 +1141,12 @@ class Dimensions {
                 }
             }
             case SpanParentWidth: {
-                var parent = getParentDim();
+                var parent = getParentDim(lastItem);
                 dim.x = parent?.x;
                 dim.width = parent?.width;
             }
             case SpanParentHeight: {
-                var parent = getParentDim();
+                var parent = getParentDim(lastItem);
                 dim.y = parent.y;
                 dim.height = parent.height;
             }
@@ -1174,18 +1174,29 @@ class Dimensions {
         }
     }
 
-    static function getParentDim() {
-        var parent = getParent();
+    static function getParentDim(object:DimObjectResult, levels:Int = 1) {
+        var parent = getParent(object, levels);
         return parent?.dim;
     }
 
-    static function getParent() {
-        if (currentParents.length > 1) {
-            return dimCommandStack[dimCommandStack.length - 2][currentParents[currentParents.length - 2]];
+    static function getParent(object:DimObjectResult, levels:Int = 1) {
+        var slash = object.path.indexOf("/");
+        if (slash > -1) {
+            var parentPath = object.path;
+            var level = levels;
+            while (level > 0) {
+                if (parentPath.indexOf("/") == -1) {
+                    break;
+                }
+
+                parentPath = parentPath.substr(0, parentPath.lastIndexOf("/"));
+                level -= 1;
+            }
+
+            return findItemByName(parentPath);
         }
-        else {
-            return null;
-        }
+
+        return null;
     }
 
     static function getParentIndex() {
