@@ -691,7 +691,7 @@ class Dimensions {
                     for (dimItem in items) {
                         var slash = stack[i][j].path.length + 1;
                         var childPath = dimItem.path.substr(slash);
-                        obj.resultingDimensions[childPath] = dimItem.dim;
+                        obj.resultingDimensions[childPath] = dimItem.resultIndex;
                     }
                 }
 

@@ -1,6 +1,5 @@
 package twinspire;
 
-import twinspire.geom.Dim;
 import twinspire.Dimensions.DimCommand;
 import twinspire.Dimensions.DimInitCommand;
 import twinspire.scenes.SceneObject;
@@ -14,7 +13,7 @@ class DimObject extends SceneObject {
     
     public var dimObjectResult:DimObjectResult;
     public var initCommand:DimInitCommand;
-    public var resultingDimensions:Map<String, Dim>;
+    public var resultingDimensions:Map<String, DimIndex>;
 
     public function new() {
         super();
@@ -40,8 +39,18 @@ class DimObject extends SceneObject {
         var text = "";
 
         switch (init) {
-            case CreateWrapper(_, then): {
-                text = findText(then);
+            case CreateWrapper(inits, then): {
+                for (i in inits) {
+                    var item = findTextFromInit(i);
+                    if (item != null) {
+                        text = item;
+                        break;
+                    }
+                }
+
+                if (text == null) {
+                    text = findText(then);
+                }
             }
             case CreateEmpty(then): {
                 text = findText(then);
