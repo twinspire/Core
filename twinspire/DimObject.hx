@@ -10,15 +10,17 @@ class DimObject extends SceneObject {
     private var isMouseDown:Bool;
     private var isMouseOver:Bool;
 
-    
+    public var data:Map<String, Dynamic>;
     public var dimObjectResult:DimObjectResult;
     public var initCommand:DimInitCommand;
     public var resultingDimensions:Map<String, DimIndex>;
+    public var groupIndex:DimIndex;
 
     public function new() {
         super();
 
         resultingDimensions = [];
+        data = [];
     }
 
     /**

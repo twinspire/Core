@@ -290,6 +290,58 @@ class GraphicsContext {
     }
 
     /**
+    * Add a `DimIndex` or integer value that is an index itself
+    * to the currently active group. Only provide a single argument.
+    *
+    * If providing an integer value, the value must be within the range
+    * of the currently active dimension stack.
+    **/
+    public function addToGroup(?indexRef:DimIndex, ?indexInt:Int) {
+        if (_currentGroup > -1)  {
+            if (indexRef != null) {
+                var i = switch (indexRef) {
+                    case Direct(index): index;
+                    default: -1;
+                };
+
+                if (i > -1) {
+                    _groups[_currentGroup].push(i);
+                }
+            }
+            else if (indexInt != null) {
+                if (indexInt < 0 || indexInt > dimensions.length) {
+                    return;
+                }
+
+                _groups[_currentGroup].push(indexInt);
+            }
+        }
+    }
+
+    /**
+    * Set the links of a group to a specific parent index.
+    *
+    * @param group The group index to assign to a parent index.
+    * @param parent The parent index to assign the group indices to. 
+    **/
+    public function setupGroupLinksToIndex(group:DimIndex, parent:DimIndex) {
+        switch (group) {
+            case Direct(_): {
+                throw "Invalid index reference.";
+            }
+            case Group(index, _): {
+                var children = _groups[index];
+                for (child in children) {
+                    dimensionLinks[child] = switch(parent) {
+                        case Direct(i): i;
+                        default: -1;
+                    };
+                }
+            }
+        }
+    }
+
+    /**
     * Gets the indices from a `DimIndex`. If you use links to a `Group` index,
     * both the links and the wrapping dimension indices are included, and the
     * wrapping index is likely to always be at zero (depending on your specific

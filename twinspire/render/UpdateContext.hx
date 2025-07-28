@@ -1306,10 +1306,6 @@ class UpdateContext {
             return null;
         }
 
-        if (_gctx.activities[index].length == 0) {
-            return null;
-        }
-
         for (a in _gctx.activities[index]) {
             if (a.type == type) {
                 return a.data;
@@ -1327,7 +1323,7 @@ class UpdateContext {
     * @param type The type of activity.
     * @param data An array of data to match.
     *
-    * @return Returns `true` if the data matches, `false` otherwise. Returns `false` if there is no data.
+    * @return Returns `true` if the data matches, `false` otherwise. Returns `true` if there is no data to match but the activity type exists.
     **/
     public function hasActivityData(index:Null<Int>, type:ActivityType, data:...Dynamic) {
         if (index == null) {
@@ -1341,6 +1337,10 @@ class UpdateContext {
         var array = getActivity(index, type);
         if (array == null) {
             return false;
+        }
+
+        if (array.length == 0 && data.length == 0) {
+            return true;
         }
 
         var result = true;
