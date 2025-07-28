@@ -693,7 +693,6 @@ class Dimensions {
                         var childPath = dimItem.path.substr(slash);
                         obj.resultingDimensions[childPath] = dimItem.dim;
                     }
-                    trace(obj.resultingDimensions);
                 }
 
                 if (obj.dimObjectResult.bindings != null) {
