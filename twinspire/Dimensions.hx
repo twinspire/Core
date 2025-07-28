@@ -386,7 +386,31 @@ class Dimensions {
                 trimPath();
             }
             case CreateGridEquals(columns, rows, items, ident, id, bindings): {
+                if (items.length > columns * rows) {
+                    throw "Number of items exceeds number of cells within this grid.";
+                }
 
+                appendPath(ident);
+
+                var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                
+
+                var grid = dimGridEquals(lastItem.dim, columns, rows);
+                for (item in items) {
+                    construct(item, level + 1);
+                }
+
+                var children = findItemsByParentName(currentPath);
+                for (y in 0...rows) {
+                    for (x in 0...columns) {
+                        var index:Int = x * y + x;
+                        var cell = grid[index];
+                        children[index].dim.x = cell.x;
+                        children[index].dim.y = cell.y;
+                    }
+                }
+
+                trimPath();
             }
             default: {
 
