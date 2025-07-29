@@ -118,6 +118,8 @@ enum DimCommand {
     ScreenAlign(align:DimAlignment, offset:FastVector2);
     Align(against:Int, align:DimAlignment, ?offset:FastVector2);
     MeasureText(text:String, font:Font, fontSize:Int);
+    MinOf(texts:Array<String>, font:Font, fontSize:Int);
+    MaxOf(texts:Array<String>, font:Font, fontSize:Int);
     AddSpacingAround(space:Float);
     AddSpacing(space:Float, dir:Direction);
     Scale(scale:Float);
@@ -1080,6 +1082,32 @@ class Dimensions {
 
                 dim.width += textSize.width;
                 dim.height += textSize.height;
+            }
+            case MinOf(texts, font, fontSize): {
+                var minWidth = 0.0;
+                var minHeight = 0.0;
+                for (text in texts) {
+                    var size = getTextDim(font, fontSize, text);
+                    minWidth = Math.min(size.width, minWidth);
+                    minHeight = Math.min(size.height, minHeight);
+                }
+
+                lastItem.textDim = new Dim(0, 0, minWidth, minHeight);
+                dim.width += minWidth;
+                dim.height += minHeight;
+            }
+            case MaxOf(texts, font, fontSize): {
+                var maxWidth = 0.0;
+                var maxHeight = 0.0;
+                for (text in texts) {
+                    var size = getTextDim(font, fontSize, text);
+                    maxWidth = Math.max(size.width, maxWidth);
+                    maxHeight = Math.max(size.height, maxHeight);
+                }
+
+                lastItem.textDim = new Dim(0, 0, maxWidth, maxHeight);
+                dim.width += maxWidth;
+                dim.height += maxHeight;
             }
             case AddSpacingAround(space): {
                 if (lastItem.textDim != null) {
