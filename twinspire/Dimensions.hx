@@ -487,6 +487,48 @@ class Dimensions {
 
                 trimPath();
             }
+            case CreateGridFloats(columns, rows, items, ident, id, bindings): {
+                if (items.length > columns.length * rows.length) {
+                    throw "Number of items exceeds number of cells within this grid.";
+                }
+
+                appendPath(ident);
+
+                var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                var object = copyDimObjectResult(lastItem);
+                object.path = currentPath;
+                object.ident = ident;
+                object.id = id;
+                object.autoSize = false;
+
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                    dimCommandStack.push([ object ]);
+                }
+                else {
+                    dimCommandStack[level].push(object);
+                    currentParents[level] = dimCommandStack[level].length - 1;
+                }
+
+                var grid = dimGridFloats(object.dim, columns, rows);
+                var options = new Array<DimObjectOptions>();
+
+                for (y in 0...rows.length) {
+                    for (x in 0...columns.length) {
+                        var index:Int = x * y + x;
+
+                        var cell = grid[index];
+                        options.push({ offsetFromPosition: new FastVector2(cell.x, cell.y), passthrough: true });
+                    }
+                }
+
+                for (i in 0...items.length) {
+                    var item = items[i];
+                    construct(item, level + 1, options[i]);
+                }
+
+                trimPath();
+            }
             default: {
 
             }
