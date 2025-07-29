@@ -671,6 +671,43 @@ class Dimensions {
 
                 trimPath();
             }
+            case CreateFlowComplex(flow, items, ident, id, bindings): {
+                // TODO
+
+                appendPath(ident);
+
+                var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                var object = copyDimObjectResult(lastItem);
+                object.path = currentPath;
+                object.ident = ident;
+                object.id = id;
+                object.autoSize = false;
+
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                    dimCommandStack.push([ object ]);
+                }
+                else {
+                    dimCommandStack[level].push(object);
+                    currentParents[level] = dimCommandStack[level].length - 1;
+                }
+
+                var dims = new Array<DimObjectResult>();
+                for (item in items) {
+                    construct(item, level + 1);
+
+                    var lastConstructedObject = findItemByName(getLastImmediateNamedChild(currentPath + "/"));
+                    dims.push(lastConstructedObject);
+                }
+
+                switch (flow) {
+                    default: {
+
+                    }
+                }
+
+                trimPath();
+            }
             default: {
 
             }
