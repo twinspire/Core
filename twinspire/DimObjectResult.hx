@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.DimSize;
 import kha.math.FastVector2;
 import twinspire.events.DimBindingOptions;
 import twinspire.Dimensions.DimInitCommand;
@@ -28,5 +29,6 @@ typedef DimObjectOptions = {
     var ?makeContainer:Bool;
     var ?bindings:DimBindingOptions;
     var ?offsetFromPosition:FastVector2;
+    var ?overrideSize:DimSize;
     var ?passthrough:Bool;
 }

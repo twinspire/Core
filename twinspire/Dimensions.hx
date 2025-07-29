@@ -44,7 +44,7 @@ enum abstract VerticalAlign(Int) from Int to Int {
 	var VALIGN_BOTTOM			=	3;
 }
 
-enum abstract Direction(Int) {
+enum abstract Direction(Int) to Int {
     var Up;
     var Down;
     var Left;
@@ -239,6 +239,12 @@ class Dimensions {
 
                 trimPath();
                 calculateDimFromCommands(then);
+
+                if (options.overrideSize != null) {
+                    var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? currentParents.length - 1]];
+                    lastItem.dim.width = options.overrideSize.width;
+                    lastItem.dim.height = options.overrideSize.height;
+                }
             }
             case CreateWrapper(inside, then, ident, id, bindings): {
                 var dim = new Dim(0, 0, 0, 0, level);
@@ -259,10 +265,16 @@ class Dimensions {
                 }
 
                 calculateDimFromCommands(then);
+                if (options.overrideSize != null) {
+                    var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? currentParents.length - 1]];
+                    lastItem.dim.width = options.overrideSize.width;
+                    lastItem.dim.height = options.overrideSize.height;
+                }
 
                 for (i in inside) {
                     if (options.passthrough && bindings.noPassthrough != true) {
                         options.passthrough = false;
+                        options.overrideSize = null;
                         construct(i, level + 1, options);
                     }
                     else {
@@ -285,9 +297,15 @@ class Dimensions {
                 currentParents.push(0);
                 dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: resultDim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
 
+                if (options.overrideSize != null) {
+                    var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? currentParents.length - 1]];
+                    lastItem.dim.width = options.overrideSize.width;
+                    lastItem.dim.height = options.overrideSize.height;
+                }
 
                 if (options.passthrough && bindings.noPassthrough != true) {
                     options.passthrough = false;
+                    options.overrideSize = null;
                     construct(init, dimCommandStack.length - 1, options);
                 }
                 else {
@@ -314,6 +332,7 @@ class Dimensions {
                 for (o in inside) {
                     if (options.passthrough && bindings.noPassthrough != true) {
                         options.passthrough = false;
+                        options.overrideSize = null;
                         construct(o, level + 1, options);
                     }
                     else {
@@ -341,6 +360,7 @@ class Dimensions {
                 for (o in inside) {
                     if (options.passthrough && bindings.noPassthrough != true) {
                         options.passthrough = false;
+                        options.overrideSize = null;
                         construct(o, level + 1, options);
                     }
                     else {
@@ -567,6 +587,41 @@ class Dimensions {
                 for (i in 0...items.length) {
                     var item = items[i];
                     construct(item, level + 1, options[i]);
+                }
+
+                trimPath();
+            }
+            case CreateFixedFlow(itemSize, dir, items, ident, id, bindings): {
+                appendPath(ident);
+
+                var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                var object = copyDimObjectResult(lastItem);
+                object.path = currentPath;
+                object.ident = ident;
+                object.id = id;
+                object.autoSize = false;
+
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                    dimCommandStack.push([ object ]);
+                }
+                else {
+                    dimCommandStack[level].push(object);
+                    currentParents[level] = dimCommandStack[level].length - 1;
+                }
+
+                dimFixedFlow(object.dim, new Dim(0, 0, itemSize.width, itemSize.height), dir);
+                for (i in 0...items.length) {
+                    var item = items[i];
+                    var pos = getNewDim();
+
+                    construct(item, level + 1, {
+                        offsetFromPosition: new FastVector2(pos.x, pos.y),
+                        overrideSize: itemSize,
+                        passthrough: true
+                    });
+
+
                 }
 
                 trimPath();
@@ -1560,7 +1615,7 @@ class Dimensions {
             var y = containerColumnOrRow.getY();
             var width = containerColumnOrRow.getWidth();
             var height = containerColumnOrRow.getHeight();
-            if (containerDirection == 1)
+            if (containerDirection == Direction.Up)
             {
                 if (containerMethod == FLOW_FIXED)
                     y -= (containerCellSize.height * containerCell) - padding;
@@ -1569,7 +1624,7 @@ class Dimensions {
 
                 height = containerCellSize.height;
             }
-            else if (containerDirection == 2)
+            else if (containerDirection == Direction.Down)
             {
                 if (containerMethod == FLOW_FIXED)
                     y += (containerCellSize.height * containerCell) + padding;
@@ -1578,7 +1633,7 @@ class Dimensions {
 
                 height = containerCellSize.height;
             }
-            else if (containerDirection == 3)
+            else if (containerDirection == Direction.Left)
             {
                 if (containerMethod == FLOW_FIXED)
                     x -= (containerCellSize.width * containerCell) - padding;
@@ -1587,7 +1642,7 @@ class Dimensions {
 
                 width = containerCellSize.width;
             }
-            else if (containerDirection == 4)
+            else if (containerDirection == Direction.Right)
             {
                 if (containerMethod == FLOW_FIXED)
                     x += (containerCellSize.width * containerCell) + padding;
