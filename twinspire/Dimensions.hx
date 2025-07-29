@@ -155,6 +155,10 @@ class Dimensions {
     * refers to the path by given identifiers.
     **/
     static var currentPath:String = "";
+    /**
+    * refers to all names added to the hierarchy
+    **/
+    static var namesAdded:Array<String>;
 
     static function appendPath(value:String) {
         if (currentPath != "") {
@@ -168,6 +172,12 @@ class Dimensions {
             var pathName = "child" + currentParents[currentParents.length - 1];
             currentPath += pathName;
         }
+
+        if (namesAdded == null) {
+            namesAdded = [];
+        }
+
+        namesAdded.push(currentPath);
     }
 
     static function trimPath() {
@@ -626,10 +636,66 @@ class Dimensions {
 
                 trimPath();
             }
+            case CreateVariableFlow(dir, items, ident, id, bindings): {
+                appendPath(ident);
+
+                var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                var object = copyDimObjectResult(lastItem);
+                object.path = currentPath;
+                object.ident = ident;
+                object.id = id;
+                object.autoSize = false;
+
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                    dimCommandStack.push([ object ]);
+                }
+                else {
+                    dimCommandStack[level].push(object);
+                    currentParents[level] = dimCommandStack[level].length - 1;
+                }
+
+                dimVariableFlow(object.dim, dir);
+                for (i in 0...items.length) {
+                    var item = items[i];
+                    var pos = getNewDim();
+
+                    construct(item, level + 1, {
+                        offsetFromPosition: new FastVector2(pos.x, pos.y),
+                        passthrough: true
+                    });
+
+                    var lastConstructedObject = findItemByName(getLastImmediateNamedChild(currentPath + "/"));
+                    dimVariableSetNextDim(lastConstructedObject.dim);
+                }
+
+                trimPath();
+            }
             default: {
 
             }
         }
+    }
+
+    static function getLastImmediateNamedChild(parent:String):String {
+        var lastIndex = namesAdded.length - 1;
+        var numSlashes = parent.toCharArray().whereIndices((char) -> char == "/".code).length;
+        if (lastIndex < 0) {
+            return null;
+        }
+
+        while (lastIndex > -1) {
+            var name = namesAdded[lastIndex];
+            var match = name.indexOf(parent) > -1;
+            var slashCount = name.toCharArray().whereIndices((char) -> char == "/".code).length;
+            if (match && numSlashes == slashCount) {
+                break;
+            }
+
+            lastIndex -= 1;
+        }
+
+        return namesAdded[lastIndex];
     }
 
     static function copyDimObjectResult(object:DimObjectResult):DimObjectResult {
@@ -873,6 +939,10 @@ class Dimensions {
     * @return A `DimObjectResult` of the found item. `null` otherwise.
     **/
     public static function findItemByName(name:String) {
+        if (name == null) {
+            return null;
+        }
+
         var splitted = name.split("/");
         var indexFinds = new Array<Int>();
         var found = true;
@@ -1592,7 +1662,6 @@ class Dimensions {
     /**
      * 
      * @param container The container to use for creating new rows.
-     * @param height The height of each row.
      * @param direction 1 for up, 2 for down, 3 for left, 4 for right
      */
     public static function dimVariableFlow(container:Dim, direction:Int) {
