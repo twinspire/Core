@@ -1,5 +1,6 @@
 package twinspire;
 
+import kha.math.FastVector2;
 import twinspire.events.DimBindingOptions;
 import twinspire.Dimensions.DimInitCommand;
 import twinspire.Id;
@@ -26,4 +27,6 @@ typedef DimObjectOptions = {
     var ?forceClipping:Bool;
     var ?makeContainer:Bool;
     var ?bindings:DimBindingOptions;
+    var ?offsetFromPosition:FastVector2;
+    var ?passthrough:Bool;
 }

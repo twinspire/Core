@@ -1,5 +1,6 @@
 package twinspire;
 
+import kha.AssetError;
 import twinspire.DimIndex.DimIndexUtils;
 import haxe.io.Path;
 import twinspire.events.EventArgs;
@@ -18,6 +19,7 @@ import twinspire.scenes.Scene;
 import twinspire.scenes.SceneObject;
 import twinspire.Application;
 using twinspire.extensions.ArrayExtensions;
+using kha.StringExtensions;
 
 import kha.graphics2.Graphics;
 import kha.math.FastVector2;
@@ -218,8 +220,13 @@ class Dimensions {
             }
             case CreateEmpty(then, ident, id, bindings): {
                 var dim = new Dim(0, 0, 0, 0, level);
-
                 appendPath(ident);
+                if (then.findIndex((cmd) -> cmd.getName() == "Align") == -1) {
+                    if (options.offsetFromPosition != null) {
+                        dim.x += options.offsetFromPosition.x;
+                        dim.y += options.offsetFromPosition.y;
+                    }
+                }
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
@@ -235,6 +242,10 @@ class Dimensions {
             }
             case CreateWrapper(inside, then, ident, id, bindings): {
                 var dim = new Dim(0, 0, 0, 0, level);
+                if (options.offsetFromPosition != null) {
+                    dim.x += options.offsetFromPosition.x;
+                    dim.y += options.offsetFromPosition.y;
+                }
 
                 appendPath(ident);
 
@@ -250,20 +261,38 @@ class Dimensions {
                 calculateDimFromCommands(then);
 
                 for (i in inside) {
-                    construct(i, level + 1);
+                    if (options.passthrough && bindings.noPassthrough != true) {
+                        options.passthrough = false;
+                        construct(i, level + 1, options);
+                    }
+                    else {
+                        construct(i, level + 1);
+                    }
                 }
 
                 trimPath();
             }
             case CreateOnInit(dim, init, ident, id, bindings): {
-                dim.order = level;
+                var resultDim = dim.clone();
+                resultDim.order = level;
+                if (options.offsetFromPosition != null) {
+                    resultDim.x += options.offsetFromPosition.x;
+                    resultDim.y += options.offsetFromPosition.y;
+                }
                 
                 appendPath(ident);
 
                 currentParents.push(0);
-                dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: resultDim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
 
-                construct(init, dimCommandStack.length - 1);
+
+                if (options.passthrough && bindings.noPassthrough != true) {
+                    options.passthrough = false;
+                    construct(init, dimCommandStack.length - 1, options);
+                }
+                else {
+                    construct(init, dimCommandStack.length - 1);
+                }
 
                 trimPath();
             }
@@ -283,7 +312,13 @@ class Dimensions {
                 }
                 
                 for (o in inside) {
-                    construct(o, level + 1);
+                    if (options.passthrough && bindings.noPassthrough != true) {
+                        options.passthrough = false;
+                        construct(o, level + 1, options);
+                    }
+                    else {
+                        construct(o, level + 1);
+                    }
                 }
 
                 trimPath();
@@ -304,7 +339,13 @@ class Dimensions {
                 }
                 
                 for (o in inside) {
-                    construct(o, level + 1);
+                    if (options.passthrough && bindings.noPassthrough != true) {
+                        options.passthrough = false;
+                        construct(o, level + 1, options);
+                    }
+                    else {
+                        construct(o, level + 1);
+                    }
                 }
 
                 trimPath();
@@ -325,7 +366,13 @@ class Dimensions {
                 }
                 
                 for (o in inside) {
-                    construct(o, level + 1);
+                    if (options.passthrough && bindings.noPassthrough != true) {
+                        options.passthrough = false;
+                        construct(o, level + 1, options);
+                    }
+                    else {
+                        construct(o, level + 1);
+                    }
                 }
 
                 trimPath();
@@ -363,15 +410,22 @@ class Dimensions {
                 }
                 
                 for (o in inside) {
-                    construct(o, level + 1);
+                    if (options.passthrough && bindings.noPassthrough != true) {
+                        options.passthrough = false;
+                        construct(o, level + 1, options);
+                    }
+                    else {
+                        construct(o, level + 1);
+                    }
                 }
 
                 trimPath();
             }
             case CreateFromOffset(offset, inside, ident, id, bindings): {
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
-
-                var wrapper = createFromOffset(lastItem.dim, offset);
+                
+                var resultDim = lastItem.dim.clone();
+                var wrapper = createFromOffset(resultDim, offset);
                 wrapper.order = level;
 
                 appendPath(ident);
@@ -380,7 +434,13 @@ class Dimensions {
                 currentParents[dimCommandStack.length - 1] += 1;
                 
                 for (o in inside) {
-                    construct(o, level + 1);
+                    if (options.passthrough && bindings.noPassthrough != true) {
+                        options.passthrough = false;
+                        construct(o, level + 1, options);
+                    }
+                    else {
+                        construct(o, level + 1);
+                    }
                 }
 
                 trimPath();
@@ -393,21 +453,36 @@ class Dimensions {
                 appendPath(ident);
 
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
-                
+                var object = copyDimObjectResult(lastItem);
+                object.path = currentPath;
+                object.ident = ident;
+                object.id = id;
+                object.autoSize = false;
 
-                var grid = dimGridEquals(lastItem.dim, columns, rows);
-                for (item in items) {
-                    construct(item, level + 1);
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                    dimCommandStack.push([ object ]);
+                }
+                else {
+                    dimCommandStack[level].push(object);
+                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
-                var children = findItemsByParentName(currentPath);
+                var grid = dimGridEquals(object.dim, columns, rows);
+                var options = new Array<DimObjectOptions>();
+
                 for (y in 0...rows) {
                     for (x in 0...columns) {
                         var index:Int = x * y + x;
+
                         var cell = grid[index];
-                        children[index].dim.x = cell.x;
-                        children[index].dim.y = cell.y;
+                        options.push({ offsetFromPosition: new FastVector2(cell.x, cell.y), passthrough: true });
                     }
+                }
+
+                for (i in 0...items.length) {
+                    var item = items[i];
+                    construct(item, level + 1, options[i]);
                 }
 
                 trimPath();
@@ -416,6 +491,24 @@ class Dimensions {
 
             }
         }
+    }
+
+    static function copyDimObjectResult(object:DimObjectResult):DimObjectResult {
+        return {
+            ident: "",
+            dim: object.dim,
+            autoSize: object.autoSize,
+            clipped: object.clipped,
+            id: object.id,
+            textInput: object.textInput,
+            requestedContainer: object.requestedContainer,
+            parentIndex: null,
+            resultIndex: null,
+            originalCommand: null,
+            textDim: object.textDim,
+            bindings: object.bindings,
+            path: object.path
+        };
     }
 
     static var mappedScenes:Map<String, SceneMap>;
@@ -682,7 +775,8 @@ class Dimensions {
                 return null;
             }
 
-            var results = dimCommandStack[item.parentIndex + 2].filter((o) -> o.path.indexOf(name) != -1);
+            var levels = item.path.toCharArray().whereIndices((char) -> char == "/".code).length;
+            var results = dimCommandStack[levels + 1].filter((o) -> o.path.indexOf(name) != -1);
             return results;
         }
 
@@ -857,12 +951,12 @@ class Dimensions {
                 dimGrowH(dim, value);
             }
             case Align(against, align, offset): {
-                var dimItems = dimCommandStack[currentParents[currentParents.length - 1]];
+                var dimItems = findItemsByParentName(lastItem.path.substr(0, lastItem.path.lastIndexOf("/")));
                 if (against > dimItems.length - 1) {
                     return;
                 }
 
-                var againstDim:Dim = getParentDim(lastItem);
+                var againstDim:Dim = dimItems[against].dim;
                 var isOffset = offset != null;
                 
                 switch (align) {
@@ -1201,9 +1295,9 @@ class Dimensions {
         var cellHeight = container.height / rows;
         var results = [];
 
-        for (c in 0...columns)
+        for (r in 0...rows)
         {
-            for (r in 0...rows)
+            for (c in 0...columns)
             {
                 results.push(new Dim(c * cellWidth + container.x, r * cellHeight + container.y, cellWidth, cellHeight));
             }
