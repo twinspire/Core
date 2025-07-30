@@ -181,6 +181,33 @@ class UpdateContext {
         }
     }
 
+    /**
+    * Gets a reference to a dimension at the given index.
+    **/
+    public function getDimensionsRefAt(index:DimIndex) {
+        switch (index) {
+            case Direct(item): {
+                if (item < 0 || item > _gctx.dimensions.length - 1) {
+                    return [ null ];
+                }
+
+                return [ _gctx.dimensions[item] ];
+            }
+            case Group(item): {
+                var results = [];
+                for (grp in _gctx.getDimIndicesAtGroupIndex(item)) {
+                    if (grp > _gctx.dimensions.length - 1) {
+                        break;
+                    }
+
+                    results.push(_gctx.dimensions[grp]);
+                }
+
+                return results;
+            }
+        }
+    }
+
     public function getTextInputState(index:Int) {
         return _gctx.textInputs[index];
     }
