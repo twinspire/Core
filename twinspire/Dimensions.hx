@@ -122,6 +122,9 @@ enum DimCommand {
     MaxOf(texts:Array<String>, font:Font, fontSize:Int);
     AddSpacingAround(space:Float);
     AddSpacing(space:Float, dir:Direction);
+    SetSize(width:Float, height:Float);
+    SetWidth(width:Float);
+    SetHeight(height:Float);
     Scale(scale:Float);
     ScaleX(scale:Float);
     ScaleY(scale:Float);
@@ -1108,6 +1111,16 @@ class Dimensions {
                 lastItem.textDim = new Dim(0, 0, maxWidth, maxHeight);
                 dim.width += maxWidth;
                 dim.height += maxHeight;
+            }
+            case SetSize(width, height): {
+                dim.width = width;
+                dim.height = height;
+            }
+            case SetHeight(height): {
+                dim.height = height;
+            }
+            case SetWidth(width): {
+                dim.width = width;
             }
             case AddSpacingAround(space): {
                 if (lastItem.textDim != null) {
