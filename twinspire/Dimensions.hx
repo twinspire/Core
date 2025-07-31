@@ -1243,7 +1243,15 @@ class Dimensions {
                     return;
                 }
 
-                var againstDim:Dim = dimItems[against].dim;
+                // -1 refers to parent, so get parent dim instead
+                var againstDim:Dim;
+                if (against == -1) {
+                    againstDim = findItemByName(lastItem.path.substr(0, lastItem.path.lastIndexOf("/"))).dim;
+                }
+                else {
+                    againstDim = dimItems[against].dim;
+                }
+
                 var isOffset = offset != null;
                 
                 switch (align) {
