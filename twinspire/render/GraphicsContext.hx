@@ -318,6 +318,22 @@ class GraphicsContext {
         }
     }
 
+    public function setupDirectLink(child:DimIndex, parent:DimIndex) {
+        switch ([ child, parent ]) {
+            case [ Direct(cindex), Direct(pindex) ]: {
+                if (cindex > dimensionLinks.length - 1) {
+                    _dimTempLinkTo[cindex] = pindex;
+                }
+                else {
+                    dimensionLinks[cindex] = pindex;
+                }
+            }
+            default: {
+
+            }
+        }
+    }
+
     /**
     * Set the links of a group to a specific parent index.
     *
@@ -332,10 +348,18 @@ class GraphicsContext {
             case Group(index, _): {
                 var children = _groups[index];
                 for (child in children) {
-                    dimensionLinks[child] = switch(parent) {
-                        case Direct(i): i;
-                        default: -1;
-                    };
+                    if (child > dimensionLinks.length - 1) {
+                        _dimTempLinkTo[child] = switch(parent) {
+                            case Direct(i): i;
+                            default: -1;
+                        };
+                    }
+                    else {
+                        dimensionLinks[child] = switch(parent) {
+                            case Direct(i): i;
+                            default: -1;
+                        };
+                    }
                 }
             }
         }

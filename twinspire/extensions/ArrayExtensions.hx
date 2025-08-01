@@ -1,5 +1,7 @@
 package twinspire.extensions;
 
+import twinspire.math.Orientation;
+
 class ArrayExtensions
 {
 
@@ -137,6 +139,20 @@ class ArrayExtensions
 		}
 
 		return false;
+	}
+
+	public static function collect<T>(arr:Array<T>, ofIndices:Array<Int>, onEach:(T) -> T):T {
+		if (arr.length == 0) {
+			return null;
+		}
+
+		var fullResults = [];
+		for (i in ofIndices) {
+			var results = onEach(arr[i]);
+			fullResults = fullResults.concat(cast results);
+		}
+
+		return cast fullResults;
 	}
 
 }

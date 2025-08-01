@@ -321,10 +321,10 @@ class Dimensions {
                 if (options.passthrough && bindings.noPassthrough != true) {
                     options.passthrough = false;
                     options.overrideSize = null;
-                    construct(init, dimCommandStack.length - 1, options);
+                    construct(init, dimCommandStack.length, options);
                 }
                 else {
-                    construct(init, dimCommandStack.length - 1);
+                    construct(init, dimCommandStack.length);
                 }
 
                 trimPath();
@@ -1027,7 +1027,7 @@ class Dimensions {
             }
 
             var levels = item.path.toCharArray().whereIndices((char) -> char == "/".code).length;
-            var results = dimCommandStack[levels + 1].filter((o) -> o.path.indexOf(name) != -1);
+            var results = dimCommandStack.collect([ for (l in levels...dimCommandStack.length) l ], (a) -> a.filter((o) -> o.path.indexOf(name) != -1));
             return results;
         }
 
