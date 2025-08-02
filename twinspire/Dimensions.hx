@@ -240,12 +240,12 @@ class Dimensions {
             case CreateEmpty(then, ident, id, bindings): {
                 var dim = new Dim(0, 0, 0, 0, level);
                 appendPath(ident);
-                if (then.findIndex((cmd) -> cmd.getName() == "Align") == -1) {
+                // if (then.findIndex((cmd) -> cmd.getName() == "Align") == -1) {
                     if (options.offsetFromPosition != null) {
                         dim.x += options.offsetFromPosition.x;
                         dim.y += options.offsetFromPosition.y;
                     }
-                }
+                // }
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
@@ -337,14 +337,26 @@ class Dimensions {
                 
                 appendPath(ident);
 
-                currentParents.push(0);
-                dimCommandStack.push([ { 
-                    path: currentPath, originalCommand: command,
-                    parentIndex: getParentIndex(), ident: ident ?? "",
-                    dim: resultDim, autoSize: bindings?.autoSize ?? false,
-                    clipped: options.forceClipping ?? false, id: id,
-                    requestedContainer: options.makeContainer ?? false, 
-                    bindings: bindings } ]);
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                    dimCommandStack.push([ { 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: resultDim, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false, 
+                        bindings: bindings } ]);
+                }
+                else {
+                    dimCommandStack[level].push({ 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: resultDim, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false, 
+                        bindings: bindings });
+                    currentParents[level] = dimCommandStack[level].length - 1;
+                }
 
                 if (options.overrideSize != null) {
                     var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? currentParents.length - 1]];
@@ -592,20 +604,21 @@ class Dimensions {
                 }
 
                 var grid = dimGridEquals(object.dim, columns, rows);
-                var options = new Array<DimObjectOptions>();
-
-                for (y in 0...rows) {
-                    for (x in 0...columns) {
-                        var index:Int = x * y + x;
-
-                        var cell = grid[index];
-                        options.push({ offsetFromPosition: new FastVector2(cell.x, cell.y), passthrough: true });
-                    }
-                }
 
                 for (i in 0...items.length) {
+                    var cell = grid[i];
                     var item = items[i];
-                    construct(item, level + 1, options[i]);
+                    construct(item, level + 1);
+
+                    var lastChildPath = getLastImmediateNamedChild(currentPath + "/");
+                    var lastConstructedObject = findItemByName(lastChildPath);
+
+                    // get all children and position from offset
+                    var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident + "/");
+                    for (child in children) {
+                        child.dim.x += cell.x;
+                        child.dim.y += cell.y;
+                    }
                 }
 
                 trimPath();
@@ -634,20 +647,21 @@ class Dimensions {
                 }
 
                 var grid = dimGridFloats(object.dim, columns, rows);
-                var options = new Array<DimObjectOptions>();
-
-                for (y in 0...rows.length) {
-                    for (x in 0...columns.length) {
-                        var index:Int = x * y + x;
-
-                        var cell = grid[index];
-                        options.push({ offsetFromPosition: new FastVector2(cell.x, cell.y), passthrough: true });
-                    }
-                }
 
                 for (i in 0...items.length) {
+                    var cell = grid[i];
                     var item = items[i];
-                    construct(item, level + 1, options[i]);
+                    construct(item, level + 1);
+
+                    var lastChildPath = getLastImmediateNamedChild(currentPath + "/");
+                    var lastConstructedObject = findItemByName(lastChildPath);
+
+                    // get all children and position from offset
+                    var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident + "/");
+                    for (child in children) {
+                        child.dim.x += cell.x;
+                        child.dim.y += cell.y;
+                    }
                 }
 
                 trimPath();
@@ -676,20 +690,22 @@ class Dimensions {
                 }
 
                 var grid = dimGrid(object.dim, columns, rows);
-                var options = new Array<DimObjectOptions>();
-
-                for (y in 0...rows.length) {
-                    for (x in 0...columns.length) {
-                        var index:Int = x * y + x;
-
-                        var cell = grid[index];
-                        options.push({ offsetFromPosition: new FastVector2(cell.x, cell.y), passthrough: true });
-                    }
-                }
 
                 for (i in 0...items.length) {
+                    var cell = grid[i];
+
                     var item = items[i];
-                    construct(item, level + 1, options[i]);
+                    construct(item, level + 1);
+
+                    var lastChildPath = getLastImmediateNamedChild(currentPath + "/");
+                    var lastConstructedObject = findItemByName(lastChildPath);
+
+                    // get all children and position from offset
+                    var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident + "/");
+                    for (child in children) {
+                        child.dim.x += cell.x;
+                        child.dim.y += cell.y;
+                    }
                 }
 
                 trimPath();
@@ -719,12 +735,18 @@ class Dimensions {
                     var pos = getNewDim();
 
                     construct(item, level + 1, {
-                        offsetFromPosition: new FastVector2(pos.x, pos.y),
                         overrideSize: itemSize,
-                        passthrough: true
                     });
 
+                    var lastChildPath = getLastImmediateNamedChild(currentPath + "/");
+                    var lastConstructedObject = findItemByName(lastChildPath);
 
+                    // get all children and position from offset
+                    var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident + "/");
+                    for (child in children) {
+                        child.dim.x += pos.x;
+                        child.dim.y += pos.y;
+                    }
                 }
 
                 trimPath();
@@ -753,13 +775,18 @@ class Dimensions {
                     var item = items[i];
                     var pos = getNewDim();
 
-                    construct(item, level + 1, {
-                        offsetFromPosition: new FastVector2(pos.x, pos.y),
-                        passthrough: true
-                    });
+                    construct(item, level + 1);
 
-                    var lastConstructedObject = findItemByName(getLastImmediateNamedChild(currentPath + "/"));
+                    var lastChildPath = getLastImmediateNamedChild(currentPath + "/");
+                    var lastConstructedObject = findItemByName(lastChildPath);
                     dimVariableSetNextDim(lastConstructedObject.dim);
+
+                    // get all children and position from offset
+                    var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident + "/");
+                    for (child in children) {
+                        child.dim.x += pos.x;
+                        child.dim.y += pos.y;
+                    }
                 }
 
                 trimPath();
@@ -1154,6 +1181,15 @@ class Dimensions {
 
     static function calculateDimFromCommands(commands:Array<DimCommand>, ?level:Int) {
         var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? dimCommandStack.length - 1]];
+        if (lastItem.path.indexOf("/") > -1) {
+            var parentName = lastItem.path.substr(0, lastItem.path.lastIndexOf("/"));
+            if (parentName != "") {
+                var parent = findItemByName(parentName);
+                lastItem.dim.x = parent.dim.x;
+                lastItem.dim.y = parent.dim.y;
+            }
+        }
+
         for (command in commands) {
             processDimCommand(lastItem.dim, command, level);
         }
