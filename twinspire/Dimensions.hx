@@ -136,6 +136,9 @@ enum DimCommand {
     GrowH(value:Float);
     SpanParentWidth;
     SpanParentHeight;
+    Offset(x:Float, y:Float);
+    OffsetX(value:Float);
+    OffsetY(value:Float);
 }
 
 typedef SceneMap = {
@@ -1111,6 +1114,26 @@ class Dimensions {
                 lastItem.textDim = new Dim(0, 0, maxWidth, maxHeight);
                 dim.width += maxWidth;
                 dim.height += maxHeight;
+            }
+            case Offset(x, y): {
+                dim.x += x;
+                dim.y += y;
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.x += x;
+                    lastItem.textDim.y += y;
+                }
+            }
+            case OffsetX(value): {
+                dim.x += value;
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.x += value;
+                }
+            }
+            case OffsetY(value): {
+                dim.y += value;
+                if (lastItem.textDim != null) {
+                    lastItem.textDim.y += value;
+                }
             }
             case SetSize(width, height): {
                 dim.width = width;
