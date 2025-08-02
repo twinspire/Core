@@ -18,6 +18,7 @@ typedef DimBindingOptions = {
     var ?customEvents:Array<String>;
     var ?noChildObjects:Bool;
     var ?noPassthrough:Bool;
+    var ?autoSize:Bool;
 }
 
 typedef Toggler = {

@@ -248,10 +248,22 @@ class Dimensions {
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                    dimCommandStack.push([ { 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: dim, autoSize: bindings?.autoSize ?? true,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false, 
+                        bindings: bindings } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                    dimCommandStack[level].push({ 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: dim, autoSize: bindings?.autoSize ?? true,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
@@ -275,10 +287,22 @@ class Dimensions {
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                    dimCommandStack.push([ { 
+                        path: currentPath, originalCommand: command, 
+                        parentIndex: getParentIndex(), ident: ident ?? "", 
+                        dim: dim, autoSize: bindings?.autoSize ?? true,
+                        clipped: options.forceClipping ?? false,
+                        id: id, requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: dim, autoSize: true, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                    dimCommandStack[level].push({ 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: dim, autoSize: bindings?.autoSize ?? true,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
@@ -290,7 +314,7 @@ class Dimensions {
                 }
 
                 for (i in inside) {
-                    if (options.passthrough && bindings.noPassthrough != true) {
+                    if (options.passthrough && bindings?.noPassthrough != true) {
                         options.passthrough = false;
                         options.overrideSize = null;
                         construct(i, level + 1, options);
@@ -313,7 +337,13 @@ class Dimensions {
                 appendPath(ident);
 
                 currentParents.push(0);
-                dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: resultDim, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                dimCommandStack.push([ { 
+                    path: currentPath, originalCommand: command,
+                    parentIndex: getParentIndex(), ident: ident ?? "",
+                    dim: resultDim, autoSize: bindings?.autoSize ?? false,
+                    clipped: options.forceClipping ?? false, id: id,
+                    requestedContainer: options.makeContainer ?? false, 
+                    bindings: bindings } ]);
 
                 if (options.overrideSize != null) {
                     var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? currentParents.length - 1]];
@@ -321,7 +351,7 @@ class Dimensions {
                     lastItem.dim.height = options.overrideSize.height;
                 }
 
-                if (options.passthrough && bindings.noPassthrough != true) {
+                if (options.passthrough && bindings?.noPassthrough != true) {
                     options.passthrough = false;
                     options.overrideSize = null;
                     construct(init, dimCommandStack.length, options);
@@ -340,15 +370,27 @@ class Dimensions {
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                    dimCommandStack.push([ { 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id, 
+                        requestedContainer: options.makeContainer ?? false, 
+                        bindings: bindings } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                    dimCommandStack[level].push({ 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, 
+                        id: id, requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
-                    if (options.passthrough && bindings.noPassthrough != true) {
+                    if (options.passthrough && bindings?.noPassthrough != true) {
                         options.passthrough = false;
                         options.overrideSize = null;
                         construct(o, level + 1, options);
@@ -368,15 +410,27 @@ class Dimensions {
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                    dimCommandStack.push([ { 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                    dimCommandStack[level].push({
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
-                    if (options.passthrough && bindings.noPassthrough != true) {
+                    if (options.passthrough && bindings?.noPassthrough != true) {
                         options.passthrough = false;
                         options.overrideSize = null;
                         construct(o, level + 1, options);
@@ -396,15 +450,27 @@ class Dimensions {
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                    dimCommandStack.push([ { 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                    dimCommandStack[level].push({ 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
-                    if (options.passthrough && bindings.noPassthrough != true) {
+                    if (options.passthrough && bindings?.noPassthrough != true) {
                         options.passthrough = false;
                         construct(o, level + 1, options);
                     }
@@ -440,15 +506,27 @@ class Dimensions {
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
-                    dimCommandStack.push([ { path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings } ]);
+                    dimCommandStack.push([ { 
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings } ]);
                 }
                 else {
-                    dimCommandStack[level].push({ path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                    dimCommandStack[level].push({
+                        path: currentPath, originalCommand: command,
+                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                        clipped: options.forceClipping ?? false, id: id,
+                        requestedContainer: options.makeContainer ?? false,
+                        bindings: bindings });
                     currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
-                    if (options.passthrough && bindings.noPassthrough != true) {
+                    if (options.passthrough && bindings?.noPassthrough != true) {
                         options.passthrough = false;
                         construct(o, level + 1, options);
                     }
@@ -468,7 +546,13 @@ class Dimensions {
 
                 appendPath(ident);
 
-                dimCommandStack[dimCommandStack.length - 1].push({ path: currentPath, originalCommand: command, parentIndex: getParentIndex(), ident: ident ?? "", dim: wrapper, autoSize: false, clipped: options.forceClipping ?? false, id: id, requestedContainer: options.makeContainer ?? false, bindings: bindings });
+                dimCommandStack[dimCommandStack.length - 1].push({
+                    path: currentPath, originalCommand: command,
+                    parentIndex: getParentIndex(), ident: ident ?? "",
+                    dim: wrapper, autoSize: bindings?.autoSize ?? false,
+                    clipped: options.forceClipping ?? false, id: id,
+                    requestedContainer: options.makeContainer ?? false,
+                    bindings: bindings });
                 currentParents[dimCommandStack.length - 1] += 1;
                 
                 for (o in inside) {
@@ -652,7 +736,7 @@ class Dimensions {
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
-                object.autoSize = false;
+                object.autoSize = bindings?.autoSize ?? false;
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
@@ -689,7 +773,7 @@ class Dimensions {
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
-                object.autoSize = false;
+                object.autoSize = bindings?.autoSize ?? false;
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
