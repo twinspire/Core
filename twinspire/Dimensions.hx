@@ -139,6 +139,7 @@ enum DimCommand {
     Offset(x:Float, y:Float);
     OffsetX(value:Float);
     OffsetY(value:Float);
+    PositionToParent;
 }
 
 typedef SceneMap = {
@@ -1343,6 +1344,13 @@ class Dimensions {
                 }
 
                 dimGrowH(dim, value);
+            }
+            case PositionToParent: {
+                var againstDim = findItemByName(lastItem.path.substr(0, lastItem.path.lastIndexOf("/"))).dim;
+                if (againstDim != null) {
+                    dim.x = againstDim.x;
+                    dim.y = againstDim.y;
+                }
             }
             case Align(against, align, offset): {
                 var dimItems = findItemsByParentName(lastItem.path.substr(0, lastItem.path.lastIndexOf("/")));
