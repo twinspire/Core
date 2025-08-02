@@ -1003,6 +1003,11 @@ class GraphicsContext {
         var next = true;
         while (next) {
             var item = Dimensions.getLookupItem();
+            if (item.resultIndex != null) {
+                // resultIndex already set, so ignore the item
+                continue;
+            }
+
             var resultIndex:DimIndex = Direct(-1);
             if (item.textInput) {
                 var textInputResult = addTextInput(item.dim, ImSingleLine);
