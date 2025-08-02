@@ -386,7 +386,10 @@ class Graphics2
 	}
 
 	public static function fillCircleDim(g2:Graphics, destination:Dim) {
-		fillCircle(g2, destination.x + (destination.width / 2), destination.y + (destination.height / 2), destination.width / 2);
+		var cx = destination.x + (destination.width / 2);
+		var cy = destination.y + (destination.height / 2);
+		var radius = destination.width / 2;
+		fillCircle(g2, cx, cy, radius);
 	}
 
 	public static function fillTriangleDim(g2:Graphics, destination:Dim, direction:Int)
