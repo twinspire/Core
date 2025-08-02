@@ -385,6 +385,10 @@ class Graphics2
 		g2.drawVideo(video, destination.x, destination.y, destination.width, destination.height);
 	}
 
+	public static function fillCircleDim(g2:Graphics, destination:Dim) {
+		fillCircle(g2, destination.x + (destination.width / 2), destination.y + (destination.height / 2), destination.width / 2);
+	}
+
 	public static function fillTriangleDim(g2:Graphics, destination:Dim, direction:Int)
 	{
 		var x1 = 0.0, x2 = 0.0, x3 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;

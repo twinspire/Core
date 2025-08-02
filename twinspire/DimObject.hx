@@ -14,13 +14,14 @@ class DimObject extends SceneObject {
     public var dimObjectResult:DimObjectResult;
     public var initCommand:DimInitCommand;
     public var resultingDimensions:Map<String, DimIndex>;
-    public var groupIndex:DimIndex;
+    public var groups:Map<String, DimIndex>;
 
     public function new() {
         super();
 
         resultingDimensions = [];
         data = [];
+        groups = [];
     }
 
     /**
