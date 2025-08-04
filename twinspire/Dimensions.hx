@@ -111,7 +111,6 @@ enum DimInitCommand {
     CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
     CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
     CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    Reference(id:Id, ?bindings:DimBindingOptions);
 }
 
 enum DimCommand {
@@ -147,8 +146,17 @@ typedef SceneMap = {
     var ?objects:Array<SceneObject>;
 }
 
+typedef CommandResult = {
+    var ?parent:DimInitCommand;
+    var ?children:Array<DimInitCommand>;
+}
+
 class Dimensions {
 
+    /**
+    * The very first command within the command stack hierarchy.
+    **/
+    static var rootCommand:DimInitCommand;
     /**
     * command stack
     * - first index = the parent of a series of children, effectively the hierarchy
@@ -199,6 +207,72 @@ class Dimensions {
         }
     }
 
+    static function getCommandFromPath(path:String) {
+        if (path == "" || path == null) {
+            return null;
+        }
+
+        var splitted = path.split("/");
+        var command:DimInitCommand = null;
+        for (i in 0...splitted.length) {
+            var ident = splitted[i];
+            
+        }
+
+        return command;
+    }
+
+    static function findCommandIdent(init:DimInitCommand, path:String):CommandResult {
+        var result:Array<DimInitCommand> = null;
+
+        switch (init) {
+            case CreateEmpty(_, ident): {
+                if (ident == path) {
+                    result = [ ident ];
+                }
+            }
+            case CreateWrapper(cmd, _, ident): {
+                if (ident == path) {
+                    result = cmd;
+                }
+            }
+            case CreateOnInit(_, cmd, ident): {
+                if (ident == path) {
+                    result = [ cmd ];
+                }
+            }
+            case CentreScreenY(_, _, _, inside, ident): {
+                if (ident == path) {
+                    result = inside;
+                }
+            }
+            case CentreScreenX(_, _, _, inside, ident): {
+                if (ident == path) {
+                    result = inside;
+                }
+            }
+            case CentreScreenFromSize(_, _, inside, ident): {
+                if (ident == path) {
+                    result = inside;
+                }
+            }
+            case CreateDimAlignScreen(_, _, _, _, inside, ident): {
+                if (ident == path) {
+                    result = inside;
+                }
+            }
+            CreateFromOffset(offset:FastVector2, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+            CreateGridEquals(columns:Int, rows:Int, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+            CreateGridFloats(columns:Array<Float>, rows:Array<Float>, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+            CreateGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+            CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+            CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+            CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+        };
+
+
+    }
+
     /**
     * Reset the current hierarchy and clear all data.
     **/
@@ -232,11 +306,6 @@ class Dimensions {
         }
 
         switch (command) {
-            case Reference(id, bindings): {
-                if (mappedObjects.exists(id)) {
-                    construct(mappedObjects[id], level);
-                }
-            }
             case CreateEmpty(then, ident, id, bindings): {
                 var dim = new Dim(0, 0, 0, 0, level);
                 appendPath(ident);
