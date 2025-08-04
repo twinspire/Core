@@ -144,6 +144,7 @@ enum DimCommand {
 typedef SceneMap = {
     var ?stack:Array<Array<DimObjectResult>>;
     var ?objects:Array<SceneObject>;
+    var ?root:DimInitCommand;
 }
 
 typedef CommandResult = {
@@ -216,61 +217,105 @@ class Dimensions {
         var command:DimInitCommand = null;
         for (i in 0...splitted.length) {
             var ident = splitted[i];
-            
+            if (i == 0) {
+                command = findCommandIdent(rootCommand, ident);
+            }
+            else {
+                command = findCommandIdent(command, ident);
+            }
+
+            if (command == null && i != splitted.length - 1) {
+                break;
+            }
         }
 
         return command;
     }
 
-    static function findCommandIdent(init:DimInitCommand, path:String):CommandResult {
+    static function findCommandIdent(init:DimInitCommand, path:String):DimInitCommand {
         var result:Array<DimInitCommand> = null;
 
         switch (init) {
-            case CreateEmpty(_, ident): {
-                if (ident == path) {
-                    result = [ ident ];
-                }
-            }
             case CreateWrapper(cmd, _, ident): {
-                if (ident == path) {
-                    result = cmd;
-                }
+                result = cmd;
             }
             case CreateOnInit(_, cmd, ident): {
-                if (ident == path) {
-                    result = [ cmd ];
-                }
+                result = [ cmd ];
             }
             case CentreScreenY(_, _, _, inside, ident): {
-                if (ident == path) {
-                    result = inside;
-                }
+                result = inside;
             }
             case CentreScreenX(_, _, _, inside, ident): {
-                if (ident == path) {
-                    result = inside;
-                }
+                result = inside;
             }
             case CentreScreenFromSize(_, _, inside, ident): {
-                if (ident == path) {
-                    result = inside;
-                }
+                result = inside;
             }
             case CreateDimAlignScreen(_, _, _, _, inside, ident): {
-                if (ident == path) {
-                    result = inside;
-                }
+                result = inside;
             }
-            CreateFromOffset(offset:FastVector2, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-            CreateGridEquals(columns:Int, rows:Int, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-            CreateGridFloats(columns:Array<Float>, rows:Array<Float>, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-            CreateGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-            CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-            CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-            CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-        };
+            case CreateFromOffset(_, inside, ident): {
+                result = inside;
+            }
+            case CreateGridEquals(_, _, items, ident): {
+                result = items;
+            }
+            case CreateGridFloats(_, _, items, ident): {
+                result = items;
+            }
+            case CreateGrid(_, _, items, ident): {
+                result = items;
+            }
+            case CreateFixedFlow(_, _, items, ident): {
+                result = items;
+            }
+            case CreateVariableFlow(_, items, ident): {
+                result = items;
+            }
+            case CreateFlowComplex(_, items, ident): {
+                result = items;
+            }
+            default: {
 
+            }
+        }
 
+        var index = -1;
+        for (i in 0...result.length) {
+            var r = result[i];
+            var found = commandIdentMatches(r, path);
+
+            if (found) {
+                index = i;
+                break;
+            }
+        }
+
+        if (i > -1) {
+            return result[index];
+        }
+        else {
+            return null;
+        }
+    }
+
+    static function commandIdentMatches(init:DimInitCommand, path:String) {
+        return switch(init) {
+            case CreateEmpty(_, ident): ident == path;
+            case CreateWrapper(_, _, ident): ident == path;
+            case CreateOnInit(_, _, ident): ident == path;
+            case CentreScreenY(_, _, _, _, ident): ident == path;
+            case CentreScreenX(_, _, _, _, ident): ident == path;
+            case CentreScreenFromSize(_, _, _, ident): ident == path;
+            case CreateDimAlignScreen(_, _, _, _, _, ident): ident == path;
+            case CreateFromOffset(_, _, ident): ident == path;
+            case CreateGridEquals(_, _, _, ident): ident == path;
+            case CreateGridFloats(_, _, _, ident): ident == path;
+            case CreateGrid(_, _, _, ident): ident == path;
+            case CreateFixedFlow(_, _, _, ident): ident == path;
+            case CreateVariableFlow(_, _, ident): ident == path;
+            case CreateFlowComplex(_, _, ident): ident == path;
+        }
     }
 
     /**
@@ -280,6 +325,7 @@ class Dimensions {
         dimCommandStack = [];
         currentParents = [];
         currentPath = "";
+        rootCommand = null;
     }
 
     /**
@@ -296,6 +342,10 @@ class Dimensions {
     * @param options (Optional) Add options specifying additional parameters for this command. 
     **/
     public static function construct(command:DimInitCommand, level:Int = 0, ?options:DimObjectOptions) {
+        if (rootCommand == null) {
+            rootCommand = command;
+        }
+
         if (options == null) {
             options = {};
         }
@@ -961,7 +1011,8 @@ class Dimensions {
         }
 
         mappedScenes[scene.name] = {
-            stack: dimCommandStack.copy()             
+            stack: dimCommandStack.copy(),
+            root: rootCommand
         };
     }
 
@@ -1082,6 +1133,169 @@ class Dimensions {
 
         mappedScenes[scene.name].objects = objects;
         scene.init(Application.instance.graphicsCtx, objects);
+    }
+
+    
+    public static function remove(sceneName:String, path:String) {
+        if (!mappedScenes.exists(sceneName)) {
+            return false;
+        }
+
+        
+        var slash = path.lastIndexOf("/");
+        // remove everything, assuming the path matches
+        if (slash == -1) {
+            var match = commandIdentMatches(rootCommand, path);
+            if (match) {
+                resetConstruct();
+                mappedScenes[sceneName].root = null;
+                mappedScenes[sceneName].stack = null;
+            }
+        }
+
+        var command = getCommandFromPath(path.substr(0, slash));
+        var childPath = path.substr(slash + 1);
+        var dimCommandResults = findItemsByParentName(path);
+        if (command != null && dimCommandResults != null) {
+            // remove the children, so get the parent and delete the matching ident
+            //  - childPath
+            var deletedCommand = deleteCommandFromPath(path.substr(0, slash));
+
+        }
+    }
+
+    static function deleteCommandFromPath(path:String) {
+        var slash = path.lastIndexOf("/");
+        var success = true;
+        var command = getCommandFromPath(path.substr(0, slash));
+        var childPath = path.substr(slash + 1);
+
+        switch (command) {
+            case CreateWrapper(inside, _): {
+                for (i in 0...inside.length) {
+                    var found = commandIdentMatches(inside[i], childPath);
+                    if (found) {
+                        inside.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateOnInit(_, init): {
+                if (commandIdentMatches(init, childPath)) {
+
+                }
+            }
+            case CentreScreenY(_, _, _, inside): {
+                for (i in 0...inside.length) {
+                    var found = commandIdentMatches(inside[i], childPath);
+                    if (found) {
+                        inside.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CentreScreenX(_, _, _, inside): {
+                for (i in 0...inside.length) {
+                    var found = commandIdentMatches(inside[i], childPath);
+                    if (found) {
+                        inside.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CentreScreenFromSize(_, _, inside): {
+                for (i in 0...inside.length) {
+                    var found = commandIdentMatches(inside[i], childPath);
+                    if (found) {
+                        inside.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateDimAlignScreen(_, _, _, _, inside): {
+                for (i in 0...inside.length) {
+                    var found = commandIdentMatches(inside[i], childPath);
+                    if (found) {
+                        inside.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateFromOffset(_, inside): {
+                for (i in 0...inside.length) {
+                    var found = commandIdentMatches(inside[i], childPath);
+                    if (found) {
+                        inside.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateGridEquals(_, _, items): {
+                for (i in 0...items.length) {
+                    var found = commandIdentMatches(items[i], childPath);
+                    if (found) {
+                        items.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateGridFloats(_, _, items): {
+                for (i in 0...items.length) {
+                    var found = commandIdentMatches(items[i], childPath);
+                    if (found) {
+                        items.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateGridFloats(_, _, items): {
+                for (i in 0...items.length) {
+                    var found = commandIdentMatches(items[i], childPath);
+                    if (found) {
+                        items.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateGrid(_, _, items): {
+                for (i in 0...items.length) {
+                    var found = commandIdentMatches(items[i], childPath);
+                    if (found) {
+                        items.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateFixedFlow(_, _, items): {
+                for (i in 0...items.length) {
+                    var found = commandIdentMatches(items[i], childPath);
+                    if (found) {
+                        items.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateVariableFlow(_, items): {
+                for (i in 0...items.length) {
+                    var found = commandIdentMatches(items[i], childPath);
+                    if (found) {
+                        items.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            case CreateFlowComplex(_, items): {
+                for (i in 0...items.length) {
+                    var found = commandIdentMatches(items[i], childPath);
+                    if (found) {
+                        items.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        return success;
     }
 
     /**
