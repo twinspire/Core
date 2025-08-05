@@ -102,6 +102,19 @@ class Scene {
     }
 
     /**
+    * Remove an object at the given index. Does not remove any active dimensions
+    * in the dimension stack. Use `gtx.removeIndex` to remove the objects' state
+    * in the dimension stack before removing it from the scene.
+    **/
+    public function removeObjectAt(index:Int) {
+        if (index < 0 || index > objects.length - 1) {
+            return;
+        }
+
+        objects.splice(index, 1);
+    }
+
+    /**
     * Initialise this scene with starting objects.
     **/
     public function init(gtx:GraphicsContext, objects:Array<SceneObject>) {

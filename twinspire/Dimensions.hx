@@ -1,5 +1,7 @@
 package twinspire;
 
+import haxe.ds.ArraySort;
+
 import kha.AssetError;
 import twinspire.DimIndex.DimIndexUtils;
 import haxe.io.Path;
@@ -145,6 +147,7 @@ typedef SceneMap = {
     var ?stack:Array<Array<DimObjectResult>>;
     var ?objects:Array<SceneObject>;
     var ?root:DimInitCommand;
+    var ?removeObjCallback:(Int) -> Void;
 }
 
 typedef CommandResult = {
@@ -291,7 +294,7 @@ class Dimensions {
             }
         }
 
-        if (i > -1) {
+        if (index > -1) {
             return result[index];
         }
         else {
@@ -992,6 +995,7 @@ class Dimensions {
         };
     }
 
+    static var currentSceneName:String;
     static var mappedScenes:Map<String, SceneMap>;
     public static var mappedObjects:Map<Id, DimInitCommand>;
 
@@ -1131,16 +1135,19 @@ class Dimensions {
             }
         }
 
+        currentSceneName = scene.name;
         mappedScenes[scene.name].objects = objects;
+        mappedScenes[scene.name].removeObjCallback = scene.removeObjectAt;
         scene.init(Application.instance.graphicsCtx, objects);
     }
 
     
-    public static function remove(sceneName:String, path:String) {
+    public static function remove(path:String, ?sceneName:String) {
+        var sceneName = sceneName ?? currentSceneName;
+
         if (!mappedScenes.exists(sceneName)) {
             return false;
         }
-
         
         var slash = path.lastIndexOf("/");
         // remove everything, assuming the path matches
@@ -1151,38 +1158,114 @@ class Dimensions {
                 mappedScenes[sceneName].root = null;
                 mappedScenes[sceneName].stack = null;
             }
+
+            return true;
         }
 
-        var command = getCommandFromPath(path.substr(0, slash));
-        var childPath = path.substr(slash + 1);
-        var dimCommandResults = findItemsByParentName(path);
-        if (command != null && dimCommandResults != null) {
+        var command = getCommandFromPath(path.substr(path.indexOf("/") + 1));
+        if (command != null) {
             // remove the children, so get the parent and delete the matching ident
-            //  - childPath
-            var deletedCommand = deleteCommandFromPath(path.substr(0, slash));
+            var deletedCommand = deleteCommandFromPath(path.substr(path.indexOf("/") + 1));
+            if (!deletedCommand) {
+                trace('The command of path $path could not be deleted. Could not find a valid parent or the path was typed incorrectly.');
+                return false;
+            }
 
+            // iterate the entire stack, checking the full paths and deleting the children
+            // of the given path before deleting the instance of the path itself
+            begin();
+            var currentParent = _lookupParent;
+            var childIndices = new Array<Array<Int>>();
+            var indicesToRemove = new Array<DimIndex>();
+            var matchedParent = [ -1, -1 ];
+
+            while (next()) {
+                var item = getLookupItem();
+                if (_lookupParent != currentParent) {
+                    currentParent = _lookupParent;
+                }
+                
+                if (item.path.indexOf(path) > -1 && item.path != path) {
+                    while (currentParent > childIndices.length - 1) {
+                        childIndices.push([]);
+                    }
+
+                    childIndices[currentParent].push(_lookupChild);
+                }
+                else if (item.path == path) {
+                    indicesToRemove.push(item.resultIndex);
+                    matchedParent = [ _lookupParent, _lookupChild ];
+                }
+            }
+
+            // delete the parent and children from the command stack
+            for (parent in 0...childIndices.length) {
+                ArraySort.sort(childIndices[parent], (x, y) -> {
+                    if (x > y) return 1;
+                    else if (x < y) return -1;
+                    else return 0;
+                });
+
+                // delete in reverse to avoid overlapping indices
+                var child = childIndices[parent].length - 1;
+                while (child > -1) {
+                    var removed = dimCommandStack[parent].splice(child, 1);
+                    for (rem in removed) {
+                        indicesToRemove.push(rem.resultIndex);
+                    }
+                    child -= 1;
+                }
+            }
+
+            // delete object from mappedScene
+            var objIndex = mappedScenes[sceneName].objects.findIndex((obj) -> obj.index == dimCommandStack[matchedParent[0]][matchedParent[1]].resultIndex);
+            mappedScenes[sceneName].objects.splice(objIndex, 1);
+
+            // copy the adjusted to scenes
+            dimCommandStack[matchedParent[0]].splice(matchedParent[1], 1);
+            mappedScenes[sceneName].stack = dimCommandStack.copy();
+
+            // remove from scene
+            mappedScenes[sceneName].removeObjCallback(objIndex);
+
+            // delete indices from dimension stack
+            Application.instance.graphicsCtx.removeIndices(indicesToRemove);
         }
+
+        return true;
     }
 
     static function deleteCommandFromPath(path:String) {
         var slash = path.lastIndexOf("/");
-        var success = true;
+        if (slash == -1) {
+            return false;
+        }
+
+        var success = false;
         var command = getCommandFromPath(path.substr(0, slash));
         var childPath = path.substr(slash + 1);
 
         switch (command) {
+            case CreateEmpty(_, ident): {
+                if (ident == childPath) {
+                    var parent = path.substr(0, childPath.length - 1);
+                    success = deleteCommandFromPath(parent);
+                }
+            }
             case CreateWrapper(inside, _): {
                 for (i in 0...inside.length) {
                     var found = commandIdentMatches(inside[i], childPath);
                     if (found) {
                         inside.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
             }
             case CreateOnInit(_, init): {
                 if (commandIdentMatches(init, childPath)) {
-
+                    var parent = path.substr(0, childPath.length - 1);
+                    success = deleteCommandFromPath(parent);
                 }
             }
             case CentreScreenY(_, _, _, inside): {
@@ -1190,6 +1273,7 @@ class Dimensions {
                     var found = commandIdentMatches(inside[i], childPath);
                     if (found) {
                         inside.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1199,6 +1283,7 @@ class Dimensions {
                     var found = commandIdentMatches(inside[i], childPath);
                     if (found) {
                         inside.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1208,6 +1293,7 @@ class Dimensions {
                     var found = commandIdentMatches(inside[i], childPath);
                     if (found) {
                         inside.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1217,6 +1303,7 @@ class Dimensions {
                     var found = commandIdentMatches(inside[i], childPath);
                     if (found) {
                         inside.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1226,6 +1313,7 @@ class Dimensions {
                     var found = commandIdentMatches(inside[i], childPath);
                     if (found) {
                         inside.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1235,6 +1323,7 @@ class Dimensions {
                     var found = commandIdentMatches(items[i], childPath);
                     if (found) {
                         items.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1244,6 +1333,7 @@ class Dimensions {
                     var found = commandIdentMatches(items[i], childPath);
                     if (found) {
                         items.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1253,6 +1343,7 @@ class Dimensions {
                     var found = commandIdentMatches(items[i], childPath);
                     if (found) {
                         items.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1262,6 +1353,7 @@ class Dimensions {
                     var found = commandIdentMatches(items[i], childPath);
                     if (found) {
                         items.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1271,6 +1363,7 @@ class Dimensions {
                     var found = commandIdentMatches(items[i], childPath);
                     if (found) {
                         items.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1280,6 +1373,7 @@ class Dimensions {
                     var found = commandIdentMatches(items[i], childPath);
                     if (found) {
                         items.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }
@@ -1289,6 +1383,7 @@ class Dimensions {
                     var found = commandIdentMatches(items[i], childPath);
                     if (found) {
                         items.splice(i, 1);
+                        success = true;
                         break;
                     }
                 }

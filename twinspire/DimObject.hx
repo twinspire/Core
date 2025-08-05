@@ -160,14 +160,6 @@ class DimObject extends SceneObject {
                     }
                 }
             }
-            case Reference(id): {
-                if (Dimensions.mappedObjects.exists(id)) {
-                    var item = findTextFromInit(Dimensions.mappedObjects[id]);
-                    if (item != null) {
-                        text = item;
-                    }
-                }
-            }
         }
 
         return text;

@@ -54,6 +54,9 @@ class GraphicsContext {
 
     private var _activeDimensions:Array<Bool>;
 
+    private var _dormantDimIndices:Array<Int>;
+    private var _dormantGroups:Array<Int>;
+
     /**
     * A collection of dimensions within this context. Do not write directly.
     **/
@@ -118,6 +121,8 @@ class GraphicsContext {
         _dimForceChangeIndices = [];
         _activeDimensions = [];
         _containerTemp = [];
+        _dormantDimIndices = [];
+        _dormantGroups = [];
         _ended = false;
         _currentMenu = -1;
         _containerOffsetsChanged = false;
@@ -281,11 +286,20 @@ class GraphicsContext {
             }
             else {
                 // log error
-                return;
             }
+
+            return;
         }
-        
-        _currentGroup = _groups.push([]) - 1;
+
+        var temp = _groups.length;
+        if (_dormantGroups.length > 0) {
+            temp = _dormantGroups.shift();
+        }
+        else {
+            _groups.push([]);
+        }
+
+        _currentGroup = temp;
         _currentGroupRenderType = renderType;
     }
 
@@ -318,6 +332,12 @@ class GraphicsContext {
         }
     }
 
+    /**
+    * Set the link of a direct index to a specific parent index.
+    *
+    * @param child The direct index to assign to a parent index.
+    * @param parent The parent index to assign the child index to. 
+    **/
     public function setupDirectLink(child:DimIndex, parent:DimIndex) {
         switch ([ child, parent ]) {
             case [ Direct(cindex), Direct(pindex) ]: {
@@ -505,11 +525,11 @@ class GraphicsContext {
     public function isDimIndexValid(index:DimIndex) {
         switch (index) {
             case Direct(item): {
-                return item > -1 && item < dimensions.length;
+                return item > -1 && item < dimensions.length && !_dormantDimIndices.contains(item);
             }
             case Group(group): {
                 for (item in _groups[group]) {
-                    if (item < 0 || item > dimensions.length - 1) {
+                    if (item < 0 || item > dimensions.length - 1 || _dormantDimIndices.contains(item)) {
                         return false;
                     }
                 }
@@ -712,6 +732,154 @@ class GraphicsContext {
     }
 
     /**
+    * Compares two `DimIndex` instances.
+    * This function returns `true` if any of the following conditions are met:
+    *
+    *   - `a` and `b` are `Direct` and have the exact same integer values.
+    *   - `a` and `b` are `Group` and have the exact same integer values.
+    *   - `a` is a `Group`, and `b` is `Direct`, and the integer value of `b` resides in `a`.
+    * 
+    * The comparison where `a` is `Direct` and `b` is a `Group` is an incompatible comparison, and returns `false`.
+    **/
+    public function compareIndex(a:DimIndex, b:DimIndex) {
+        if (a == b) {
+            return true;
+        }
+        else {
+            switch [a, b] {
+                case [ Direct(aResult), Direct(bResult) ]: {
+                    return aResult == bResult;
+                }
+                case [ Direct(_), Group(_) ]: {
+                    return false;
+                }
+                case [ Group(aResult), Direct(bResult) ]: {
+                    var children = _groups[aResult];
+                    return children.contains(bResult);
+                }
+                case [ Group(aResult), Group(bResult) ]: {
+                    return aResult == bResult;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+    * Marks to remove an index from the dimension stack. Instead of physically removing the item,
+    * the stack's respective indices are simply set to `null` and allowed to be replaced by other
+    * indices when using any of the `add` functions.
+    *
+    * Any text inputs or containers that are related to any of the indices are physically removed.
+    * If you use index referencing for text inputs or containers, it is recommended to refresh these
+    * indices.
+    *
+    * @param index The index `Direct` or `Group` to remove.
+    **/
+    public function removeIndex(index:DimIndex) {
+        var toRemove = new Array<Int>();
+        var groupToRemove = -1;
+        switch (index) {
+            case Direct(i): {
+                // ignore if already dormant
+                if (_dormantDimIndices.contains(i)) {
+                    return;
+                }
+
+                toRemove.push(i);
+            }
+            case Group(i): {
+                if (_dormantGroups.contains(i)) {
+                    return;
+                }
+
+                var children = _groups[i];
+                for (child in children) {
+                    if (!_dormantDimIndices.contains(child)) {
+                        toRemove.push(child);
+                    }
+                }
+
+                groupToRemove = i;
+            }
+        }
+
+
+        // check inputs/containers
+        var inputsRemove = new Array<Int>();
+        for (i in 0...textInputs.length) {
+            var input = textInputs[i];
+            for (r in toRemove) {
+                if (compareIndex(input.index.dimIndex, Direct(r))) {
+                    inputsRemove.push(i);
+                }
+            }
+        }
+
+        var inputIndex = inputsRemove.length - 1;
+        while (inputIndex > -1) {
+            var index = inputsRemove[inputIndex];
+            textInputs.splice(index, 1);
+
+            inputIndex -= 1;
+        }
+
+        var containersToRemove = containers.whereIndices((c) -> toRemove.contains(c.dimIndex));
+
+        for (i in 0...containers.length) {
+            var container = containers[i];
+
+            var found = container.childIndices.whereIndices((di) -> toRemove.contains(DimIndexUtils.getDirectIndex(di)));
+            for (j in found.length...0) {
+                container.childIndices.splice(found[j], 1);
+            }
+        }
+
+        var containerIndex = containersToRemove.length - 1;
+        while (containerIndex > -1) {
+            var index = containersToRemove[containerIndex];
+            containers.splice(index, 1);
+
+            containerIndex -= 1;
+        }
+
+        var removeIndex = toRemove.length - 1; 
+        while (removeIndex > -1) {
+            var index = toRemove[removeIndex];
+            dimensions[index] = null;
+            queries[index] = null;
+            activities[index] = null;
+            _activeDimensions[index] = false;
+
+            var links = dimensionLinks.whereIndices((l) -> l == index);
+            for (l in links) {
+                dimensionLinks[l] = -1;
+            }
+
+            _dormantDimIndices.push(index);
+
+            removeIndex -= 1;
+        }
+
+        if (groupToRemove > -1) {
+            _groups[groupToRemove] = null;
+            _dormantGroups.push(groupToRemove);
+        }
+    }
+
+    /**
+    * Remove a collection of indices. Uses the same behaviour as `removeIndex`.
+    *
+    * @param collection The collection of indices to remove from the stack.
+    **/
+    public function removeIndices(collection:Array<DimIndex>) {
+        for (item in collection) {
+            removeIndex(item);
+        }
+    }
+
+    /**
     * Copy a dim index with the given `pos` offset from the original position of all
     * dimensions within this function. This function takes into account possible containers.
     *
@@ -859,6 +1027,14 @@ class GraphicsContext {
         }
     }
 
+    private function getNewIndex(index:Int) {
+        if (_dormantDimIndices.length > 0) {
+            return _dormantDimIndices[0];
+        }
+        
+        return index;
+    }
+
     /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
@@ -881,18 +1057,25 @@ class GraphicsContext {
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
         _dimClientPositions.push(new FastVector2(dim.x, dim.y));
-        var index = _dimTemp.length - 1;
-        if (noVirtualSceneChange) {
+        var index = getNewIndex(_dimTemp.length - 1);
+        if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
             index += dimensions.length;
         }
 
         var query = new RenderQuery();
         query.type = QUERY_STATIC;
         query.renderType = renderType;
-        queries.push(query);
 
-        activities.push([]);
-        _activeDimensions.push(true);
+        if (index < _dimTemp.length) {
+            queries[index] = query;
+            activities[index] = [];
+            _activeDimensions[index] = true;
+        }
+        else {
+            queries.push(query);
+            activities.push([]);
+            _activeDimensions.push(true);
+        }
 
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
@@ -922,18 +1105,24 @@ class GraphicsContext {
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
         _dimClientPositions.push(new FastVector2(dim.x, dim.y));
-        var index = _dimTemp.length - 1;
-        if (noVirtualSceneChange) {
+        var index = getNewIndex(_dimTemp.length - 1);
+        if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
             index += dimensions.length;
         }
 
         var query = new RenderQuery();
         query.type = QUERY_UI;
         query.renderType = renderType;
-        queries.push(query);
-
-        activities.push([]);
-        _activeDimensions.push(true);
+        if (index < _dimTemp.length) {
+            queries[index] = query;
+            activities[index] = [];
+            _activeDimensions[index] = true;
+        }
+        else {
+            queries.push(query);
+            activities.push([]);
+            _activeDimensions.push(true);
+        }
 
         if (_currentMenu > -1) {
             _menus[_currentMenu].indices.push(index);
@@ -975,10 +1164,16 @@ class GraphicsContext {
         var query = new RenderQuery();
         query.type = QUERY_SPRITE;
         query.renderType = renderType;
-        queries.push(query);
-
-        activities.push([]);
-        _activeDimensions.push(true);
+        if (index < _dimTemp.length) {
+            queries[index] = query;
+            activities[index] = [];
+            _activeDimensions[index] = true;
+        }
+        else {
+            queries.push(query);
+            activities.push([]);
+            _activeDimensions.push(true);
+        }
 
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
@@ -1202,8 +1397,16 @@ class GraphicsContext {
         }
         else {
             for (i in 0..._dimTemp.length) {
-                dimensions.push(_dimTemp[i]);
-                dimensionLinks.push(_dimTempLinkTo[i]);
+                var index = i;
+                if (_dormantDimIndices.length > 0) {
+                    index = _dormantDimIndices.shift();
+                    dimensions[index] = _dimTemp[i];
+                    dimensionLinks[index] = _dimTempLinkTo[i];
+                }
+                else {
+                    dimensions.push(_dimTemp[i]);
+                    dimensionLinks.push(_dimTempLinkTo[i]);
+                }
             }
 
             for (i in 0..._containerTemp.length) {
