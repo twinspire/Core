@@ -345,7 +345,8 @@ class Dimensions {
     * @param options (Optional) Add options specifying additional parameters for this command. 
     **/
     public static function construct(command:DimInitCommand, level:Int = 0, ?options:DimObjectOptions) {
-        if (rootCommand == null) {
+        var isRoot = rootCommand == null;
+        if (isRoot) {
             rootCommand = command;
         }
 
@@ -373,25 +374,25 @@ class Dimensions {
                     currentParents.push(0);
                     dimCommandStack.push([ { 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: dim, autoSize: bindings?.autoSize ?? true,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false, 
                         bindings: bindings } ]);
                 }
                 else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
                     dimCommandStack[level].push({ 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: dim, autoSize: bindings?.autoSize ?? true,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings });
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 trimPath();
-                calculateDimFromCommands(then);
+                calculateDimFromCommands(then, isRoot ? null : level);
 
                 if (options.overrideSize != null) {
                     var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? currentParents.length - 1]];
@@ -412,24 +413,24 @@ class Dimensions {
                     currentParents.push(0);
                     dimCommandStack.push([ { 
                         path: currentPath, originalCommand: command, 
-                        parentIndex: getParentIndex(), ident: ident ?? "", 
+                        parentIndex: getParentIndex(level), ident: ident ?? "", 
                         dim: dim, autoSize: bindings?.autoSize ?? true,
                         clipped: options.forceClipping ?? false,
                         id: id, requestedContainer: options.makeContainer ?? false,
                         bindings: bindings } ]);
                 }
                 else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
                     dimCommandStack[level].push({ 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: dim, autoSize: bindings?.autoSize ?? true,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings });
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
-                calculateDimFromCommands(then);
+                calculateDimFromCommands(then, isRoot ? null : level);
                 if (options.overrideSize != null) {
                     var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? currentParents.length - 1]];
                     lastItem.dim.width = options.overrideSize.width;
@@ -463,21 +464,21 @@ class Dimensions {
                     currentParents.push(0);
                     dimCommandStack.push([ { 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: resultDim, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false, 
                         bindings: bindings } ]);
                 }
                 else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
                     dimCommandStack[level].push({ 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: resultDim, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false, 
                         bindings: bindings });
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 if (options.overrideSize != null) {
@@ -489,10 +490,10 @@ class Dimensions {
                 if (options.passthrough && bindings?.noPassthrough != true) {
                     options.passthrough = false;
                     options.overrideSize = null;
-                    construct(init, dimCommandStack.length, options);
+                    construct(init, level + 1, options);
                 }
                 else {
-                    construct(init, dimCommandStack.length);
+                    construct(init, level + 1);
                 }
 
                 trimPath();
@@ -507,21 +508,21 @@ class Dimensions {
                     currentParents.push(0);
                     dimCommandStack.push([ { 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id, 
                         requestedContainer: options.makeContainer ?? false, 
                         bindings: bindings } ]);
                 }
                 else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
                     dimCommandStack[level].push({ 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, 
                         id: id, requestedContainer: options.makeContainer ?? false,
                         bindings: bindings });
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
@@ -547,21 +548,21 @@ class Dimensions {
                     currentParents.push(0);
                     dimCommandStack.push([ { 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings } ]);
                 }
                 else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
                     dimCommandStack[level].push({
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings });
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
@@ -587,21 +588,21 @@ class Dimensions {
                     currentParents.push(0);
                     dimCommandStack.push([ { 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings } ]);
                 }
                 else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
                     dimCommandStack[level].push({ 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings });
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
@@ -643,21 +644,21 @@ class Dimensions {
                     currentParents.push(0);
                     dimCommandStack.push([ { 
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings } ]);
                 }
                 else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
                     dimCommandStack[level].push({
                         path: currentPath, originalCommand: command,
-                        parentIndex: getParentIndex(), ident: ident ?? "",
+                        parentIndex: getParentIndex(level), ident: ident ?? "",
                         dim: wrapper, autoSize: bindings?.autoSize ?? false,
                         clipped: options.forceClipping ?? false, id: id,
                         requestedContainer: options.makeContainer ?? false,
                         bindings: bindings });
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
                 
                 for (o in inside) {
@@ -683,7 +684,7 @@ class Dimensions {
 
                 dimCommandStack[dimCommandStack.length - 1].push({
                     path: currentPath, originalCommand: command,
-                    parentIndex: getParentIndex(), ident: ident ?? "",
+                    parentIndex: getParentIndex(level), ident: ident ?? "",
                     dim: wrapper, autoSize: bindings?.autoSize ?? false,
                     clipped: options.forceClipping ?? false, id: id,
                     requestedContainer: options.makeContainer ?? false,
@@ -710,19 +711,25 @@ class Dimensions {
                 appendPath(ident);
 
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                }
+                else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
+                }
+
                 var object = copyDimObjectResult(lastItem);
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
                 object.autoSize = false;
+                object.parentIndex = getParentIndex(level);
 
                 if (level > dimCommandStack.length - 1) {
-                    currentParents.push(0);
                     dimCommandStack.push([ object ]);
                 }
                 else {
                     dimCommandStack[level].push(object);
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 var grid = dimGridEquals(object.dim, columns, rows);
@@ -753,19 +760,25 @@ class Dimensions {
                 appendPath(ident);
 
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                }
+                else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
+                }
+
                 var object = copyDimObjectResult(lastItem);
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
                 object.autoSize = false;
+                object.parentIndex = getParentIndex(level);
 
                 if (level > dimCommandStack.length - 1) {
-                    currentParents.push(0);
                     dimCommandStack.push([ object ]);
                 }
                 else {
                     dimCommandStack[level].push(object);
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 var grid = dimGridFloats(object.dim, columns, rows);
@@ -796,19 +809,25 @@ class Dimensions {
                 appendPath(ident);
 
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                }
+                else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
+                }
+
                 var object = copyDimObjectResult(lastItem);
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
                 object.autoSize = false;
+                object.parentIndex = getParentIndex(level);
 
                 if (level > dimCommandStack.length - 1) {
-                    currentParents.push(0);
                     dimCommandStack.push([ object ]);
                 }
                 else {
                     dimCommandStack[level].push(object);
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 var grid = dimGrid(object.dim, columns, rows);
@@ -836,19 +855,25 @@ class Dimensions {
                 appendPath(ident);
 
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                }
+                else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
+                }
+
                 var object = copyDimObjectResult(lastItem);
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
                 object.autoSize = false;
+                object.parentIndex = getParentIndex(level);
 
                 if (level > dimCommandStack.length - 1) {
-                    currentParents.push(0);
                     dimCommandStack.push([ object ]);
                 }
                 else {
                     dimCommandStack[level].push(object);
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 dimFixedFlow(object.dim, new Dim(0, 0, itemSize.width, itemSize.height), dir);
@@ -877,19 +902,25 @@ class Dimensions {
                 appendPath(ident);
 
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                }
+                else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
+                }
+
                 var object = copyDimObjectResult(lastItem);
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
                 object.autoSize = bindings?.autoSize ?? false;
+                object.parentIndex = getParentIndex(level);
 
                 if (level > dimCommandStack.length - 1) {
-                    currentParents.push(0);
                     dimCommandStack.push([ object ]);
                 }
                 else {
                     dimCommandStack[level].push(object);
-                    currentParents[level] = dimCommandStack[level].length - 1;
                 }
 
                 dimVariableFlow(object.dim, dir);
@@ -904,7 +935,7 @@ class Dimensions {
                     dimVariableSetNextDim(lastConstructedObject.dim);
 
                     // get all children and position from offset
-                    var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident + "/");
+                    var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident);
                     for (child in children) {
                         child.dim.x += pos.x;
                         child.dim.y += pos.y;
@@ -919,11 +950,19 @@ class Dimensions {
                 appendPath(ident);
 
                 var lastItem = dimCommandStack[dimCommandStack.length - 1][currentParents[currentParents.length - 1]];
+                if (level > dimCommandStack.length - 1) {
+                    currentParents.push(0);
+                }
+                else {
+                    currentParents[level] = isRoot ? -1 : dimCommandStack[level].length;
+                }
+
                 var object = copyDimObjectResult(lastItem);
                 object.path = currentPath;
                 object.ident = ident;
                 object.id = id;
                 object.autoSize = bindings?.autoSize ?? false;
+                object.parentIndex = getParentIndex(level);
 
                 if (level > dimCommandStack.length - 1) {
                     currentParents.push(0);
@@ -1338,16 +1377,6 @@ class Dimensions {
                     }
                 }
             }
-            case CreateGridFloats(_, _, items): {
-                for (i in 0...items.length) {
-                    var found = commandIdentMatches(items[i], childPath);
-                    if (found) {
-                        items.splice(i, 1);
-                        success = true;
-                        break;
-                    }
-                }
-            }
             case CreateGrid(_, _, items): {
                 for (i in 0...items.length) {
                     var found = commandIdentMatches(items[i], childPath);
@@ -1551,7 +1580,7 @@ class Dimensions {
     static function getChildIndexFromParent(name:String, level:Int, parent:Int) {
         var result = childExists(name, level);
         if (result) {
-            return dimCommandStack[level].findIndex((dc) -> dc.ident == name);
+            return dimCommandStack[level].findIndex((dc) -> dc.ident == name && dc.parentIndex == parent);
         }
 
         return -1;
@@ -1912,9 +1941,9 @@ class Dimensions {
         return null;
     }
 
-    static function getParentIndex() {
+    static function getParentIndex(?level:Int = -1) {
         if (currentParents.length > 1) {
-            return currentParents[currentParents.length - 2] ?? -1;
+            return currentParents[(level > 0 ? level - 1 : currentParents.length - 2)] ?? -1;
         }
 
         return -1;
