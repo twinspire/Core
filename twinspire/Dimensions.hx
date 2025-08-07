@@ -1256,19 +1256,18 @@ class Dimensions {
                 }
             }
 
+            var gtx = Application.instance.graphicsCtx;
+
             // delete object from mappedScene
-            var objIndex = mappedScenes[sceneName].objects.findIndex((obj) -> obj.index == dimCommandStack[matchedParent[0]][matchedParent[1]].resultIndex);
+            var objIndex = mappedScenes[sceneName].objects.findIndex((obj) -> gtx.compareIndex(obj.index, dimCommandStack[matchedParent[0]][matchedParent[1]].resultIndex));
             mappedScenes[sceneName].objects.splice(objIndex, 1);
 
             // copy the adjusted to scenes
             dimCommandStack[matchedParent[0]].splice(matchedParent[1], 1);
             mappedScenes[sceneName].stack = dimCommandStack.copy();
 
-            // remove from scene
-            mappedScenes[sceneName].removeObjCallback(objIndex);
-
             // delete indices from dimension stack
-            Application.instance.graphicsCtx.removeIndices(indicesToRemove);
+            gtx.removeIndices(indicesToRemove);
         }
 
         return true;
