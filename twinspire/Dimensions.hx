@@ -118,7 +118,7 @@ enum DimInitCommand {
 enum DimCommand {
     ScreenAlign(align:DimAlignment, offset:FastVector2);
     Align(against:Int, align:DimAlignment, ?offset:FastVector2);
-    MeasureText(text:String, font:Font, fontSize:Int);
+    MeasureText(text:String, font:Font, fontSize:Int, ?fixedSize:Bool);
     MinOf(texts:Array<String>, font:Font, fontSize:Int);
     MaxOf(texts:Array<String>, font:Font, fontSize:Int);
     AddSpacingAround(space:Float);
@@ -1581,12 +1581,18 @@ class Dimensions {
         var lastItem = dimCommandStack[level ?? dimCommandStack.length - 1][currentParents[level ?? dimCommandStack.length - 1]];
 
         switch (command) {
-            case MeasureText(text, font, fontSize): {
+            case MeasureText(text, font, fontSize, fixedSize): {
                 var textSize = getTextDim(font, fontSize, text);
                 lastItem.textDim = textSize;
 
-                dim.width += textSize.width;
-                dim.height += textSize.height;
+                if (fixedSize != null && fixedSize) {
+                    dim.width = textSize.width;
+                    dim.height = textSize.height;
+                }
+                else {
+                    dim.width += textSize.width;
+                    dim.height += textSize.height;
+                }
             }
             case MinOf(texts, font, fontSize): {
                 var minWidth = 0.0;
