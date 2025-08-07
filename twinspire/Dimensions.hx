@@ -1248,7 +1248,7 @@ class Dimensions {
                 // delete in reverse to avoid overlapping indices
                 var child = childIndices[parent].length - 1;
                 while (child > -1) {
-                    var removed = dimCommandStack[parent].splice(child, 1);
+                    var removed = dimCommandStack[parent].splice(childIndices[parent][child], 1);
                     for (rem in removed) {
                         indicesToRemove.push(rem.resultIndex);
                     }
