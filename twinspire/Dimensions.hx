@@ -932,14 +932,14 @@ class Dimensions {
 
                     var lastChildPath = getLastImmediateNamedChild(currentPath + "/");
                     var lastConstructedObject = findItemByName(lastChildPath);
-                    dimVariableSetNextDim(lastConstructedObject.dim);
-
                     // get all children and position from offset
                     var children = findItemsByParentName(currentPath + "/" + lastConstructedObject.ident);
                     for (child in children) {
                         child.dim.x += pos.x;
                         child.dim.y += pos.y;
                     }
+
+                    dimVariableSetNextDim(lastConstructedObject.dim);
                 }
 
                 trimPath();
@@ -2293,6 +2293,7 @@ class Dimensions {
     static var containerCellSize:Dim;
     static var containerCell:Int;
     static var containerMethod:Int;
+    static var containerOffset:FastVector2;
 
     /**
      * Create a dimension column, within which each time the function `getNewDim` is called,
@@ -2307,6 +2308,14 @@ class Dimensions {
         containerDirection = direction;
         containerMethod = FLOW_FIXED;
         containerCell = 0;
+        containerOffset = new FastVector2();
+
+        if (direction == Direction.Up) {
+            containerOffset = new FastVector2(0, containerColumnOrRow.getHeight() + containerColumnOrRow.getY());
+        }
+        else if (direction == Direction.Left) {
+            containerOffset = new FastVector2(containerColumnOrRow.getWidth() + containerColumnOrRow.getX(), 0);
+        }
     }
 
     /**
@@ -2317,14 +2326,23 @@ class Dimensions {
     public static function dimVariableFlow(container:Dim, direction:Int) {
         containerColumnOrRow = container;
         containerDirection = direction;
+        containerOffset = new FastVector2();
+        if (direction == Direction.Up) {
+            containerOffset = new FastVector2(0, containerColumnOrRow.getHeight() + containerColumnOrRow.getY());
+        }
+        else if (direction == Direction.Left) {
+            containerOffset = new FastVector2(containerColumnOrRow.getWidth() + containerColumnOrRow.getX(), 0);
+        }
+
         containerMethod = FLOW_VARIABLE;
         containerCellSize = new Dim(0, 0, 0, 0);
         containerCell = 0;
     }
 
     public static function dimVariableSetNextDim(dim:Dim) {
-        if (containerMethod == FLOW_VARIABLE)
+        if (containerMethod == FLOW_VARIABLE) {
             containerCellSize = dim.clone();
+        }
     }
 
     public static function getNewDim(padding:Float = 0) {
@@ -2336,42 +2354,31 @@ class Dimensions {
             var height = containerColumnOrRow.getHeight();
             if (containerDirection == Direction.Up)
             {
-                if (containerMethod == FLOW_FIXED)
-                    y -= (containerCellSize.height * containerCell) - padding;
-                else if (containerMethod == FLOW_VARIABLE)
-                    y -= containerCellSize.height - padding;
-
+                containerOffset.y -= containerCellSize.height + padding;
+                y = containerOffset.y + y;
                 height = containerCellSize.height;
             }
             else if (containerDirection == Direction.Down)
             {
-                if (containerMethod == FLOW_FIXED)
-                    y += (containerCellSize.height * containerCell) + padding;
-                else if (containerMethod == FLOW_VARIABLE)
-                    y += containerCellSize.height + padding;
+                containerOffset.y += containerCellSize.height;
+                y = containerOffset.y;
 
                 height = containerCellSize.height;
             }
             else if (containerDirection == Direction.Left)
             {
-                if (containerMethod == FLOW_FIXED)
-                    x -= (containerCellSize.width * containerCell) - padding;
-                else if (containerMethod == FLOW_VARIABLE)
-                    x -= containerCellSize.width - padding;
+                containerOffset.x -= containerCellSize.width + padding;
+                x = containerOffset.x + x;
 
                 width = containerCellSize.width;
             }
             else if (containerDirection == Direction.Right)
             {
-                if (containerMethod == FLOW_FIXED)
-                    x += (containerCellSize.width * containerCell) + padding;
-                else if (containerMethod == FLOW_VARIABLE)
-                    x += containerCellSize.width + padding;
-
+                containerOffset.x += containerCellSize.width;
+                x = containerOffset.x;
                 width = containerCellSize.width;
             }
 
-            containerCell += 1;
             return new Dim(x, y, width, height);
         }
 
