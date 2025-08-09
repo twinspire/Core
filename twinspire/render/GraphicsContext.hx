@@ -844,6 +844,19 @@ class GraphicsContext {
             containerIndex -= 1;
         }
 
+        for (g in _groups) {
+            var gi = g.whereIndices((item) -> toRemove.contains(item));
+            gi.sort((x, y) -> {
+                if (x > y) return 1;
+                else if (x < y) return -1;
+                else return 0;
+            });
+
+            for (item in gi) {
+                g.splice(item, 1);
+            }
+        }
+
         var removeIndex = toRemove.length - 1; 
         while (removeIndex > -1) {
             var index = toRemove[removeIndex];
@@ -1239,6 +1252,35 @@ class GraphicsContext {
     }
 
     /**
+    * Adjusts the positions of dimensions within an existing Dimension command stack.
+    **/
+    public function adjustComplex() {
+        Dimensions.begin();
+
+        var item = Dimensions.getLookupItem();
+        var scanning = true;
+        while (scanning) {
+            if (!Dimensions.next()) {
+                scanning = false;   
+            }
+
+            markDimChange(item.resultIndex);
+            switch (item.resultIndex) {
+                case Direct(index): {
+                    dimensions[index] = item.dim.clone();
+                }
+                default: {
+
+                }
+            }
+
+            if (scanning) {
+                item = Dimensions.getLookupItem();
+            }
+        }
+    }
+
+    /**
     * Adds a container at the given dimension and then supplies the index of the container
     * as it would be in permanent storage. Containers are UI elements, but have special properties
     * that enables scroll and other like events to occur automatically.
@@ -1475,6 +1517,10 @@ class GraphicsContext {
 
         if (dimIndicesChanged.length > 0) {
             for (index in dimIndicesChanged) {
+                if (dimensions[index] == null) {
+                    continue;
+                }
+
                 // iterate each dimension
                 var dim = dimensions[index].get();
                 var childIndex = index;

@@ -1210,64 +1210,66 @@ class Dimensions {
                 return false;
             }
 
-            // iterate the entire stack, checking the full paths and deleting the children
-            // of the given path before deleting the instance of the path itself
+            // originally, we deleted only parts of the stack according to the path
+            // given. Now, we delete everything and re-construct from scratch using the
+            // modified `rootCommand`. This is less error-prone, even if it sacrifices
+            // some speed.
+
+            var parentItem = findItemByName(path);
+
+            var copiedStack = dimCommandStack.copy();
+            var copiedCommand = rootCommand;
+
+            resetConstruct();
+            construct(copiedCommand);
             begin();
-            var currentParent = _lookupParent;
-            var childIndices = new Array<Array<Int>>();
+
             var indicesToRemove = new Array<DimIndex>();
-            var matchedParent = [ -1, -1 ];
-
-            while (next()) {
-                var item = getLookupItem();
-                if (_lookupParent != currentParent) {
-                    currentParent = _lookupParent;
-                }
-                
-                if (item.path.indexOf(path) > -1 && item.path != path) {
-                    while (currentParent > childIndices.length - 1) {
-                        childIndices.push([]);
+            var item = getLookupItem();
+            var copiedStackParent = 0;
+            var copiedStackChild = 0;
+            var scanning = true;
+            while (scanning) {
+                var copiedItem = copiedStack[copiedStackParent][copiedStackChild];
+                if (copiedItem.path == item.path) {
+                    item.resultIndex = copiedItem.resultIndex;
+                    if (next()) {
+                        item = getLookupItem();
                     }
-
-                    childIndices[currentParent].push(_lookupChild);
-                }
-                else if (item.path == path) {
-                    indicesToRemove.push(item.resultIndex);
-                    matchedParent = [ _lookupParent, _lookupChild ];
-                }
-            }
-
-            // delete the parent and children from the command stack
-            for (parent in 0...childIndices.length) {
-                ArraySort.sort(childIndices[parent], (x, y) -> {
-                    if (x > y) return 1;
-                    else if (x < y) return -1;
-                    else return 0;
-                });
-
-                // delete in reverse to avoid overlapping indices
-                var child = childIndices[parent].length - 1;
-                while (child > -1) {
-                    var removed = dimCommandStack[parent].splice(childIndices[parent][child], 1);
-                    for (rem in removed) {
-                        indicesToRemove.push(rem.resultIndex);
+                    else {
+                        break;
                     }
-                    child -= 1;
+                }
+                else {
+                    indicesToRemove.push(copiedItem.resultIndex);
+                }
+
+                if (copiedStack[copiedStackParent].length > 0 && copiedStackChild + 1 < copiedStack[copiedStackParent].length) {
+                    copiedStackChild += 1;
+                }
+                else {
+                    if (copiedStackParent + 1 >= copiedStack.length) {
+                        break;
+                    }
+                    else {
+                        copiedStackParent += 1;
+                        copiedStackChild = 0;
+                    }
                 }
             }
 
             var gtx = Application.instance.graphicsCtx;
 
             // delete object from mappedScene
-            var objIndex = mappedScenes[sceneName].objects.findIndex((obj) -> gtx.compareIndex(obj.index, dimCommandStack[matchedParent[0]][matchedParent[1]].resultIndex));
+            var objIndex = mappedScenes[sceneName].objects.findIndex((obj) -> gtx.compareIndex(obj.index, parentItem.resultIndex));
             mappedScenes[sceneName].objects.splice(objIndex, 1);
 
             // copy the adjusted to scenes
-            dimCommandStack[matchedParent[0]].splice(matchedParent[1], 1);
             mappedScenes[sceneName].stack = dimCommandStack.copy();
 
-            // delete indices from dimension stack
             gtx.removeIndices(indicesToRemove);
+            // adjust to re-position for the new stack
+            gtx.adjustComplex();
         }
 
         return true;
