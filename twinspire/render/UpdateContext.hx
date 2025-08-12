@@ -874,6 +874,149 @@ class UpdateContext {
     }
 
     /**
+    * Checks if the mouse has been released outside of the given dimension and all its linked dimensions.
+    * This includes checking if the release occurred outside any child dimensions that are linked to the given dimension.
+    * 
+    * @param index The index of the dimension to check against.
+    * @param allGroup (Optional) Specify that all indices in a group receive this event if one returns `true`.
+    * @return Returns `true` if the mouse was released this frame and the release position is outside the dimension 
+    *         and all its linked children. Returns `false` if no release occurred, or if the release was inside 
+    *         the dimension or any of its linked children.
+    **/
+    public function isMouseReleasedOutside(index:DimIndex, ?allGroup:Bool = false):Bool {
+        // No mouse release occurred this frame
+        if (_mouseIsReleased == -1) {
+            return false;
+        }
+        
+        // Get all indices we need to check against
+        var indicesToCheck:Array<Int> = [];
+        var partOfGroup = false;
+        
+        switch (index) {
+            case Direct(item): {
+                indicesToCheck.push(item);
+            }
+            case Group(item): {
+                partOfGroup = true;
+                // For groups, check all dimensions in the group
+                var groupIndices = _gctx.getDimIndicesAtGroupIndex(item);
+                indicesToCheck = groupIndices.copy();
+            }
+        }
+        
+        if (indicesToCheck.length == 0) {
+            return false;
+        }
+        
+        // Store original indices for activity tracking
+        var originalIndices = indicesToCheck.copy();
+        
+        // Add all linked children to the check list
+        var linkedChildren = _gctx.dimensionLinks.whereIndices((dl) -> {
+            // Find all dimensions that are linked to any of our indices to check
+            for (idx in indicesToCheck) {
+                if (dl == idx) {
+                    return true;
+                }
+            }
+            return false;
+        });
+        
+        for (child in linkedChildren) {
+            if (indicesToCheck.indexOf(child) == -1) {
+                indicesToCheck.push(child);
+            }
+        }
+        
+        // Also check if any of our indices are children of another dimension
+        for (idx in indicesToCheck.copy()) {
+            var parentIndex = _gctx.dimensionLinks[idx];
+            if (parentIndex > -1 && indicesToCheck.indexOf(parentIndex) == -1) {
+                indicesToCheck.push(parentIndex);
+            }
+        }
+        
+        // Check if the mouse release was on any of our related dimensions
+        // _mouseIsReleased contains the index that received the release event
+        // If it matches any of our indices, the release was inside, not outside
+        for (idx in indicesToCheck) {
+            if (_mouseIsReleased == idx) {
+                return false;
+            }
+        }
+        
+        // Mouse was released outside - add activities
+        var result = true;
+        
+        if (result) {
+            // Check if original index has a parent that should also receive the event
+            var firstOriginal = originalIndices[0];
+            var parentIndex = _gctx.dimensionLinks[firstOriginal];
+            if (parentIndex > -1 && !partOfGroup) {
+                var activity = new Activity();
+                activity.type = ACTIVITY_MOUSE_CLICKED_OUT;
+                
+                activity.data.push(_mouseButtons);
+                activity.data.push(GlobalEvents.getMousePosition());
+                var parentDim = _gctx.getClientDimensionsAtIndex(Direct(parentIndex))[0];
+                activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - parentDim.x, 
+                                                GlobalEvents.getMousePosition().y - parentDim.y));
+                
+                _gctx.activities[parentIndex].push(activity);
+            }
+            
+            switch (index) {
+                case Group(item): {
+                    if (!allGroup) {
+                        // Only add activity to the first index in the group
+                        var activity = new Activity();
+                        activity.type = ACTIVITY_MOUSE_CLICKED_OUT;
+                        
+                        activity.data.push(_mouseButtons);
+                        activity.data.push(GlobalEvents.getMousePosition());
+                        var currentDim = _gctx.getClientDimensionsAtIndex(Direct(originalIndices[0]))[0];
+                        activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, 
+                                                        GlobalEvents.getMousePosition().y - currentDim.y));
+                        
+                        _gctx.activities[originalIndices[0]].push(activity);
+                    }
+                    else {
+                        // Add activity to all indices in the group
+                        for (child in originalIndices) {
+                            var activity = new Activity();
+                            activity.type = ACTIVITY_MOUSE_CLICKED_OUT;
+                            
+                            activity.data.push(_mouseButtons);
+                            activity.data.push(GlobalEvents.getMousePosition());
+                            var currentDim = _gctx.getClientDimensionsAtIndex(Direct(child))[0];
+                            activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, 
+                                                            GlobalEvents.getMousePosition().y - currentDim.y));
+                            
+                            _gctx.activities[child].push(activity);
+                        }
+                    }
+                }
+                default: {
+                    // Direct index case
+                    var activity = new Activity();
+                    activity.type = ACTIVITY_MOUSE_CLICKED_OUT;
+                    
+                    activity.data.push(_mouseButtons);
+                    activity.data.push(GlobalEvents.getMousePosition());
+                    var currentDim = _gctx.getClientDimensionsAtIndex(Direct(originalIndices[0]))[0];
+                    activity.data.push(new FastVector2(GlobalEvents.getMousePosition().x - currentDim.x, 
+                                                    GlobalEvents.getMousePosition().y - currentDim.y));
+                    
+                    _gctx.activities[originalIndices[0]].push(activity);
+                }
+            }
+        }
+        
+        return result;
+    }
+
+    /**
     * Checks that the following dimension at the given index is receiving a mouse
     * scroll event.
     *

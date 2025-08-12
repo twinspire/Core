@@ -1048,6 +1048,18 @@ class Dimensions {
         }
     }
 
+    public static function getScene(name:String):SceneMap {
+        if (mappedScenes == null) {
+            mappedScenes = [];
+        }
+
+        if (!mappedScenes.exists(name)) {
+            trace("Scene with name '" + name + "' does not exist.");
+        }
+
+        return mappedScenes[name];
+    }
+
     public static function mapToScene(scene:Scene) {
         if (mappedScenes == null) {
             mappedScenes = [];

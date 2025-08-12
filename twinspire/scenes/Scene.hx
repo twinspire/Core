@@ -87,6 +87,28 @@ class Scene {
         return results;
     }
 
+    // hide dimensions in the dimension stack
+    public function hideObjects() {
+        var gtx = Application.instance.graphicsCtx;
+        for (o in objects) {
+            gtx.activateDimensions([ o.index ], false);
+            for (dim in gtx.getDimensionsAtIndex(o.index)) {
+                dim.visible = true;
+            };
+        }
+    }
+
+    // show dimensions in the dimension stack
+    public function showObjects() {
+        var gtx = Application.instance.graphicsCtx;
+        for (o in objects) {
+            gtx.activateDimensions([ o.index ], true);
+            for (dim in gtx.getDimensionsAtIndex(o.index)) {
+                dim.visible = true;
+            };
+        }
+    }
+
     /**
     * Gets a collection of indices from all the objects in this scene.
     **/
