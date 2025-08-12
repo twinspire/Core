@@ -21,6 +21,12 @@ class RenderQuery {
     **/
     public var acceptsKeyInput:Bool;
     /**
+    * A value determining if the dimension should be offset by a camera.
+    * This value is only relevant when this dimensions' position is
+    * referred to within `beginCamera` and `endCamera` calls.
+    **/
+    public var cameraPositioned:Bool;
+    /**
     * Allows this dimension to be dragged with the mouse.
     **/
     public var allowDragging:Bool;

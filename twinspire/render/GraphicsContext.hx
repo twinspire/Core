@@ -57,6 +57,8 @@ class GraphicsContext {
     private var _dormantDimIndices:Array<Int>;
     private var _dormantGroups:Array<Int>;
 
+    private var _cameras:Array<Camera>;
+
     /**
     * A collection of dimensions within this context. Do not write directly.
     **/
@@ -174,6 +176,34 @@ class GraphicsContext {
                 return _groups[item].map((grp) -> activities[grp]);
             }
         }
+    }
+
+    /**
+    * Specifies the camera to use for observing dimensions.
+    **/
+    public function beginCamera(camera:Camera) {
+
+    }
+
+    /**
+    * Stop using the current camera. This function determines what indices are observable
+    * while the camera is idle, and filtering on dimensions close enough to the camera's
+    * observation of the dimension stack. Note that camera observation only applies to
+    * queries of type `STATIC` and `SPRITE`. `UI` type dimensions are ignored.
+    *
+    * To obtain the list of observed dimensions, use `getCameraObserved`.
+    **/
+    public function endCamera() {
+
+    }
+
+    /**
+    * Retrieve an array of all currently observed DimIndices. If a `DimIndex` completely
+    * overlaps the referenced dimension of another, the final `DimIndex` is the one rendered
+    * first.
+    **/
+    public function getCameraObserved():Array<DimIndex> {
+        
     }
 
     /**
