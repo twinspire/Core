@@ -690,7 +690,7 @@ class GraphicsContext {
             }
         }
 
-        return [];
+        return [ null ];
     }
 
     /**

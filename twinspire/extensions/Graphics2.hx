@@ -34,28 +34,43 @@ class Graphics2
 	private static var _forceMultilineUpdate:Bool;
 	private static var _useCrlf:Bool;
 
-	public static function drawImageDim(g2:Graphics, img:Image, dim:Dim)
-	{
+	public static function drawImageDim(g2:Graphics, img:Image, dim:Dim) {
+		if (dim == null || img == null) {
+			return;
+		}
+
 		g2.drawImage(img, dim.x, dim.y);
 	}
 
-	public static function drawSubImageDim(g2:Graphics, img:Image, source:Dim, destination:Dim)
-	{
+	public static function drawSubImageDim(g2:Graphics, img:Image, source:Dim, destination:Dim) {
+		if (destination == null || img == null || source == null) {
+			return;
+		}
+
 		g2.drawSubImage(img, destination.x, destination.y, source.x, source.y, source.width, source.height);
 	}
 
-	public static function drawScaledImageDim(g2:Graphics, img:Image, destination:Dim)
-	{
+	public static function drawScaledImageDim(g2:Graphics, img:Image, destination:Dim) {
+		if (destination == null || img == null) {
+			return;
+		}
+
 		g2.drawScaledImage(img, destination.x, destination.y, destination.width, destination.height);
 	}
 
-	public static function drawScaledSubImageDim(g2:Graphics, img:Image, source:Dim, destination:Dim)
-	{
+	public static function drawScaledSubImageDim(g2:Graphics, img:Image, source:Dim, destination:Dim) {
+		if (destination == null || img == null || source == null) {
+			return;
+		}
+
 		g2.drawScaledSubImage(img, source.x, source.y, source.width, source.height, destination.x, destination.y, destination.width, destination.height);
 	}
 
-
 	public static function drawPatchedImage(g2:Graphics, img:Image, patch:Patch, destination:Dim) {
+		if (destination == null || img == null || patch == null) {
+			return;
+		}
+
 		var segments = patch.getSegments();
 		if (segments.length != 9) {
 			drawScaledSubImageDim(g2, img, patch.source, destination);
@@ -120,6 +135,10 @@ class Graphics2
 	* axis: 0 = both; 1 = vertical, 2 = horizontal
 	**/
 	public static function drawImageRepeat(g2:Graphics, img:Image, source:Dim, destination:Dim, axis:Int = 0) {
+		if (destination == null || img == null || source == null) {
+			return;
+		}
+
 		var yRepeat = 0.0;
 		var xRepeat = 0.0;
 		var yRemainder = 0.0;
@@ -214,13 +233,19 @@ class Graphics2
 		}
 	}
 
-	public static function drawRectDim(g2:Graphics, destination:Dim, lineThickness:Float = 1.0)
-	{
+	public static function drawRectDim(g2:Graphics, destination:Dim, lineThickness:Float = 1.0) {
+		if (destination == null) {
+			return;
+		}
+
 		g2.drawRect(destination.x, destination.y, destination.width, destination.height, lineThickness);
 	}
 
-	public static function drawBorders(g2:Graphics, destination:Dim, lineThickness:Float = 1.0, borders:Int = BORDER_ALL)
-	{
+	public static function drawBorders(g2:Graphics, destination:Dim, lineThickness:Float = 1.0, borders:Int = BORDER_ALL) {
+		if (destination == null) {
+			return;
+		}
+
 		if ((borders & BORDER_TOP) != 0)
 		{
 			g2.drawLine(destination.x + lineThickness / 2, destination.y + lineThickness / 2, 
@@ -246,28 +271,31 @@ class Graphics2
 		}
 	}
 
-	public static function fillRectDim(g2:Graphics, destination:Dim)
-	{
+	public static function fillRectDim(g2:Graphics, destination:Dim) {
+		if (destination == null) {
+			return;
+		}
+
 		g2.fillRect(destination.x, destination.y, destination.width, destination.height);
 	}
 
-	public static function drawStringDim(g2:Graphics, text:String, destination:Dim)
-	{
+	public static function drawStringDim(g2:Graphics, text:String, destination:Dim) {
+		if (destination == null || text == null) {
+			return;
+		}
+
 		g2.drawString(text, destination.x, destination.y);
 	}
 
-	public static function forceMultilineUpdate()
-	{
+	public static function forceMultilineUpdate() {
 		_forceMultilineUpdate = true;
 	}
 
-	public static function disableMultilineUpdate()
-	{
+	public static function disableMultilineUpdate() {
 		_forceMultilineUpdate = false;
 	}
 
-	public static function useCRLF(crlf:Bool)
-	{
+	public static function useCRLF(crlf:Bool) {
 		_useCrlf = crlf;
 	}
 
@@ -293,8 +321,11 @@ class Graphics2
 	 * @param breaks 
 	 * @return Array<Int>
 	 */
-	public static function drawCharactersDim(g2:Graphics, characters:Array<Int>, start:Int, length:Int, destination:Dim, autoWrap:Bool = false, clipping:Bool = false, breaks:Array<Int> = null):Array<Int>
-	{
+	public static function drawCharactersDim(g2:Graphics, characters:Array<Int>, start:Int, length:Int, destination:Dim, autoWrap:Bool = false, clipping:Bool = false, breaks:Array<Int> = null):Array<Int> {
+		if (destination == null || characters == null || characters.length == 0) {
+			return null;
+		}
+
 		if (!autoWrap)
 		{
 			g2.drawCharacters(characters, start, length, destination.x, destination.y);
@@ -380,20 +411,30 @@ class Graphics2
 		}
 	}
 
-	public static function drawVideoDim(g2:Graphics, video:Video, destination:Dim)
-	{
+	public static function drawVideoDim(g2:Graphics, video:Video, destination:Dim) {
+		if (destination == null || video == null) {
+			return;
+		}
+
 		g2.drawVideo(video, destination.x, destination.y, destination.width, destination.height);
 	}
 
 	public static function fillCircleDim(g2:Graphics, destination:Dim) {
+		if (destination == null) {
+			return;
+		}
+
 		var cx = destination.x + (destination.width / 2);
 		var cy = destination.y + (destination.height / 2);
 		var radius = destination.width / 2;
 		fillCircle(g2, cx, cy, radius);
 	}
 
-	public static function fillTriangleDim(g2:Graphics, destination:Dim, direction:Int)
-	{
+	public static function fillTriangleDim(g2:Graphics, destination:Dim, direction:Int) {
+		if (destination == null) {
+			return;
+		}
+
 		var x1 = 0.0, x2 = 0.0, x3 = 0.0, y1 = 0.0, y2 = 0.0, y3 = 0.0;
 
 		if ((direction & TRIANGLE_UP) != 0) {
@@ -468,12 +509,19 @@ class Graphics2
 		g2.fillTriangle(x1, y1, x2, y2, x3, y3);
 	}
 
-	public static function scissorDim(g2:Graphics, dim:Dim)
-	{
+	public static function scissorDim(g2:Graphics, dim:Dim) {
+		if (dim == null) {
+			return;
+		}
+
 		g2.scissor(cast dim.x, cast dim.y, cast dim.width, cast dim.height);
 	}
 
 	static function getAnimateSpriteFrameIndex(sprite:Sprite, ?stateIndex:Int, ?group:String) {
+		if (sprite == null || sprite.states == null || sprite.states.length == 0) {
+			return -1;
+		}
+
 		var state = sprite.currentFrame;
 		if (stateIndex != null) {
 			state = stateIndex;
@@ -536,6 +584,10 @@ class Graphics2
 	}
 
 	public static function drawSprite(g2:Graphics, sprite:Sprite, index:Int, dim:Dim) {
+		if (sprite == null || sprite.states == null || sprite.states.length == 0 || index < 0 || index >= sprite.states.length) {
+			return;
+		}
+
 		var state = sprite.states[index];
 		if (state.patches.length == 0) {
 			drawScaledImageDim(g2, state.image, dim);
@@ -558,11 +610,19 @@ class Graphics2
 	}
 
 	public static function drawSpritePatch(g2:Graphics, sprite:Sprite, stateIndex:Int, patchIndex:Int, dim:Dim) {
+		if (sprite == null || sprite.states == null || sprite.states.length == 0 || stateIndex < 0 || stateIndex >= sprite.states.length) {
+			return;
+		}
+
 		var state = sprite.states[stateIndex];
 		drawPatchedImage(g2, state.image, state.patches[patchIndex], dim);
 	}
 
 	public static function drawSpriteGroup(g2:Graphics, sprite:Sprite, index:Int, group:String, dim:Dim) {
+		if (sprite == null || sprite.states == null || sprite.states.length == 0 || index < 0 || index >= sprite.states.length) {
+			return;
+		}
+		
 		var state = sprite.states[index];
 		if (state.groups.exists(group)) {
 			var animateIndex = 0;
