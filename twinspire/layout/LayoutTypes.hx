@@ -4,6 +4,7 @@
 
 package twinspire.layout;
 
+import twinspire.layout.Layout.NamedDimRef;
 import twinspire.render.GraphicsContext;
 import kha.math.FastVector2;
 import twinspire.DimIndex;
@@ -54,32 +55,32 @@ enum LayoutAlignment {
  */
 class LayoutRef {
     private var layout:Layout;
-    public var index(default, null):Int;
+    public var index(default, null):NamedDimRef;
     
-    public function new(layout:Layout, index:Int) {
+    public function new(layout:Layout, index:NamedDimRef) {
         this.layout = layout;
         this.index = index;
     }
     
     public function align(alignment:LayoutAlignment, ?relativeTo:LayoutRef):LayoutRef {
-        var refIndex = relativeTo != null ? relativeTo.index : -1;
-        layout.constraints.push(Align(index, refIndex, alignment));
+        var refIndex = relativeTo != null ? relativeTo.index.index : -1;
+        layout.constraints.push(Align(index.index, refIndex, alignment));
         return this;
     }
     
     public function at(x:Float, y:Float):LayoutRef {
-        layout.constraints.push(Position(index, x, y));
+        layout.constraints.push(Position(index.index, x, y));
         return this;
     }
     
     public function size(width:Float, height:Float):LayoutRef {
-        layout.constraints.push(Size(index, width, height));
+        layout.constraints.push(Size(index.index, width, height));
         return this;
     }
     
     public function offset(x:Float, y:Float):LayoutRef {
-        var current = layout.dims[index];
-        layout.constraints.push(Position(index, current.x + x, current.y + y));
+        var current = layout.dims[index.index];
+        layout.constraints.push(Position(index.index, current.x + x, current.y + y));
         return this;
     }
     
@@ -97,11 +98,11 @@ class LayoutRef {
  */
 class LayoutResult {
     public var indices:Map<Int, DimIndex>;
-    public var named:Map<String, Int>;
+    public var named:Map<String, NamedDimRef>;
     public var containerIndices:Map<Int, Int>;
     private var layout:Layout;
     
-    public function new(indices:Map<Int, DimIndex>, named:Map<String, Int>, containerIndices:Map<Int, Int>, layout:Layout) {
+    public function new(indices:Map<Int, DimIndex>, named:Map<String, NamedDimRef>, containerIndices:Map<Int, Int>, layout:Layout) {
         this.indices = indices;
         this.named = named;
         this.containerIndices = containerIndices;
@@ -109,7 +110,7 @@ class LayoutResult {
     }
     
     public function get(name:String):DimIndex {
-        var layoutIndex = named[name];
+        var layoutIndex = named[name].index;
         return layoutIndex != null ? indices[layoutIndex] : null;
     }
     

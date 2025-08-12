@@ -15,6 +15,11 @@ import twinspire.Id;
 import twinspire.DimIndex;
 using twinspire.extensions.ArrayExtensions;
 
+typedef NamedDimRef = {
+    var index:Int;
+    var type:Id;
+}
+
 /**
  * Functional Layout API - Low-level dimension generation and manipulation
  */
@@ -24,7 +29,7 @@ class Layout {
     // do not touch
     public var constraints:Array<LayoutConstraint>;
 
-    private var namedDims:Map<String, Int>;
+    private var namedDims:Map<String, NamedDimRef>;
     private var deleted:Array<Int>;
     private var containers:Array<ContainerInfo>;
     private var textContent:Map<Int, String>;
@@ -43,40 +48,48 @@ class Layout {
     /**
      * Create a dimension with optional naming for later reference
      */
-    public function dim(width:Float, height:Float, ?name:String):LayoutRef {
+    public function dim(width:Float, height:Float, ?name:String, ?type:Id):LayoutRef {
         var d = new Dim(0, 0, width, height);
         var index = dims.push(d) - 1;
+        var dimRef:NamedDimRef = {
+            index: index,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = index;
+            namedDims[name] = dimRef;
         }
         
-        return new LayoutRef(this, index);
+        return new LayoutRef(this, dimRef);
     }
     
     /**
      * Create dimension from text measurement
      */
-    public function text(str:String, font:Font, size:Int, ?name:String):LayoutRef {
+    public function text(str:String, font:Font, size:Int, ?name:String, ?type:Id):LayoutRef {
         var textDim = Dimensions.getTextDim(font, size, str);
         var index = dims.push(textDim) - 1;
+        var textRef:NamedDimRef = {
+            index: index,
+            type: type != null ? type : Id.None
+        };
         
         // Store text content and font info for later updates
         textContent[index] = str;
         textFonts[index] = {font: font, size: size};
         
         if (name != null) {
-            namedDims[name] = index;
+            namedDims[name] = textRef;
         }
         
-        return new LayoutRef(this, index);
+        return new LayoutRef(this, textRef);
     }
     
     /**
      * Update text content without rebuilding
      */
     public function updateText(name:String, newText:String):Bool {
-        var index = namedDims[name];
+        var index = namedDims[name].index;
         if (index == null || !textFonts.exists(index)) return false;
         
         var fontInfo = textFonts[index];
@@ -91,111 +104,135 @@ class Layout {
     /**
      * Create a horizontal box layout
      */
-    public function hbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String):LayoutRef {
+    public function hbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String, ?type:Id):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
+        var containerRef:NamedDimRef = {
+            index: containerIndex,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = containerIndex;
+            namedDims[name] = containerRef;
         }
         
-        constraints.push(HorizontalFlow(containerIndex, items.map(r -> r.index), spacing));
+        constraints.push(HorizontalFlow(containerIndex, items.map(r -> r.index.index), spacing));
         
-        return new LayoutRef(this, containerIndex);
+        return new LayoutRef(this, containerRef);
     }
     
     /**
      * Create a vertical box layout
      */
-    public function vbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String):LayoutRef {
+    public function vbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String, ?type:Id):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
+        var containerRef:NamedDimRef = {
+            index: containerIndex,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = containerIndex;
+            namedDims[name] = containerRef;
         }
         
-        constraints.push(VerticalFlow(containerIndex, items.map(r -> r.index), spacing));
+        constraints.push(VerticalFlow(containerIndex, items.map(r -> r.index.index), spacing));
         
-        return new LayoutRef(this, containerIndex);
+        return new LayoutRef(this, containerRef);
     }
     
     /**
      * Create a grid layout with percentages or fixed sizes
      */
-    public function grid(columns:Array<GridSize>, rows:Array<GridSize>, items:Array<LayoutRef>, ?name:String):LayoutRef {
+    public function grid(columns:Array<GridSize>, rows:Array<GridSize>, items:Array<LayoutRef>, ?name:String, ?type:Id):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
+        var containerRef:NamedDimRef = {
+            index: containerIndex,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = containerIndex;
+            namedDims[name] = containerRef;
         }
         
-        constraints.push(GridLayout(containerIndex, columns, rows, items.map(r -> r.index)));
+        constraints.push(GridLayout(containerIndex, columns, rows, items.map(r -> r.index.index)));
         
-        return new LayoutRef(this, containerIndex);
+        return new LayoutRef(this, containerRef);
     }
     
     /**
      * Create a stack where items overlap
      */
-    public function stack(items:Array<LayoutRef>, ?name:String):LayoutRef {
+    public function stack(items:Array<LayoutRef>, ?name:String, ?type:Id):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
+        var containerRef:NamedDimRef = {
+            index: containerIndex,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = containerIndex;
+            namedDims[name] = containerRef;
         }
         
-        constraints.push(StackLayout(containerIndex, items.map(r -> r.index)));
+        constraints.push(StackLayout(containerIndex, items.map(r -> r.index.index)));
         
-        return new LayoutRef(this, containerIndex);
+        return new LayoutRef(this, containerRef);
     }
     
     /**
      * Create a scrollable container
      */
-    public function scrollable(items:Array<LayoutRef>, width:Float, height:Float, ?name:String):LayoutRef {
+    public function scrollable(items:Array<LayoutRef>, width:Float, height:Float, ?name:String, ?type:Id):LayoutRef {
         var container = new Dim(0, 0, width, height);
         var containerIndex = dims.push(container) - 1;
+        var containerRef:NamedDimRef = {
+            index: containerIndex,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = containerIndex;
+            namedDims[name] = containerRef;
         }
         
         containers.push({
             index: containerIndex,
-            children: items.map(r -> r.index),
+            children: items.map(r -> r.index.index),
             scrollable: true,
             clipContent: true
         });
         
-        constraints.push(ScrollContainer(containerIndex, items.map(r -> r.index)));
+        constraints.push(ScrollContainer(containerIndex, items.map(r -> r.index.index)));
         
-        return new LayoutRef(this, containerIndex);
+        return new LayoutRef(this, containerRef);
     }
     
     /**
      * Create a clipped container (no scroll)
      */
-    public function clipped(items:Array<LayoutRef>, width:Float, height:Float, ?name:String):LayoutRef {
+    public function clipped(items:Array<LayoutRef>, width:Float, height:Float, ?name:String, ?type:Id):LayoutRef {
         var container = new Dim(0, 0, width, height);
         var containerIndex = dims.push(container) - 1;
+        var containerRef:NamedDimRef = {
+            index: containerIndex,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = containerIndex;
+            namedDims[name] = containerRef;
         }
         
         containers.push({
             index: containerIndex,
-            children: items.map(r -> r.index),
+            children: items.map(r -> r.index.index),
             scrollable: false,
             clipContent: true
         });
         
-        constraints.push(ClippedContainer(containerIndex, items.map(r -> r.index)));
+        constraints.push(ClippedContainer(containerIndex, items.map(r -> r.index.index)));
         
-        return new LayoutRef(this, containerIndex);
+        return new LayoutRef(this, containerRef);
     }
     
     /**
@@ -208,10 +245,14 @@ class Layout {
     public function pad4(ref:LayoutRef, top:Float, right:Float, bottom:Float, left:Float):LayoutRef {
         var wrapper = new Dim(0, 0, 0, 0);
         var wrapperIndex = dims.push(wrapper) - 1;
+        var wrapperRef:NamedDimRef = {
+            index: wrapperIndex,
+            type: Id.None
+        };
         
-        constraints.push(Padding(wrapperIndex, ref.index, top, right, bottom, left));
+        constraints.push(Padding(wrapperIndex, ref.index.index, top, right, bottom, left));
         
-        return new LayoutRef(this, wrapperIndex);
+        return new LayoutRef(this, wrapperRef);
     }
     
     /**
@@ -229,7 +270,7 @@ class Layout {
      * Remove an element by name
      */
     public function remove(name:String):Bool {
-        var index = namedDims[name];
+        var index = namedDims[name].index;
         if (index == null) return false;
         
         deleted.push(index);
@@ -257,7 +298,7 @@ class Layout {
      * Add to an existing container
      */
     public function addTo(containerName:String, ref:LayoutRef):LayoutRef {
-        var containerIdx = namedDims[containerName];
+        var containerIdx = namedDims[containerName].index;
         if (containerIdx == null) {
             throw 'Container "$containerName" not found';
         }
@@ -265,19 +306,19 @@ class Layout {
         for (constraint in constraints) {
             switch (constraint) {
                 case VerticalFlow(c, children, _) if (c == containerIdx):
-                    children.push(ref.index);
+                    children.push(ref.index.index);
                     break;
                     
                 case HorizontalFlow(c, children, _) if (c == containerIdx):
-                    children.push(ref.index);
+                    children.push(ref.index.index);
                     break;
                     
                 case ScrollContainer(c, children) if (c == containerIdx):
-                    children.push(ref.index);
+                    children.push(ref.index.index);
                     break;
                     
                 case ClippedContainer(c, children) if (c == containerIdx):
-                    children.push(ref.index);
+                    children.push(ref.index.index);
                     break;
                     
                 default:
@@ -287,7 +328,7 @@ class Layout {
         // Also update container info if it exists
         for (container in containers) {
             if (container.index == containerIdx) {
-                container.children.push(ref.index);
+                container.children.push(ref.index.index);
                 break;
             }
         }
@@ -309,7 +350,7 @@ class Layout {
     /**
      * Merge another layout into this one
      */
-    public function merge(other:Layout, ?at:LayoutRef, ?name:String):LayoutRef {
+    public function merge(other:Layout, ?at:LayoutRef, ?name:String, ?type:Id):LayoutRef {
         var baseIndex = dims.length;
         var indexMap:Map<Int, Int> = [];
         
@@ -336,8 +377,11 @@ class Layout {
         // Remap named dimensions
         for (key => value in other.namedDims) {
             var prefixedKey = name != null ? name + "_" + key : key;
-            if (indexMap.exists(value)) {
-                namedDims[prefixedKey] = indexMap[value];
+            if (indexMap.exists(value.index)) {
+                namedDims[prefixedKey] = {
+                    index: indexMap[value.index],
+                    type: value.type
+                };
             }
         }
         
@@ -357,14 +401,18 @@ class Layout {
         // Create a wrapper dim for the merged layout
         var wrapperDim = new Dim(0, 0, 0, 0);
         var wrapperIndex = dims.push(wrapperDim) - 1;
+        var wrapper:NamedDimRef = {
+            index: wrapperIndex,
+            type: type != null ? type : Id.None
+        };
         
         if (name != null) {
-            namedDims[name] = wrapperIndex;
+            namedDims[name] = wrapper;
         }
         
         // Position relative to anchor if provided
         if (at != null) {
-            constraints.push(Align(wrapperIndex, at.index, TopLeft));
+            constraints.push(Align(wrapperIndex, at.index.index, TopLeft));
         }
         
         // Make all merged dims children of wrapper
@@ -373,14 +421,14 @@ class Layout {
             constraints.push(MergedLayout(wrapperIndex, mergedIndices));
         }
         
-        return new LayoutRef(this, wrapperIndex);
+        return new LayoutRef(this, wrapper);
     }
     
     /**
      * Add a sub-layout as a child
      */
-    public function embed(other:Layout, ?name:String):LayoutRef {
-        return merge(other, null, name);
+    public function embed(other:Layout, ?name:String, ?type:Id):LayoutRef {
+        return merge(other, null, name, type);
     }
     
     /**
@@ -420,6 +468,14 @@ class Layout {
         for (i in 0...dims.length) {
             if (deleted.indexOf(i) > -1) continue;
             
+            var nameRef:NamedDimRef = null;
+            for (_ => value in namedDims) {
+                if (value.index == i) {
+                    nameRef = value;
+                    break;
+                }
+            }
+
             var isContainer = containers.find(c -> c.index == i) != null;
             
             if (previous != null && previous.indices.exists(i)) {
@@ -434,11 +490,11 @@ class Layout {
             } else {
                 // Add new dimension
                 if (isContainer) {
-                    var containerIdx = ctx.addContainer(dims[i], Id.None);
+                    var containerIdx = ctx.addContainer(dims[i], nameRef != null ? nameRef.type : Id.None);
                     indices[i] = containerIdx.dimIndex;
                     containerIndices[i] = containerIdx.containerIndex;
                 } else {
-                    indices[i] = ctx.addUI(dims[i], Id.None);
+                    indices[i] = ctx.addUI(dims[i], nameRef != null ? nameRef.type : Id.None);
                 }
             }
         }
