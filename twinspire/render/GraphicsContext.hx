@@ -125,6 +125,7 @@ class GraphicsContext {
         _containerTemp = [];
         _dormantDimIndices = [];
         _dormantGroups = [];
+        _cameras = [];
         _ended = false;
         _currentMenu = -1;
         _containerOffsetsChanged = false;
@@ -203,7 +204,7 @@ class GraphicsContext {
     * first.
     **/
     public function getCameraObserved():Array<DimIndex> {
-        
+        return [];
     }
 
     /**
@@ -1588,6 +1589,7 @@ class GraphicsContext {
         }
 
         _ended = true;
+        _g2.end();
     }
 
 }

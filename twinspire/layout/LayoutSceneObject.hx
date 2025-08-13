@@ -4,6 +4,7 @@
 
 package twinspire.layout;
 
+import twinspire.layout.LayoutTypes.LayoutResult;
 import twinspire.scenes.SceneObject;
 import twinspire.scenes.Scene;
 import twinspire.render.GraphicsContext;

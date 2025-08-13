@@ -268,8 +268,6 @@ class Application
 			end(_graphicsContext, _updateContext);
 		}
 
-		g2.end();
-
 		GlobalEvents.end();
 		_lastTime = System.time;
 	}
