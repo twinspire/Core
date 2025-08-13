@@ -12,10 +12,16 @@ import twinspire.DimIndex;
 import twinspire.Id;
 import twinspire.geom.Dim;
 
+import kha.Image;
+
 /**
  * SceneObject that contains layout information
  */
 class LayoutSceneObject extends SceneObject {
+
+    // states if generating images to cache
+    private var _states:Array<Image>;
+
     public var layout:Layout;
     public var result:LayoutResult;
     public var autoReapply:Bool = true;
@@ -29,6 +35,7 @@ class LayoutSceneObject extends SceneObject {
         super();
         this.type = id ?? Id.None;
         cachedRefs = [];
+        _states = [];
     }
     
     /**
@@ -81,4 +88,41 @@ class LayoutSceneObject extends SceneObject {
             reapply(ctx);
         }
     }
+
+    /**
+    * Adds a state to this object and returns the index.
+    **/
+    public function addState(image:Image) {
+        return _states.push(image) - 1;
+    }
+
+    /**
+    * Get a state image at the given index.
+    **/
+    public function getState(index:Int):Image {
+        if (index < 0 || index >= _states.length) {
+            return null;
+        }
+
+        return _states[index];
+    }
+
+    /**
+    * Removes a state with the given index.
+    **/
+    public function removeState(index:Int) {
+        if (index < 0 || index >= _states.length) {
+            return;
+        }
+
+        _states.splice(index, 1);
+    }
+
+    /**
+    * Gets the state from the name of a `DimIndex` reference.
+    **/
+    public function getStateFromName(name:String) {
+        
+    }
+
 }
