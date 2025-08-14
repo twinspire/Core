@@ -4,6 +4,7 @@
 
 package twinspire.render;
 
+import twinspire.utils.PerlinNoise;
 import kha.math.Vector2i;
 import haxe.io.Bytes;
 import kha.Image;
@@ -870,9 +871,135 @@ class ImageEffectRenderer {
     * @param max Determines the coverage of the highest range on the color palette within spots not covered by the lowest range.
     **/
     public function perlin(seed:Int, scale:Float, grid:Vector2i, palette:Array<Color>, ?falloff:Float = 1.0, min:Float = 0.0, max:Float = 1.0) {
-
-
+        // Initialize Perlin noise with the given seed
+        PerlinNoise.init(seed);
+        
+        // Calculate effective scale based on grid size
+        var effectiveScale = scale / Math.max(grid.x, grid.y);
+        
+        // Generate noise grid
+        var octaves = 4; // Good default for natural-looking noise
+        var persistence = 0.5;
+        var noiseIndices = PerlinNoise.generateNoiseGrid(width, height, effectiveScale, octaves, persistence, palette.length);
+        
+        // Apply falloff and min/max constraints
+        var adjustedIndices = applyPerlinConstraints(noiseIndices, palette.length, falloff, min, max);
+        
+        // Apply the palette to the image
+        var bytesPerPixel = 4;
+        for (y in 0...height) {
+            for (x in 0...width) {
+                var pixelIndex = (y * width + x) * bytesPerPixel;
+                var noiseIndex = y * width + x;
+                var paletteIndex = adjustedIndices[noiseIndex];
+                var color = palette[paletteIndex];
+                
+                // Handle edge falloff if there are transparent areas
+                var alpha = _data.get(pixelIndex + 3);
+                if (alpha == 0 && falloff > 0) {
+                    // Apply falloff effect to transparent edges
+                    var edgeColor = calculateEdgeFalloff(x, y, adjustedIndices, palette, falloff);
+                    color = edgeColor;
+                }
+                
+                _data.set(pixelIndex, Math.round(color.R * 255));
+                _data.set(pixelIndex + 1, Math.round(color.G * 255));
+                _data.set(pixelIndex + 2, Math.round(color.B * 255));
+                _data.set(pixelIndex + 3, Math.round(color.A * 255));
+            }
+        }
+        
         return this;
+    }
+
+    /**
+    * Apply falloff and min/max constraints to noise indices with improved distribution.
+    **/
+    private function applyPerlinConstraints(noiseIndices:Array<Int>, paletteSize:Int, falloff:Float, min:Float, max:Float):Array<Int> {
+        var result = new Array<Int>();
+        
+        // Calculate the effective range based on min/max
+        var minIndex = Math.floor(min * (paletteSize - 1));
+        var maxIndex = Math.floor(max * (paletteSize - 1));
+        var range = maxIndex - minIndex + 1;
+        
+        // Find the actual min/max values in the noise data for better mapping
+        var actualMin = Math.POSITIVE_INFINITY;
+        var actualMax = Math.NEGATIVE_INFINITY;
+        
+        for (index in noiseIndices) {
+            actualMin = Math.min(actualMin, index);
+            actualMax = Math.max(actualMax, index);
+        }
+        
+        var actualRange = actualMax - actualMin;
+        
+        for (index in noiseIndices) {
+            // Normalize based on actual range in the data
+            var normalizedIndex = (index - actualMin) / actualRange; // 0.0 to 1.0
+            
+            // Apply falloff (affects the contrast/spread of the noise)
+            if (falloff != 1.0) {
+                // Use a more aggressive curve for falloff
+                if (falloff > 1.0) {
+                    // Increase contrast - push values toward extremes
+                    normalizedIndex = Math.pow(normalizedIndex, 1.0 / falloff);
+                } else {
+                    // Decrease contrast - pull values toward middle
+                    normalizedIndex = Math.pow(normalizedIndex, falloff);
+                }
+            }
+            
+            // Map to the constrained range using proper rounding
+            var constrainedIndex = minIndex + Math.round(normalizedIndex * (range - 1));
+            constrainedIndex = cast Math.max(minIndex, Math.min(maxIndex, constrainedIndex));
+            
+            result.push(constrainedIndex);
+        }
+        
+        return result;
+    }
+
+    /**
+    * Calculate falloff effect for transparent edges.
+    **/
+    private function calculateEdgeFalloff(x:Int, y:Int, noiseIndices:Array<Int>, palette:Array<Color>, falloff:Float):Color {
+        // Find nearest non-transparent pixel and blend
+        var searchRadius = Math.round(falloff * 10);
+        var totalR = 0.0, totalG = 0.0, totalB = 0.0, totalA = 0.0;
+        var samples = 0;
+        
+        for (dy in -searchRadius...searchRadius + 1) {
+            for (dx in -searchRadius...searchRadius + 1) {
+                var nx = x + dx;
+                var ny = y + dy;
+                
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    var nPixelIndex = (ny * width + nx) * 4;
+                    var nAlpha = _data.get(nPixelIndex + 3);
+                    
+                    if (nAlpha > 0) {
+                        var distance = Math.sqrt(dx * dx + dy * dy);
+                        var weight = 1.0 / (1.0 + distance);
+                        
+                        var noiseIndex = ny * width + nx;
+                        var color = palette[noiseIndices[noiseIndex]];
+                        
+                        totalR += color.R * weight;
+                        totalG += color.G * weight;
+                        totalB += color.B * weight;
+                        totalA += color.A * weight;
+                        samples++;
+                    }
+                }
+            }
+        }
+        
+        if (samples > 0) {
+            return Color.fromFloats(totalR / samples, totalG / samples, totalB / samples, totalA / samples);
+        }
+        
+        return palette[0]; // Fallback
     }
 
     /**
