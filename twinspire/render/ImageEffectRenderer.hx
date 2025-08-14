@@ -9,6 +9,25 @@ import haxe.io.Bytes;
 import kha.Image;
 import kha.Color;
 
+enum ClampMode {
+    /**
+    * Extend the edge pixels outward (default behavior).
+    **/
+    ClampExtend;
+    /**
+    * Mirror the image at the edges.
+    **/
+    ClampMirror;
+    /**
+    * Wrap the image around (tiling effect).
+    **/
+    ClampWrap;
+    /**
+    * Fill edges with a solid color.
+    **/
+    ClampColor(color:kha.Color);
+}
+
 enum SharpenMethod {
     /**
     * Uses an unsharp masking approach to sharpening image edges.
@@ -263,14 +282,385 @@ class ImageEffectRenderer {
         return this;
     }
 
-    
-
     /**
-    * Clamp the transparent edges of the image.
+    * Clamp the edges within an image with different modes.
     **/
-    public function clamp() {
-
+    public function clamp(?mode:ClampMode, ?borderSize:Int = 1, ?handleCorners:Bool = false) {
+        if (mode == null) {
+            mode = ClampExtend;
+        }
+        
+        if (borderSize <= 0 || borderSize >= Math.min(width, height) / 2) {
+            return this;
+        }
+        
+        var bytesPerPixel = 4;
+        
+        switch (mode) {
+            case ClampExtend: {
+                return clampExtend(borderSize);
+            }
+            case ClampMirror: {
+                if (handleCorners) {
+                    return clampMirrorComplete(borderSize);
+                }
+                else {
+                    return clampMirror(borderSize);
+                }
+            }
+            case ClampWrap: {
+                if (handleCorners) {
+                    return clampWrapComplete(borderSize);
+                }
+                else {
+                    return clampWrap(borderSize);
+                }
+            }
+            case ClampColor(color): {
+                return clampColor(color, borderSize);
+            }
+        }
+        
         return this;
+    }
+
+    private function clampExtend(borderSize:Int) {
+        var bytesPerPixel = 4;
+        
+        // Same as the previous implementation
+        for (borderY in 0...borderSize) {
+            for (x in borderSize...(width - borderSize)) {
+                var topSourceIndex = (borderSize * width + x) * bytesPerPixel;
+                var topTargetIndex = (borderY * width + x) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(topTargetIndex + channel, _data.get(topSourceIndex + channel));
+                }
+                
+                var bottomSourceIndex = ((height - borderSize - 1) * width + x) * bytesPerPixel;
+                var bottomTargetIndex = ((height - borderY - 1) * width + x) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(bottomTargetIndex + channel, _data.get(bottomSourceIndex + channel));
+                }
+            }
+        }
+        
+        for (borderX in 0...borderSize) {
+            for (y in 0...height) {
+                var leftSourceIndex = (y * width + borderSize) * bytesPerPixel;
+                var leftTargetIndex = (y * width + borderX) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(leftTargetIndex + channel, _data.get(leftSourceIndex + channel));
+                }
+                
+                var rightSourceIndex = (y * width + (width - borderSize - 1)) * bytesPerPixel;
+                var rightTargetIndex = (y * width + (width - borderX - 1)) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(rightTargetIndex + channel, _data.get(rightSourceIndex + channel));
+                }
+            }
+        }
+        
+        return this;
+    }
+
+    private function clampColor(color:kha.Color, borderSize:Int) {
+        var bytesPerPixel = 4;
+        var r = Math.round(color.R * 255);
+        var g = Math.round(color.G * 255);
+        var b = Math.round(color.B * 255);
+        var a = Math.round(color.A * 255);
+        
+        // Fill top and bottom borders
+        for (borderY in 0...borderSize) {
+            for (x in 0...width) {
+                var topIndex = (borderY * width + x) * bytesPerPixel;
+                var bottomIndex = ((height - borderY - 1) * width + x) * bytesPerPixel;
+                
+                _data.set(topIndex, r);
+                _data.set(topIndex + 1, g);
+                _data.set(topIndex + 2, b);
+                _data.set(topIndex + 3, a);
+                
+                _data.set(bottomIndex, r);
+                _data.set(bottomIndex + 1, g);
+                _data.set(bottomIndex + 2, b);
+                _data.set(bottomIndex + 3, a);
+            }
+        }
+        
+        // Fill left and right borders
+        for (borderX in 0...borderSize) {
+            for (y in borderSize...(height - borderSize)) {
+                var leftIndex = (y * width + borderX) * bytesPerPixel;
+                var rightIndex = (y * width + (width - borderX - 1)) * bytesPerPixel;
+                
+                _data.set(leftIndex, r);
+                _data.set(leftIndex + 1, g);
+                _data.set(leftIndex + 2, b);
+                _data.set(leftIndex + 3, a);
+                
+                _data.set(rightIndex, r);
+                _data.set(rightIndex + 1, g);
+                _data.set(rightIndex + 2, b);
+                _data.set(rightIndex + 3, a);
+            }
+        }
+        
+        return this;
+    }
+
+    private function clampMirror(borderSize:Int) {
+        var bytesPerPixel = 4;
+        
+        // Mirror top and bottom borders
+        for (borderY in 0...borderSize) {
+            for (x in borderSize...(width - borderSize)) {
+                // Top border - mirror from valid area
+                var mirrorY = borderSize + (borderSize - borderY - 1);
+                var topSourceIndex = (mirrorY * width + x) * bytesPerPixel;
+                var topTargetIndex = (borderY * width + x) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(topTargetIndex + channel, _data.get(topSourceIndex + channel));
+                }
+                
+                // Bottom border - mirror from valid area
+                var bottomMirrorY = (height - borderSize - 1) - (borderSize - borderY - 1);
+                var bottomSourceIndex = (bottomMirrorY * width + x) * bytesPerPixel;
+                var bottomTargetIndex = ((height - borderY - 1) * width + x) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(bottomTargetIndex + channel, _data.get(bottomSourceIndex + channel));
+                }
+            }
+        }
+        
+        // Mirror left and right borders
+        for (borderX in 0...borderSize) {
+            for (y in 0...height) {
+                // Left border - mirror from valid area
+                var mirrorX = borderSize + (borderSize - borderX - 1);
+                var leftSourceIndex = (y * width + mirrorX) * bytesPerPixel;
+                var leftTargetIndex = (y * width + borderX) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(leftTargetIndex + channel, _data.get(leftSourceIndex + channel));
+                }
+                
+                // Right border - mirror from valid area
+                var rightMirrorX = (width - borderSize - 1) - (borderSize - borderX - 1);
+                var rightSourceIndex = (y * width + rightMirrorX) * bytesPerPixel;
+                var rightTargetIndex = (y * width + (width - borderX - 1)) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(rightTargetIndex + channel, _data.get(rightSourceIndex + channel));
+                }
+            }
+        }
+        
+        return this;
+    }
+
+    private function clampWrap(borderSize:Int) {
+        var bytesPerPixel = 4;
+        
+        // Wrap top and bottom borders
+        for (borderY in 0...borderSize) {
+            for (x in borderSize...(width - borderSize)) {
+                // Top border - wrap from bottom of valid area
+                var wrapY = (height - borderSize - 1) - borderY;
+                var topSourceIndex = (wrapY * width + x) * bytesPerPixel;
+                var topTargetIndex = (borderY * width + x) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(topTargetIndex + channel, _data.get(topSourceIndex + channel));
+                }
+                
+                // Bottom border - wrap from top of valid area
+                var bottomWrapY = borderSize + borderY;
+                var bottomSourceIndex = (bottomWrapY * width + x) * bytesPerPixel;
+                var bottomTargetIndex = ((height - borderY - 1) * width + x) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(bottomTargetIndex + channel, _data.get(bottomSourceIndex + channel));
+                }
+            }
+        }
+        
+        // Wrap left and right borders
+        for (borderX in 0...borderSize) {
+            for (y in 0...height) {
+                // Left border - wrap from right of valid area
+                var wrapX = (width - borderSize - 1) - borderX;
+                var leftSourceIndex = (y * width + wrapX) * bytesPerPixel;
+                var leftTargetIndex = (y * width + borderX) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(leftTargetIndex + channel, _data.get(leftSourceIndex + channel));
+                }
+                
+                // Right border - wrap from left of valid area
+                var rightWrapX = borderSize + borderX;
+                var rightSourceIndex = (y * width + rightWrapX) * bytesPerPixel;
+                var rightTargetIndex = (y * width + (width - borderX - 1)) * bytesPerPixel;
+                
+                for (channel in 0...bytesPerPixel) {
+                    _data.set(rightTargetIndex + channel, _data.get(rightSourceIndex + channel));
+                }
+            }
+        }
+        
+        return this;
+    }
+
+    private function clampMirrorComplete(borderSize:Int) {
+        var bytesPerPixel = 4;
+        
+        // Handle corners first to avoid conflicts
+        handleCornersMirror(borderSize);
+        
+        // Mirror top and bottom borders (excluding corners)
+        for (borderY in 0...borderSize) {
+            for (x in borderSize...(width - borderSize)) {
+                // Top border
+                var mirrorY = borderSize + (borderSize - borderY - 1);
+                copyPixel(mirrorY, x, borderY, x);
+                
+                // Bottom border
+                var bottomMirrorY = (height - borderSize - 1) - (borderSize - borderY - 1);
+                copyPixel(bottomMirrorY, x, height - borderY - 1, x);
+            }
+        }
+        
+        // Mirror left and right borders (excluding corners)
+        for (borderX in 0...borderSize) {
+            for (y in borderSize...(height - borderSize)) {
+                // Left border
+                var mirrorX = borderSize + (borderSize - borderX - 1);
+                copyPixel(y, mirrorX, y, borderX);
+                
+                // Right border
+                var rightMirrorX = (width - borderSize - 1) - (borderSize - borderX - 1);
+                copyPixel(y, rightMirrorX, y, width - borderX - 1);
+            }
+        }
+        
+        return this;
+    }
+
+    private function clampWrapComplete(borderSize:Int) {
+        var bytesPerPixel = 4;
+        
+        // Handle corners first
+        handleCornersWrap(borderSize);
+        
+        // Wrap top and bottom borders (excluding corners)
+        for (borderY in 0...borderSize) {
+            for (x in borderSize...(width - borderSize)) {
+                // Top border - wrap from bottom
+                var wrapY = (height - borderSize - 1) - borderY;
+                copyPixel(wrapY, x, borderY, x);
+                
+                // Bottom border - wrap from top
+                var bottomWrapY = borderSize + borderY;
+                copyPixel(bottomWrapY, x, height - borderY - 1, x);
+            }
+        }
+        
+        // Wrap left and right borders (excluding corners)
+        for (borderX in 0...borderSize) {
+            for (y in borderSize...(height - borderSize)) {
+                // Left border - wrap from right
+                var wrapX = (width - borderSize - 1) - borderX;
+                copyPixel(y, wrapX, y, borderX);
+                
+                // Right border - wrap from left
+                var rightWrapX = borderSize + borderX;
+                copyPixel(y, rightWrapX, y, width - borderX - 1);
+            }
+        }
+        
+        return this;
+    }
+
+    private function handleCornersMirror(borderSize:Int) {
+        // Top-left corner
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var mirrorY = borderSize + (borderSize - borderY - 1);
+                var mirrorX = borderSize + (borderSize - borderX - 1);
+                copyPixel(mirrorY, mirrorX, borderY, borderX);
+            }
+        }
+        
+        // Top-right corner
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var mirrorY = borderSize + (borderSize - borderY - 1);
+                var mirrorX = (width - borderSize - 1) - (borderSize - borderX - 1);
+                copyPixel(mirrorY, mirrorX, borderY, width - borderX - 1);
+            }
+        }
+        
+        // Bottom-left corner
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var mirrorY = (height - borderSize - 1) - (borderSize - borderY - 1);
+                var mirrorX = borderSize + (borderSize - borderX - 1);
+                copyPixel(mirrorY, mirrorX, height - borderY - 1, borderX);
+            }
+        }
+        
+        // Bottom-right corner
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var mirrorY = (height - borderSize - 1) - (borderSize - borderY - 1);
+                var mirrorX = (width - borderSize - 1) - (borderSize - borderX - 1);
+                copyPixel(mirrorY, mirrorX, height - borderY - 1, width - borderX - 1);
+            }
+        }
+    }
+
+    private function handleCornersWrap(borderSize:Int) {
+        // Top-left corner -> Bottom-right of valid area
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var wrapY = (height - borderSize - 1) - borderY;
+                var wrapX = (width - borderSize - 1) - borderX;
+                copyPixel(wrapY, wrapX, borderY, borderX);
+            }
+        }
+        
+        // Top-right corner -> Bottom-left of valid area
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var wrapY = (height - borderSize - 1) - borderY;
+                var wrapX = borderSize + borderX;
+                copyPixel(wrapY, wrapX, borderY, width - borderX - 1);
+            }
+        }
+        
+        // Bottom-left corner -> Top-right of valid area
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var wrapY = borderSize + borderY;
+                var wrapX = (width - borderSize - 1) - borderX;
+                copyPixel(wrapY, wrapX, height - borderY - 1, borderX);
+            }
+        }
+        
+        // Bottom-right corner -> Top-left of valid area
+        for (borderY in 0...borderSize) {
+            for (borderX in 0...borderSize) {
+                var wrapY = borderSize + borderY;
+                var wrapX = borderSize + borderX;
+                copyPixel(wrapY, wrapX, height - borderY - 1, width - borderX - 1);
+            }
+        }
     }
 
     /**
@@ -399,6 +789,19 @@ class ImageEffectRenderer {
         // Copy back to original data
         for (i in 0...data.length) {
             data.set(i, tempData.get(i));
+        }
+    }
+
+    /**
+    * Helper function to copy a pixel from source coordinates to target coordinates.
+    **/
+    private inline function copyPixel(srcY:Int, srcX:Int, targetY:Int, targetX:Int) {
+        var bytesPerPixel = 4;
+        var sourceIndex = (srcY * width + srcX) * bytesPerPixel;
+        var targetIndex = (targetY * width + targetX) * bytesPerPixel;
+        
+        for (channel in 0...bytesPerPixel) {
+            _data.set(targetIndex + channel, _data.get(sourceIndex + channel));
         }
     }
 
