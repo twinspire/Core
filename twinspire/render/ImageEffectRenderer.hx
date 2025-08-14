@@ -7,22 +7,64 @@ import kha.Color;
 
 class ImageEffectRenderer {
 
-    private var _img:Image;
+    private var width:Int;
+    private var height:Int;
     private var _data:Bytes;
     
     public function new(img:Image) {
-        this._img = Image.createRenderTarget(img.realWidth, img.realHeight);
+        var originalPixels = img.getPixels();
     
-        var g2 = this._img.g2;
-        g2.begin(true, Color.Transparent);
-        g2.color = Color.White;
-        g2.drawImage(img, 0, 0);
-        g2.end();
+        if (originalPixels != null) {
+            // Direct copy from original
+            this.width = img.realWidth;
+            this.height = img.realHeight;
+            this._data = originalPixels;
+        } else {
+            // Software fallback - create empty buffer and manually copy pixel data
+            var width = img.realWidth;
+            var height = img.realHeight;
+            var size = width * height * 4; // RGBA
+            
+            this._data = Bytes.alloc(size);
+            
+            // Try to extract pixels through alternative method
+            if (!extractPixelsManually(img, width, height)) {
+                trace("Warning: Could not extract pixel data, effects may not work properly");
+                // Fill with transparent pixels as fallback
+                for (i in 0...size) {
+                    this._data.set(i, 0);
+                }
+            }
 
-        this._data = this._img.lock();
-        if (this._data == null) {
-            throw "Failed to lock image data for effect processing";
+            this.width = width;
+            this.height = height;
         }
+    }
+
+    private function extractPixelsManually(sourceImg:Image, width:Int, height:Int):Bool {
+        try {
+            // Create a temporary render target with a format that supports readback
+            var tempTarget = Image.createRenderTarget(width, height, null, NoDepthAndStencil, 0);
+            var g2 = tempTarget.g2;
+            
+            g2.begin(true, Color.Transparent);
+            g2.drawImage(sourceImg, 0, 0);
+            g2.end();
+            
+            // Try to get pixels after explicit end()
+            var pixels = tempTarget.getPixels();
+            if (pixels != null) {
+                // Copy to our buffer
+                for (i in 0...pixels.length) {
+                    this._data.set(i, pixels.get(i));
+                }
+                return true;
+            }
+        } catch (e:Dynamic) {
+            trace('Manual extraction failed: $e');
+        }
+        
+        return false;
     }
 
     /**
@@ -43,8 +85,6 @@ class ImageEffectRenderer {
         // Create temporary buffer for horizontal pass
         var tempData = Bytes.alloc(_data.length);
         
-        var width = _img.width;
-        var height = _img.height;
         var bytesPerPixel = 4; // Assuming RGBA format
         
         // Horizontal pass
@@ -160,8 +200,7 @@ class ImageEffectRenderer {
     * Return the final image.
     **/
     public function getOutput() {
-        _img.unlock();
-        return _img;
+        return Image.fromBytes(this._data, width, height);
     }
 
 
