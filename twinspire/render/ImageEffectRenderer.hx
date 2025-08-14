@@ -39,6 +39,21 @@ enum SharpenMethod {
     Performance;
 }
 
+enum NoiseType {
+    /**
+    * Random scattered noise points.
+    **/
+    Scattered;
+    /**
+    * Uniform noise applied to all pixels.
+    **/
+    Uniform;
+    /**
+    * Film grain-like noise pattern.
+    **/
+    FilmGrain;
+}
+
 class ImageEffectRenderer {
 
     private var width:Int;
@@ -664,15 +679,187 @@ class ImageEffectRenderer {
     }
 
     /**
-    * Generate basic noise with the given amount, intensity, and variation in colour.
+    * Generate noise with the given parameters and noise type.
     **/
-    public function noise(amount:Float, intensity:Float, variation:Float) {
-
+    public function noise(amount:Float, intensity:Float, variation:Float, ?type:NoiseType) {
+        if (type == null) {
+            type = Scattered;
+        }
+        
+        if (amount <= 0 || intensity <= 0) {
+            return this;
+        }
+        
+        // Clamp parameters
+        amount = Math.min(amount, 1.0);
+        intensity = Math.min(intensity, 1.0);
+        variation = Math.min(variation, 1.0);
+        
+        switch (type) {
+            case Scattered: {
+                return applyScatteredNoise(amount, intensity, variation);
+            }
+            case Uniform: {
+                return applyUniformNoise(amount, intensity, variation);
+            }
+            case FilmGrain: {
+                return applyFilmGrainNoise(amount, intensity, variation);
+            }
+        }
+        
         return this;
     }
 
+    private function applyScatteredNoise(amount:Float, intensity:Float, variation:Float) {        
+        var bytesPerPixel = 4;
+        var baseSeed = Math.round(Date.now().getTime() % 1000000);
+        
+        for (y in 0...height) {
+            for (x in 0...width) {
+                // Use multiple large primes to ensure good distribution
+                var pixelSeed = baseSeed + (y * 2654435761) + (x * 1610612741);
+                
+                if (randomFloat(cast pixelSeed, 0.0, 1.0) < amount) {
+                    var pixelIndex = (y * width + x) * bytesPerPixel;
+                    
+                    var currentR = _data.get(pixelIndex);
+                    var currentG = _data.get(pixelIndex + 1);
+                    var currentB = _data.get(pixelIndex + 2);
+                    var currentA = _data.get(pixelIndex + 3);
+                    
+                    // Generate base noise
+                    var baseNoise = randomFloat(cast pixelSeed * 3, -1.0, 1.0);
+                    
+                    var noiseR = baseNoise;
+                    var noiseG = baseNoise;
+                    var noiseB = baseNoise;
+                    
+                    // Add color variation if requested
+                    if (variation > 0.1) {
+                        var colorSeedR = pixelSeed * 7 + 1234;
+                        var colorSeedG = pixelSeed * 11 + 5678;
+                        var colorSeedB = pixelSeed * 13 + 9101;
+                        
+                        var varR = randomFloat(cast colorSeedR, -variation, variation);
+                        var varG = randomFloat(cast colorSeedG, -variation, variation);
+                        var varB = randomFloat(cast colorSeedB, -variation, variation);
+                        
+                        noiseR = Math.max(-1.0, Math.min(1.0, baseNoise + varR));
+                        noiseG = Math.max(-1.0, Math.min(1.0, baseNoise + varG));
+                        noiseB = Math.max(-1.0, Math.min(1.0, baseNoise + varB));
+                    }
+                    
+                    // Apply noise
+                    var noiseAmount = intensity * 128;
+                    var newR = currentR + (noiseR * noiseAmount);
+                    var newG = currentG + (noiseG * noiseAmount);
+                    var newB = currentB + (noiseB * noiseAmount);
+                    
+                    _data.set(pixelIndex, clampPixel(newR));
+                    _data.set(pixelIndex + 1, clampPixel(newG));
+                    _data.set(pixelIndex + 2, clampPixel(newB));
+                    _data.set(pixelIndex + 3, currentA);
+                }
+            }
+        }
+        
+        return this;
+    }
+
+    private function applyUniformNoise(amount:Float, intensity:Float, variation:Float) {
+        var bytesPerPixel = 4;
+        var seed = Math.round(Date.now().getTime() % 1000000);
+        
+        for (y in 0...height) {
+            for (x in 0...width) {
+                // Use amount as probability for each pixel
+                var pixelSeed = seed + (y * width + x);
+                var shouldApply = randomFloat(pixelSeed, 0.0, 1.0) < amount;
+                
+                if (shouldApply) {
+                    addNoiseToPixel(x, y, intensity, variation, pixelSeed);
+                }
+            }
+        }
+        
+        return this;
+    }
+
+    private function applyFilmGrainNoise(amount:Float, intensity:Float, variation:Float) {
+        var bytesPerPixel = 4;
+        var seed = Math.round(Date.now().getTime() % 1000000);
+        
+        // Film grain tends to be more clustered and varies with image brightness
+        for (y in 0...height) {
+            for (x in 0...width) {
+                var pixelIndex = (y * width + x) * bytesPerPixel;
+                
+                // Get pixel brightness to influence grain intensity
+                var r = _data.get(pixelIndex);
+                var g = _data.get(pixelIndex + 1);
+                var b = _data.get(pixelIndex + 2);
+                var brightness = (r + g + b) / (3 * 255); // 0.0 to 1.0
+                
+                // Film grain is more visible in mid-tones
+                var grainMultiplier = 1.0 - Math.abs(brightness - 0.5) * 2.0;
+                grainMultiplier = Math.max(grainMultiplier, 0.1); // Minimum visibility
+                
+                var pixelSeed = seed + (y * width + x);
+                var shouldApply = randomFloat(pixelSeed, 0.0, 1.0) < (amount * grainMultiplier);
+                
+                if (shouldApply) {
+                    var adjustedIntensity = intensity * grainMultiplier;
+                    addNoiseToPixel(x, y, adjustedIntensity, variation, pixelSeed);
+                }
+            }
+        }
+        
+        return this;
+    }
+
+    private function addNoiseToPixel(x:Int, y:Int, intensity:Float, variation:Float, seed:Int) {
+        var bytesPerPixel = 4;
+        var pixelIndex = (y * width + x) * bytesPerPixel;
+        
+        // Get current pixel values
+        var currentR = _data.get(pixelIndex);
+        var currentG = _data.get(pixelIndex + 1);
+        var currentB = _data.get(pixelIndex + 2);
+        var currentA = _data.get(pixelIndex + 3);
+        
+        // Generate noise values
+        var noiseR = randomFloat(seed * 1234, -255 * intensity, 255 * intensity);
+        var noiseG = randomFloat(seed * 5678, -255 * intensity, 255 * intensity);
+        var noiseB = randomFloat(seed * 9101, -255 * intensity, 255 * intensity);
+        
+        // Apply color variation
+        if (variation < 0.5) {
+            var baseNoise = randomFloat(seed * 1121, -255 * intensity, 255 * intensity);
+            var variationFactor = variation * 2.0;
+            
+            noiseR = baseNoise + (noiseR - baseNoise) * variationFactor;
+            noiseG = baseNoise + (noiseG - baseNoise) * variationFactor;
+            noiseB = baseNoise + (noiseB - baseNoise) * variationFactor;
+        }
+        
+        // Apply noise to pixel
+        var newR = currentR + noiseR;
+        var newG = currentG + noiseG;
+        var newB = currentB + noiseB;
+        
+        // Clamp values and set pixel
+        _data.set(pixelIndex, clampPixel(newR));
+        _data.set(pixelIndex + 1, clampPixel(newG));
+        _data.set(pixelIndex + 2, clampPixel(newB));
+        _data.set(pixelIndex + 3, currentA);
+    }
+
     /**
-    * Generate perlin noise from a set of parameters.
+    * Generate perlin noise from a set of parameters, with an optional colour palette. When a colour palette is used, the underlying image is replaced.
+    * If a colour palette is not used, perlin will base colours on each pixel value, detecting a range of colours based on the scale and grid size.
+    * Finally, if transparent edges are detected, perlin will spill over the edges based on the `falloff` range.
+    *
+    * Function inspired by the Perlin noise generator here (https://mcperlin.streamlit.app / https://github.com/davidandrocket/blank-app/blob/main/streamlit_app.py)
     *
     * @param seed A numeric value to generate the perlin noise from.
     * @param scale Scale of the generated image.
@@ -683,6 +870,7 @@ class ImageEffectRenderer {
     * @param max Determines the coverage of the highest range on the color palette within spots not covered by the lowest range.
     **/
     public function perlin(seed:Int, scale:Float, grid:Vector2i, palette:Array<Color>, ?falloff:Float = 1.0, min:Float = 0.0, max:Float = 1.0) {
+
 
         return this;
     }
@@ -803,6 +991,31 @@ class ImageEffectRenderer {
         for (channel in 0...bytesPerPixel) {
             _data.set(targetIndex + channel, _data.get(sourceIndex + channel));
         }
+    }
+
+    /**
+    * Generate a pseudo-random integer between min and max (inclusive).
+    **/
+    private function randomInt(seed:Int, min:Int, max:Int):Int {
+        // Linear congruential generator
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        return min + (seed % (max - min + 1));
+    }
+
+    /**
+    * Generate a pseudo-random float between min and max.
+    **/
+    private function randomFloat(seed:Int, min:Float, max:Float):Float {
+        var hash = seed;
+        hash = (hash ^ 61) ^ (hash >> 16);
+        hash = hash + (hash << 3);
+        hash = hash ^ (hash >> 4);
+        hash = hash * 0x27d4eb2d;
+        hash = hash ^ (hash >> 15);
+        
+        // Convert to 0-1 range
+        var normalized = (hash & 0x7fffffff) / 0x7fffffff;
+        return min + (normalized * (max - min));
     }
 
 }
