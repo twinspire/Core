@@ -642,7 +642,212 @@ class Graphics2
 		}
 	}
 
-	
+
+
+
+	public function generateVerticalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool):Image {
+		var image = Image.create(width, height);
+		var pixels = image.lock();
+		
+		for (y in 0...height) {
+			var progress = y / (height - 1);
+			
+			if (inverse) {
+				// Mirror gradient from center outward
+				var center = 0.5;
+				progress = Math.abs(progress - center) * 2;
+				progress = Math.min(progress, 1.0);
+			}
+			
+			var color = interpolateColorFromStops(colors, stops, progress);
+			
+			for (x in 0...width) {
+				pixels.set(x, y, color);
+			}
+		}
+		
+		image.unlock();
+		return image;
+	}
+
+	public function generateHorizontalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool):Image {
+		var image = Image.create(width, height);
+		var pixels = image.lock();
+		
+		for (x in 0...width) {
+			var progress = x / (width - 1);
+			
+			if (inverse) {
+				// Mirror gradient from center outward
+				var center = 0.5;
+				progress = Math.abs(progress - center) * 2;
+				progress = Math.min(progress, 1.0);
+			}
+			
+			var color = interpolateColorFromStops(colors, stops, progress);
+			
+			for (y in 0...height) {
+				pixels.set(x, y, color);
+			}
+		}
+		
+		image.unlock();
+		return image;
+	}
+
+	public function generateCircularGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>):Image {
+		var image = Image.create(width, height);
+		var pixels = image.lock();
+		
+		var centerX = width / 2;
+		var centerY = height / 2;
+		var maxRadius = Math.sqrt(centerX * centerX + centerY * centerY);
+		
+		for (y in 0...height) {
+			for (x in 0...width) {
+				var dx = x - centerX;
+				var dy = y - centerY;
+				var distance = Math.sqrt(dx * dx + dy * dy);
+				var progress = Math.min(distance / maxRadius, 1.0);
+				
+				var color = interpolateColorFromStops(colors, stops, progress);
+				pixels.set(x, y, color);
+			}
+		}
+		
+		image.unlock();
+		return image;
+	}
+
+	public function generateConalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, clockwise:Bool):Image {
+		var image = Image.create(width, height);
+		var pixels = image.lock();
+		
+		var centerX = width / 2;
+		var centerY = height / 2;
+		
+		for (y in 0...height) {
+			for (x in 0...width) {
+				var dx = x - centerX;
+				var dy = y - centerY;
+				
+				// Calculate angle from center
+				var angle = Math.atan2(dy, dx);
+				
+				// Convert to 0-1 range
+				var progress = (angle + Math.PI) / (2 * Math.PI);
+				
+				if (!clockwise) {
+					progress = 1.0 - progress;
+				}
+				
+				// Ensure progress is in [0, 1] range
+				progress = progress - Math.floor(progress);
+				
+				var color = interpolateColorFromStops(colors, stops, progress);
+				pixels.set(x, y, color);
+			}
+		}
+		
+		image.unlock();
+		return image;
+	}
+
+	public function generatePolarGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, 
+                                     scale:Float, offset:FastVector2, edge:PolarEdgeEffect):Image {
+		var image = Image.create(width, height);
+		var pixels = image.lock();
+		
+		var centerX = width / 2 + offset.x;
+		var centerY = height / 2 + offset.y;
+		
+		for (y in 0...height) {
+			for (x in 0...width) {
+				var dx = (x - centerX) / scale;
+				var dy = (y - centerY) / scale;
+				
+				// Convert to polar coordinates
+				var radius = Math.sqrt(dx * dx + dy * dy);
+				var angle = Math.atan2(dy, dx);
+				
+				// Apply polar inversion effect
+				// This creates a complex distortion based on polar coordinates
+				var u = radius * Math.cos(angle * 2) + radius * 0.5;
+				var v = radius * Math.sin(angle * 2) + radius * 0.5;
+				
+				// Combine u and v to create a progress value
+				var progress = Math.sqrt(u * u + v * v) * 0.5;
+				
+				// Apply edge effects
+				switch (edge) {
+					case Clamp: {
+						progress = Math.max(0, Math.min(1, progress));
+					}
+					case Wrap: {
+						progress = progress - Math.floor(progress);
+						if (progress < 0) progress += 1;
+					}
+					case Mirror: {
+						progress = Math.abs(progress);
+						var intPart = Math.floor(progress);
+						var fracPart = progress - intPart;
+						if (Math.floor(intPart) % 2 == 1) {
+							progress = 1 - fracPart;
+						} else {
+							progress = fracPart;
+						}
+					}
+				}
+				
+				var color = interpolateColorFromStops(colors, stops, progress);
+				pixels.set(x, y, color);
+			}
+		}
+		
+		image.unlock();
+		return image;
+	}
+
+	private function interpolateColorFromStops(colors:Array<Color>, stops:Array<Float>, progress:Float):Color {
+		// Clamp progress to [0, 1]
+		progress = Math.max(0, Math.min(1, progress));
+		
+		// Find the two stops that bracket our progress
+		var lowerIndex = 0;
+		var upperIndex = colors.length - 1;
+		
+		for (i in 0...stops.length - 1) {
+			if (progress >= stops[i] && progress <= stops[i + 1]) {
+				lowerIndex = i;
+				upperIndex = i + 1;
+				break;
+			}
+		}
+		
+		// Handle edge cases
+		if (progress <= stops[0]) {
+			return colors[0];
+		}
+		if (progress >= stops[stops.length - 1]) {
+			return colors[colors.length - 1];
+		}
+		
+		// Calculate interpolation ratio between the two stops
+		var lowerStop = stops[lowerIndex];
+		var upperStop = stops[upperIndex];
+		var localProgress = (progress - lowerStop) / (upperStop - lowerStop);
+		
+		// Interpolate between the two colors
+		var lowerColor = colors[lowerIndex];
+		var upperColor = colors[upperIndex];
+		
+		var r = Math.round((1 - localProgress) * lowerColor.Rb + localProgress * upperColor.Rb);
+		var g = Math.round((1 - localProgress) * lowerColor.Gb + localProgress * upperColor.Gb);
+		var b = Math.round((1 - localProgress) * lowerColor.Bb + localProgress * upperColor.Bb);
+		var a = Math.round((1 - localProgress) * lowerColor.A + localProgress * upperColor.A);
+		
+		return Color.fromBytes(r, g, b, a);
+	}
 
 	/**
 	 * Draws a arc.
