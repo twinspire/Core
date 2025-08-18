@@ -10,6 +10,7 @@ import twinspire.text.TextInputState;
 import twinspire.text.TextInputMethod;
 import twinspire.Application;
 using twinspire.extensions.ArrayExtensions;
+import twinspire.extensions.Graphics2;
 
 import kha.graphics2.Graphics;
 import kha.math.FastVector2;
@@ -24,6 +25,18 @@ typedef ContainerResult = {
 typedef TextInputResult = {
     > ContainerResult,
     var textInputIndex:Int;
+}
+
+typedef DimensionRecord = {
+    var dim:Dim;
+    var vectorContext:VectorContext;
+}
+
+typedef VectorContext = {
+    var active:Bool;
+    var zoom:Float;
+    var translation:FastVector2;
+    var space:VectorSpace;
 }
 
 @:allow(Application)
@@ -42,7 +55,6 @@ class GraphicsContext {
 
     private var _containerOffsetsChanged:Bool;
     private var _containerLastOffsets:Array<FastVector2>;
-    private var _dimClientPositions:Array<FastVector2>;
 
     private var _buffers:Array<Image>;
     private var _bufferDimensionIndices:Array<Array<Int>>;
@@ -58,6 +70,9 @@ class GraphicsContext {
     private var _dormantGroups:Array<Int>;
 
     private var _cameras:Array<Camera>;
+
+    private var _dimRecordsTemp:Array<DimensionRecord>;
+    private var _dimRecords:Array<DimensionRecord>;
 
     /**
     * A collection of dimensions within this context. Do not write directly.
@@ -105,17 +120,7 @@ class GraphicsContext {
     **/
     public var useTracker:Bool;
 
-
     private var _g2:Graphics;
-    public var g2(get, default):Graphics;
-    function get_g2() {
-        if (_currentBuffer > -1 && _currentBuffer < _buffers.length) {
-            return _buffers[_currentBuffer].g2;
-        }
-        else {
-            return _g2;
-        }
-    }
 
     public function new() {
         _dimTemp = [];
@@ -125,11 +130,12 @@ class GraphicsContext {
         _containerTemp = [];
         _dormantDimIndices = [];
         _dormantGroups = [];
+        _dimRecordsTemp = [];
+        _dimRecords = [];
         _cameras = [];
         _ended = false;
         _currentMenu = -1;
         _containerOffsetsChanged = false;
-        _dimClientPositions = [];
         _containerLastOffsets = [];
         _buffers = [];
         _bufferDimensionIndices = [];
@@ -144,6 +150,26 @@ class GraphicsContext {
         queries = [];
         activities = [];
         textInputs = [];
+    }
+
+    /**
+    * Internal method to get the appropriate graphics context (buffer or main).
+    **/
+    private function getGraphics():Graphics {
+        if (_currentBuffer > -1 && _currentBuffer < _buffers.length) {
+            return _buffers[_currentBuffer].g2;
+        }
+        else {
+            return _g2;
+        }
+    }
+
+    /**
+    * Get current graphics context for advanced operations.
+    * Use sparingly - prefer the wrapper methods.
+    **/
+    public function getGraphics():Graphics {
+        return getGraphics();
     }
 
 
@@ -697,31 +723,58 @@ class GraphicsContext {
     * @param index The index as a `DimIndex` of the dimension or group.
     * @return The dimensions as an `Array<Dim>` or an empty array if a group or index is invalid.
     **/
-    public function getClientDimensionsAtIndex(index:DimIndex) {
+    public function getClientDimensionsAtIndex(index:DimIndex):Array<Dim> {
         switch (index) {
             case Direct(item): {
-                if (item < dimensions.length) {
-                    var value = new Dim(_dimClientPositions[item].x, _dimClientPositions[item].y, dimensions[item].width, dimensions[item].height, dimensions[item].order);
-                    value.visible = dimensions[item].visible;
-                    value.scale = dimensions[item].scale;
-                    return [ value ];
+                if (item < _dimRecords.length) {
+                    var record = _dimRecords[item];
+                    var baseDim = calculateClientDimension(record);
+                    
+                    // Apply container transformations
+                    var containerDim = applyContainerTransformations(baseDim, item);
+                    return [ containerDim ];
                 }
             }
             case Group(item): {
                 if (item < _groups.length) {
                     var results = new Array<Dim>();
                     for (child in _groups[item]) {
-                        var value = new Dim(_dimClientPositions[child].x, _dimClientPositions[child].y, dimensions[child].width, dimensions[child].height, dimensions[child].order);
-                        value.visible = dimensions[child].visible;
-                        value.scale = dimensions[child].scale;
-                        results.push(value);
+                        if (child < _dimRecords.length) {
+                            var record = _dimRecords[child];
+                            var baseDim = calculateClientDimension(record);
+                            var containerDim = applyContainerTransformations(baseDim, child);
+                            results.push(containerDim);
+                        }
                     }
                     return results;
                 }
             }
         }
-
         return [ null ];
+    }
+
+    /**
+    * Calculate the actual screen position/size of a dimension.
+    **/
+    private function calculateClientDimension(record:DimensionRecord):Dim {
+        var dim = record.dim;
+        var context = record.vectorContext;
+        
+        if (context.active && context.space != null) {
+            // Apply vector transformation
+            var transformedPos = context.space.transformPoint(dim.x, dim.y);
+            var transformedWidth = context.space.transformDistance(dim.width);
+            var transformedHeight = context.space.transformDistance(dim.height);
+            
+            var result = new Dim(transformedPos.x, transformedPos.y, transformedWidth, transformedHeight, dim.order);
+            result.visible = dim.visible;
+            result.scale = dim.scale;
+            return result;
+        } else {
+            // No transformation needed
+            var result = dim.clone();
+            return result;
+        }
     }
 
     /**
@@ -746,20 +799,6 @@ class GraphicsContext {
                 }
             }
         }
-    }
-
-    /**
-    * Collate a given set of indices into a single group, returning the new group index as a
-    * `DimIndex`. Any existing groups found within the set of indices are extracted and moved into
-    * the new group. If the old group is emptied as a result of this, the group is deleted.
-    *
-    * Any previous reference to other groups that you hold should be refreshed using the `refreshGroups`
-    * function.
-    *
-    * @param indices The indices to collate.
-    **/
-    public function addNextGroupReference(indices:Array<Int>) {
-        // TODO   
     }
 
     /**
@@ -1098,9 +1137,25 @@ class GraphicsContext {
             throw "Cannot add to context once the current frame has ended.";
         }
         
+        // Create vector context snapshot
+        var vectorContext:VectorContext = {
+            active: _vectorActive,
+            zoom: _vectorZoom,
+            translation: _vectorTranslation != null ? _vectorTranslation.clone() : new FastVector2(0, 0),
+            space: _vectorSpace
+        };
+
+        // Store as a unified record in temporary storage
+        var record:DimensionRecord = {
+            dim: dim.clone(),
+            vectorContext: vectorContext
+        };
+        
+        _dimRecordsTemp.push(record);
+
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
-        _dimClientPositions.push(new FastVector2(dim.x, dim.y));
+        
         var index = getNewIndex(_dimTemp.length - 1);
         if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
             index += dimensions.length;
@@ -1146,9 +1201,25 @@ class GraphicsContext {
             throw "Cannot add to context once the current frame has ended.";
         }
 
+        // Create vector context snapshot
+        var vectorContext:VectorContext = {
+            active: _vectorActive,
+            zoom: _vectorZoom,
+            translation: _vectorTranslation != null ? _vectorTranslation.clone() : new FastVector2(0, 0),
+            space: _vectorSpace
+        };
+
+        // Store as a unified record in temporary storage
+        var record:DimensionRecord = {
+            dim: dim.clone(),
+            vectorContext: vectorContext
+        };
+        
+        _dimRecordsTemp.push(record);
+
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
-        _dimClientPositions.push(new FastVector2(dim.x, dim.y));
+
         var index = getNewIndex(_dimTemp.length - 1);
         if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
             index += dimensions.length;
@@ -1197,11 +1268,27 @@ class GraphicsContext {
             throw "Cannot add to context once the current frame has ended.";
         }
 
+        // Create vector context snapshot
+        var vectorContext:VectorContext = {
+            active: _vectorActive,
+            zoom: _vectorZoom,
+            translation: _vectorTranslation != null ? _vectorTranslation.clone() : new FastVector2(0, 0),
+            space: _vectorSpace
+        };
+
+        // Store as a unified record in temporary storage
+        var record:DimensionRecord = {
+            dim: dim.clone(),
+            vectorContext: vectorContext
+        };
+        
+        _dimRecordsTemp.push(record);
+
         _dimTemp.push(dim);
         _dimTempLinkTo.push(linkTo);
-        _dimClientPositions.push(new FastVector2(dim.x, dim.y));
-        var index = _dimTemp.length - 1;
-        if (noVirtualSceneChange) {
+
+        var index = getNewIndex(_dimTemp.length - 1);
+        if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
             index += dimensions.length;
         }
 
@@ -1224,91 +1311,6 @@ class GraphicsContext {
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
         return result;
-    }
-
-    /**
-    * Add into the dimension stack a complex structure created from `Dimensions.construct`.
-    * This function implies UI, so uses `addUI` function under the hood.
-    *
-    * This function returns `ComplexResult`, returning the final `DimIndex` values of all the added dimensions, container indices,
-    * text input indices, and more options.
-    **/
-    public function addComplex() {
-        var results = new ComplexResult(this);
-        
-        var currentContainer:ContainerResult = null;
-
-        Dimensions.begin();
-        var next = true;
-        while (next) {
-            var item = Dimensions.getLookupItem();
-            if (item.resultIndex != null) {
-                // resultIndex already set, so ignore the item
-                continue;
-            }
-
-            var resultIndex:DimIndex = Direct(-1);
-            if (item.textInput) {
-                var textInputResult = addTextInput(item.dim, ImSingleLine);
-                resultIndex = textInputResult.dimIndex;
-                results.textInputIndices.push(textInputResult.textInputIndex);
-                results.containerIndices.push(textInputResult.containerIndex);
-                results.indices.push(textInputResult.dimIndex);
-            }
-            else if (item.requestedContainer) {
-                currentContainer = addContainer(item.dim, item.id);
-                resultIndex = currentContainer.dimIndex;
-                results.containerIndices.push(currentContainer.containerIndex);
-                results.indices.push(currentContainer.dimIndex);
-            }
-            else {
-                var index = -1;
-                if (currentContainer != null) {
-                    index = switch(currentContainer.dimIndex) {
-                        case Direct(i): i;
-                        default: -1;
-                    };
-                }
-                var result = addUI(item.dim, item.id, index);
-                resultIndex = result;
-                results.indices.push(result);
-            }
-
-            item.resultIndex = resultIndex;
-
-            next = Dimensions.next();
-        }
-
-        return results;
-    }
-
-    /**
-    * Adjusts the positions of dimensions within an existing Dimension command stack.
-    **/
-    public function adjustComplex() {
-        Dimensions.begin();
-
-        var item = Dimensions.getLookupItem();
-        var scanning = true;
-        while (scanning) {
-            if (!Dimensions.next()) {
-                scanning = false;   
-            }
-
-            markDimChange(item.resultIndex);
-            switch (item.resultIndex) {
-                case Direct(index): {
-                    dimensions[index] = item.dim.clone();
-                }
-                default: {
-
-                }
-            }
-
-            if (scanning) {
-                item = Dimensions.getLookupItem();
-            }
-        }
     }
 
     /**
@@ -1417,37 +1419,6 @@ class GraphicsContext {
     public function begin() {
         _ended = false;
     }
-    
-    /**
-    * Begin a menu starting from the last dimension added to temporary storage.
-    * The menu automatically receives focus unless specified otherwise.
-    *
-    * @param id The unique id identifying this menu.
-    * @param autoFocus If `false`, does not automatically focus.
-    **/
-    public function beginMenu(id:Id, autoFocus:Bool = true) {
-        var menu = new Menu();
-        menu.menuId = id;
-        menu.indices.push(_dimTemp.length - 1);
-        _menus.push(menu);
-        _currentMenu = _menus.length - 1;
-
-        if (autoFocus) {
-            _activeMenu = _currentMenu;
-        }
-    }
-
-    /**
-    * Stop adding dimensions to the current menu.
-    **/
-    public function endMenu() {
-        if (menuCursorRenderId != null) {
-            var index = addStatic(new Dim(0, 0, 0, 0), menuCursorRenderId);
-            _menus[_currentMenu].dimIndex = index;
-        }
-
-        _currentMenu = -1;
-    }
 
     /**
     * Adds any temporary dimensions previously added in the current frame into permanent storage, refreshing
@@ -1459,8 +1430,8 @@ class GraphicsContext {
     **/
     public function end() {
         if (!noVirtualSceneChange) {
-            if (_dimTemp.length > 0) {
-                dimensions = _dimTemp.copy();
+            if (_dimRecordsTemp.length > 0) {
+                dimensions = _dimRecordsTemp.map((record) -> record.dim);
                 dimensionLinks = _dimTempLinkTo.copy();
             }
 
@@ -1469,15 +1440,19 @@ class GraphicsContext {
             }
         }
         else {
-            for (i in 0..._dimTemp.length) {
+            for (i in 0..._dimRecordsTemp.length) {
                 var index = i;
                 if (_dormantDimIndices.length > 0) {
                     index = _dormantDimIndices.shift();
-                    dimensions[index] = _dimTemp[i];
-                    dimensionLinks[index] = _dimTempLinkTo[i];
+                    if (index < _dimRecords.length) {
+                        _dimRecords[index] = _dimRecordsTemp[i];
+                        dimensions[index] = _dimRecordsTemp[i].dim;
+                        dimensionLinks[index] = _dimTempLinkTo[i];
+                    }
                 }
                 else {
-                    dimensions.push(_dimTemp[i]);
+                    _dimRecords.push(_dimRecordsTemp[i]);
+                    dimensions.push(_dimRecordsTemp[i].dim);
                     dimensionLinks.push(_dimTempLinkTo[i]);
                 }
             }
@@ -1487,109 +1462,208 @@ class GraphicsContext {
             }
         }
 
+        _dimRecordsTemp = [];
         _dimTemp = [];
         _dimTempLinkTo = [];
         _containerTemp = [];
 
+        updateContainerContentBounds();
+
         for (i in 0...activities.length) {
             activities[i] = [];
-        }
-        
-        var containersChanged = new Array<Int>();
-        
-        // add any additional containers added in current frame
-        if (_containerLastOffsets.length != containers.length) {
-            var remainder = containers.length - _containerLastOffsets.length;
-            // ensure remainder is positive
-            if (remainder > 0) {
-                for (i in 0...remainder) {
-                    _containerLastOffsets.push(new FastVector2());
-                    // force a check on all additional containers
-                    containersChanged.push(i + containers.length);
-                }
-            }
-        }
-
-        // determine which containers were last changed
-        for (i in 0..._containerLastOffsets.length) {
-            var current = containers[i].offset;
-            var last = _containerLastOffsets[i];
-
-            if (current.x != last.x || current.y != last.y) {
-                containersChanged.push(i);
-            }
-        }
-
-        // recalculate client dimensions for all dimensions affected
-        // by a container change
-        var dimIndicesChanged = new Array<Int>();
-
-        if (containersChanged.length > -1) {
-            for (ci in 0...containersChanged.length) {
-                var container = containers[ci];
-                for (di in container.childIndices) {
-                    switch (di) {
-                        case Direct(index): {
-                            dimIndicesChanged.push(index);
-                        }
-                        case Group(index): {
-                            dimIndicesChanged.concat(_groups[index]);
-                        }
-                    }
-                }
-            }
-        }
-
-        for (index in _dimForceChangeIndices) {
-            if (!dimIndicesChanged.contains(index)) {
-                dimIndicesChanged.push(index);
-            }
-        }
-
-        if (dimIndicesChanged.length > 0) {
-            for (index in dimIndicesChanged) {
-                if (dimensions[index] == null) {
-                    continue;
-                }
-
-                // iterate each dimension
-                var dim = dimensions[index].get();
-                var childIndex = index;
-                
-                var containerIndex = -1;
-                // contain an offset resolving to client coordinates
-                var offset = new FastVector2(0, 0);
-                var found = 0;
-                
-                // loop all containers and check a child index is not found
-                // i.e., reached the root-level.
-                while (found != -1) {
-                    var innerFound = -1;
-                    for (i in 0...containers.length) {
-                        var c = containers[i];
-                        // determine if the offset should change based on whether the container is buffered
-                        var scale = (c.bufferIndex == -1 ? 1 : c.bufferZoomFactor);
-                        if (c.childIndices.findIndex((di) -> switch (di) {
-                            case Direct(index): index == childIndex;
-                            case Group(index): _groups[index].contains(childIndex);
-                        }) != -1) {
-                            offset.x += c.offset.x * scale;
-                            offset.y += c.offset.y * scale;
-                            innerFound = i;
-                            childIndex = c.dimIndex;
-                            break;
-                        }
-                    }
-
-                    found = innerFound;
-                }
-
-                _dimClientPositions[index] = new FastVector2(dim.x + offset.x, dim.y + offset.y);
-            }
         }
 
         _ended = true;
         _g2.end();
+    }
+
+    /**
+    * Update container content bounds based on their children's actual positions.
+    **/
+    private function updateContainerContentBounds() {
+        for (i in 0...containers.length) {
+            var container = containers[i];
+            var maxWidth = 0.0;
+            var maxHeight = 0.0;
+            var containerDim = dimensions[container.dimIndex];
+            var gap = containerDim.width * 0.3;
+
+            for (child in container.childIndices) {
+                switch (child) {
+                    case Direct(childItem): {
+                        // Get the final transformed dimensions
+                        var clientDims = getClientDimensionsAtIndex(Direct(childItem));
+                        var dim = clientDims[0];
+                        if (dim != null) {
+                            maxWidth = Math.max(dim.x + dim.width + gap, maxWidth);
+                            maxHeight = Math.max(dim.y + dim.height + gap, maxHeight);
+                        }
+                    }
+                    case Group(childGroup): {
+                        var clientDims = getClientDimensionsAtIndex(Group(childGroup));
+                        for (dim in clientDims) {
+                            if (dim != null) {
+                                maxWidth = Math.max(dim.x + dim.width + gap, maxWidth);
+                                maxHeight = Math.max(dim.y + dim.height + gap, maxHeight);
+                            }
+                        }
+                    }
+                }
+            }
+
+            container.content = new FastVector2(maxWidth, maxHeight);
+        }
+    }
+
+    /**
+    * Apply container vector space transformations to a dimension.
+    **/
+    private function applyContainerTransformations(dim:Dim, dimIndex:Int):Dim {
+        var containerIndex = findContainerForDimension(dimIndex);
+        if (containerIndex == -1) {
+            return dim;
+        }
+        
+        var container = containers[containerIndex];
+        var result = dim.clone();
+        
+        // Apply scrolling offset first (in the appropriate measurement units)
+        var offsetX = container.offset.x;
+        var offsetY = container.offset.y;
+        
+        // Convert offset based on measurement type if needed
+        if (container.measurement == UNIT_PIXELS_BUFFER && container.bufferIndex > -1) {
+            // Handle buffer pixel measurements
+            var buffer = _buffers[container.bufferIndex];
+            // Apply any buffer-specific offset calculations here
+        }
+        
+        result.x += offsetX;
+        result.y += offsetY;
+        
+        // Then apply vector space transformation if enabled
+        if (container.useVectorSpace && container.vectorSpace != null) {
+            var transformedPos = container.vectorSpace.transformPoint(result.x, result.y);
+            var transformedSize = container.vectorSpace.transformPoint(result.width, result.height);
+            
+            result.x = transformedPos.x;
+            result.y = transformedPos.y;
+            result.width = transformedSize.x;
+            result.height = transformedSize.y;
+        }
+        
+        return result;
+    }
+
+    private function findContainerForDimension(dimIndex:Int):Int {
+        for (i in 0...containers.length) {
+            var container = containers[i];
+            for (childIndex in container.childIndices) {
+                switch (childIndex) {
+                    case Direct(index): {
+                        if (index == dimIndex) return i;
+                    }
+                    case Group(groupIndex): {
+                        if (_groups[groupIndex].contains(dimIndex)) return i;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+
+    /**
+    * GRAPHICS / RENDERING FUNCTIONS
+    **/
+
+    private var vectorSpace:VectorSpace;
+    private var _vectorZoom:Float = 1.0;
+    private var _vectorTranslation:FastVector2;
+    private var _vectorActive:Bool = false;
+
+    /**
+    * Begin vector space rendering. All subsequent dimension operations will be transformed.
+    **/
+    public function beginVectorSpace(space:VectorSpace, zoom:Float = 1.0, ?translation:FastVector2 = null) {
+        _vectorSpace = space;
+        _vectorZoom = zoom;
+        _vectorTranslation = translation ?? new FastVector2(0, 0);
+        _vectorActive = true;
+    }
+
+    /**
+    * End vector space rendering.
+    **/
+    public function endVectorSpace() {
+        _vectorActive = false;
+    }
+
+    /**
+    * Transform screen coordinates to vector space coordinates.
+    * Use this for input handling when you need vector space coordinates.
+    **/
+    public function transformScreenToVector(screenPos:FastVector2):FastVector2 {
+        if (!_vectorActive || _vectorSpace == null) {
+            return screenPos;
+        }
+        
+        // Inverse transformation
+        var translatedX = screenPos.x - _vectorTranslation.x;
+        var translatedY = screenPos.y - _vectorTranslation.y;
+        
+        return new FastVector2(translatedX / _vectorZoom, translatedY / _vectorZoom);
+    }
+
+    /**
+    * Transform vector space coordinates to screen coordinates.
+    **/
+    public function transformVectorToScreen(vectorPos:FastVector2):FastVector2 {
+        if (!_vectorActive || _vectorSpace == null) {
+            return vectorPos;
+        }
+        
+        return _vectorSpace.transformPoint(vectorPos.x, vectorPos.y);
+    }
+
+    /**
+    * Apply vector transformation to a dimension.
+    **/
+    private function applyVectorTransform(dim:Dim):Dim {
+        if (!_vectorActive || _vectorSpace == null) {
+            return dim;
+        }
+        
+        var transformedPos = _vectorSpace.transformPoint(dim.x, dim.y);
+        var transformedWidth = _vectorSpace.transformDistance(dim.width);
+        var transformedHeight = _vectorSpace.transformDistance(dim.height);
+        
+        var result = new Dim(transformedPos.x, transformedPos.y, transformedWidth, transformedHeight, dim.order);
+        result.visible = dim.visible;
+        result.scale = dim.scale;
+        return result;
+    }
+
+    private function drawVectorRoundedRect(x:Float, y:Float, width:Float, height:Float, radius:Float, strength:Float, filled:Bool) {
+        // Clamp radius to prevent overlapping
+        var maxRadius = Math.min(width, height) * 0.5;
+        radius = Math.min(radius, maxRadius);
+        
+        var cacheKey = vectorSpace.getCacheKey('roundedRect_${x}_${y}_${width}_${height}_${radius}_${filled}');
+        var cachedPath = vectorSpace.getCachedPath(cacheKey);
+        
+        if (cachedPath == null) {
+            cachedPath = Graphics2.generateRoundedRectPath(x, y, width, height, radius, radius, radius, radius);
+            vectorSpace.setCachedPath(cacheKey, cachedPath);
+        }
+        
+        var scaledStrength = vectorSpace.transformDistance(strength);
+        
+        if (filled) {
+            Graphics2.drawFilledPath(g2, cachedPath);
+        } else {
+            Graphics2.drawTessellatedPath(g2, cachedPath, scaledStrength, true);
+        }
     }
 
 }

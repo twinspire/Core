@@ -37,17 +37,6 @@ class Container {
     **/
     public var bufferIndex:Int;
     /**
-    * Sets the zoom factor of the buffer as a percentage of the original buffer size. Use
-    * `Units.zoom` from `twinspire.math` to calculate a zoom factor for convenience.
-    **/
-    public var bufferZoomFactor:Float;
-    /**
-    * Set a value to determine if the buffer should receive user input events for dimensions inside it.
-    * Sprites always receive events from user input (except mouse or touch events).
-    * Default is `false`.
-    **/
-    public var bufferReceivesEvents:Bool;
-    /**
     * Either a pixel or point incremental value depending on the measurement type.
     * This is also used for automated events, such as mouse scroll for the container.
     **/
@@ -86,6 +75,16 @@ class Container {
         measurement = UNIT_POINTS;
         bufferIndex = -1;
         bufferZoomFactor = 1.0;
+    }
+
+    /**
+    * Set up vector space for this container.
+    **/
+    public function setupVectorSpace(space:VectorSpace, zoom:Float = 1.0, translation:FastVector2 = null) {
+        this.vectorSpace = space;
+        this.useVectorSpace = true;
+        this.zoom = zoom;
+        this.translation = translation ?? new FastVector2(0, 0);
     }
 
 }
