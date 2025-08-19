@@ -1626,6 +1626,334 @@ class GraphicsContext {
         return _vectorSpace.transformPoint(vectorPos.x, vectorPos.y);
     }
 
+    public function setColor(color:Color) {
+        getGraphics().color = color;
+    }
+
+    public function setFont(font:Font) {
+        getGraphics().font = font;
+    }
+
+    public function setFontSize(fontSize:Int) {
+        getGraphics().fontSize = fontSize;
+    }
+
+    public function drawImage(index:DimIndex, img:Image) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawImageDim(img, dims[0]);
+    }
+
+    public function drawSubImage(index:DimIndex, img:Image, source:Dim) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawSubImageDim(img, source, dims[0]);
+    }
+
+    public function drawScaledImage(index:DimIndex, img:Image) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawScaledImageDim(img, dims[0]);
+    }
+
+    public function drawScaledSubImage(index:DimIndex, img:Image, source:Dim) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawScaledSubImageDim(img, source, dims[0]);
+    }
+
+    public function drawPatchedImage(index:DimIndex, img:Image, patch:Patch) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawPatchedImage(img, patch, dims[0]);
+    }
+
+    public function drawImageRepeat(index:DimIndex, img:Image, source:Dim, axis:Int = 0) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawImageRepeat(img, source, dims[0], axis);
+    }
+
+    public function drawRect(index:DimIndex, lineThickness:Float = 1.0) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawRectDim(dims[0], lineThickness);
+    }
+
+    public function drawBorders(index:DimIndex, lineThickness:Float = 1.0, borders:Int = BORDER_ALL) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawBorders(dims[0], lineThickness, borders);
+    }
+
+    public function fillRect(index:DimIndex) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().fillRectDim(dims[0]);
+    }
+
+    public function drawString(index:DimIndex, text:String) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawStringDim(text, dims[0]);
+    }
+
+    public function forceMultilineUpdate() {
+        getGraphics().forceMultilineUpdate();
+    }
+
+    public function disableMultilineUpdate() {
+        getGraphics().disableMultilineUpdate();
+    }
+
+    public function useCRLF(crlf:Bool) {
+        getGraphics().useCRLF(crlf);
+    }
+
+    public function drawCharacters(index:DimIndex, characters:Array<Int>, start:Int, length:Int, autoWrap:Bool = false, clipping:Bool = false, breaks:Array<Int> = null) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        return getGraphics().drawCharactersDim(characters, start, length, dims[0], autoWrap, clipping, breaks);
+    }
+
+    public function drawVideo(index:DimIndex, video:Video) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawVideoDim(video, dims[0]);
+    }
+
+    public function drawCircle(index:DimIndex, strength:Float = 1.0) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        if (vectorSpace != null && _vectorActive) {
+            var cx = dims[0].x + (dims[0].width / 2);
+            var cy = dims[0].y + (dims[0].height / 2);
+            var radius = dims[0].width / 2;
+
+            getGraphics().drawTessellatedCircle(cx, cy, radius, strength, false);
+        }
+        else {
+            getGraphics().drawCircleDim(dims[0], strength);
+        }
+    }
+
+    public function fillCircle(index:DimIndex) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        if (vectorSpace != null && _vectorActive) {
+            var cx = dims[0].x + (dims[0].width / 2);
+            var cy = dims[0].y + (dims[0].height / 2);
+            var radius = dims[0].width / 2;
+
+            getGraphics().drawTessellatedCircle(cx, cy, radius, strength, true);
+        }
+        else {
+            getGraphics().fillCircleDim(dims[0]);
+        }
+    }
+
+    public function drawTriangle(index:DimIndex, direction:Int, strength:Float = 1.0) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawTriangleDim(dims[0], direction, strength);
+    }
+
+    public function drawEquilateralTriangleRaw(centerX:Float, centerY:Float, radius:Float, rotation:Float = 0.0, strength:Float = 1.0) {
+        getGraphics().drawEquilateralTriangle(centerX, centerY, radius, rotation, strength);
+    }
+
+    public function drawIsoscelesTriangleRaw(x:Float, y:Float, baseWidth:Float, height:Float, direction:Int = 0, strength:Float = 1.0) {
+        getGraphics().drawIsoscelesTriangle(x, y, baseWidth, height, direction, strength);
+    }
+
+    public function drawPolygon(index:DimIndex, vertices:Array<Vector2>, strength:Float = 1) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawPolygon(dims[0].x, dims[0].y, vertices, strength);
+    }
+
+    public function fillPolygon(index:DimIndex, vertices:Array<Vector2>) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+
+        getGraphics().fillPolygon(dims[0].x, dims[0].y, vertices);
+    }
+
+    public function fillTriangle(index:DimIndex, direction:Int) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().fillTriangleDim(dims[0], direction);
+    }
+
+    public function drawRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawRoundedRectDim(dims[0], radius, strength);
+    }
+
+    public function fillRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().fillRoundedRectDim(dims[0], radius, strength);
+    }
+
+    public function drawRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawRoundedRectCornersDim(dims[0], topLeft, topRight, bottomRight, bottomLeft, strength);
+    }
+
+    public function fillRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().fillRoundedRectCornersDim(dims[0], topLeft, topRight, bottomRight, bottomLeft);
+    }
+
+    public function drawCubicBezier(x:Array<Float>, y:Array<Float>, segments:Int = 20, strength:Float = 1.0) {
+        getGraphics().drawCubicBezier(x, y, segments, strength);
+    }
+
+    public function drawCubicBezierPath(x:Array<Float>, y:Array<Float>, segments:Int = 20, strength:Float = 1.0) {
+        getGraphics().drawCubicBezierPath(x, y, segments, strength);
+    }
+
+    public function scissor(index:DimIndex) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().scissorDim(dims[0]);
+    }
+
+    public function disableScissor() {
+        getGraphics().disableScissor();
+    }
+
+    public function drawSprite(index:DimIndex, sprite:Sprite, index:Int) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawSprite(sprite, index, dims[0]);
+    }
+
+    public function drawSpritePatch(index:DimIndex, sprite:Sprite, stateIndex:Int, patchIndex:Int) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawSpritePatch(sprite, stateIndex, patchIndex, dims[0]);
+    }
+
+    public function drawSpriteGroup(index:DimIndex, sprite:Sprite, index:Int, group:String) {
+        var dims = getClientDimensionsAt(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        getGraphics().drawSpriteGroup(sprite, index, group, dims[0]);
+    }
+
+    public function drawArc(cx:Float, cy:Float, radius:Float, sAngle:Float, eAngle:Float, strength:Float = 1, ccw:Bool = false,
+			segments:Int = 0) {
+        getGraphics().drawArc(cx, cy, radius, sAngle, eAngle, strength, ccw, segments);
+    }
+
+    public function fillArc(cx:Float, cy:Float, radius:Float, sAngle:Float, eAngle:Float, ccw:Bool = false, segments:Int = 0) {
+        getGraphics().fillArc(cx, cy, radius, sAngle, eAngle, ccw, segments);
+    }
+
+    public function generateVerticalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool) {
+        return getGraphics().generateVerticalGradient(width, height, colors, stops, inverse);
+    }
+
+    public function generateHorizontalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool) {
+        return getGraphics().generateHorizontalGradient(width, height, colors, stops, inverse);
+    }
+
+    public function generateCircularGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>) {
+        return getGraphics().generateCircularGradient(width, height, colors, stops);
+    }
+
+    public function generateConalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, clockwise:Bool) {
+        return getGraphics().generateConalGradient(width, height, colors, stops, clockwise);
+    }
+
+    public function generatePolarGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, scale:Float, offset:FastVector2, edge:PolarEdgeEffect) {
+        return getGraphics().generatePolarGradient(width, height, colors, stops, scale, offset, edge);
+    }
+
+
+
     /**
     * Apply vector transformation to a dimension.
     **/
@@ -1644,25 +1972,31 @@ class GraphicsContext {
         return result;
     }
 
-    private function drawVectorRoundedRect(x:Float, y:Float, width:Float, height:Float, radius:Float, strength:Float, filled:Bool) {
-        // Clamp radius to prevent overlapping
+
+    private function drawVectorRoundedRectCorners(x:Float, y:Float, width:Float, height:Float, 
+                                                topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, 
+                                                strength:Float, filled:Bool) {
+        var g2 = getGraphics();
         var maxRadius = Math.min(width, height) * 0.5;
-        radius = Math.min(radius, maxRadius);
+        topLeft = Math.min(topLeft, maxRadius);
+        topRight = Math.min(topRight, maxRadius);
+        bottomRight = Math.min(bottomRight, maxRadius);
+        bottomLeft = Math.min(bottomLeft, maxRadius);
         
-        var cacheKey = vectorSpace.getCacheKey('roundedRect_${x}_${y}_${width}_${height}_${radius}_${filled}');
+        var cacheKey = vectorSpace.getCacheKey('roundedRectCorners_${x}_${y}_${width}_${height}_${topLeft}_${topRight}_${bottomRight}_${bottomLeft}_${filled}');
         var cachedPath = vectorSpace.getCachedPath(cacheKey);
         
         if (cachedPath == null) {
-            cachedPath = Graphics2.generateRoundedRectPath(x, y, width, height, radius, radius, radius, radius);
+            cachedPath = @:privateAccess(Graphics2) Graphics2.generateRoundedRectPath(x, y, width, height, topLeft, topRight, bottomRight, bottomLeft);
             vectorSpace.setCachedPath(cacheKey, cachedPath);
         }
         
         var scaledStrength = vectorSpace.transformDistance(strength);
         
         if (filled) {
-            Graphics2.drawFilledPath(g2, cachedPath);
+            @:privateAccess(Graphics2) g2.drawFilledPath(cachedPath);
         } else {
-            Graphics2.drawTessellatedPath(g2, cachedPath, scaledStrength, true);
+            g2.drawTessellatedPath(cachedPath, scaledStrength, true);
         }
     }
 

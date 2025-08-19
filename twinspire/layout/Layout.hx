@@ -89,6 +89,8 @@ class Layout {
      * Update text content without rebuilding
      */
     public function updateText(name:String, newText:String):Bool {
+        if (!namedDims.exists(name)) return false;
+
         var index = namedDims[name].index;
         if (index == null || !textFonts.exists(index)) return false;
         
@@ -99,6 +101,22 @@ class Layout {
         textContent[index] = newText;
         
         return true;
+    }
+
+    /**
+    * Get text content
+    **/
+    public function getText(name:String):String {
+        if (!namedDims.exists(name)) {
+            return null;
+        }
+
+        var index = namedDims[name].index;
+        if (!textContent.exists(index)) {
+            return null;
+        }
+
+        return textContent[index];
     }
     
     /**

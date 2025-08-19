@@ -1617,7 +1617,7 @@ class Graphics2
                 var t = i / segments;
                 var x = controlPoints[0].x * (1 - t) + controlPoints[1].x * t;
                 var y = controlPoints[0].y * (1 - t) + controlPoints[1].y * t;
-                points.push(new FastVector2(x, y)));
+                points.push(new FastVector2(x, y));
             }
         } else if (controlPoints.length == 3) {
             // Quadratic
@@ -1656,7 +1656,7 @@ class Graphics2
         var segments = Math.floor(vectorSpace.getOptimalSegments(ExtraMath.max([ topLeft, topRight, bottomRight, bottomLeft ]) * 2 * Math.PI) / 4);
         
         // Start from top-left corner (after radius)
-        points.push(new FastVector2(x + topLeft, y)));
+        points.push(new FastVector2(x + topLeft, y));
         
         // Top edge
         points.push(new FastVector2(x + width - topRight, y));
@@ -1730,32 +1730,6 @@ class Graphics2
         }
     }
     
-    public static function drawVectorRoundedRectCorners(g2:Graphics, x:Float, y:Float, width:Float, height:Float, 
-                                                topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, 
-                                                strength:Float, filled:Bool) {
-        var maxRadius = Math.min(width, height) * 0.5;
-        topLeft = Math.min(topLeft, maxRadius);
-        topRight = Math.min(topRight, maxRadius);
-        bottomRight = Math.min(bottomRight, maxRadius);
-        bottomLeft = Math.min(bottomLeft, maxRadius);
-        
-        var cacheKey = vectorSpace.getCacheKey('roundedRectCorners_${x}_${y}_${width}_${height}_${topLeft}_${topRight}_${bottomRight}_${bottomLeft}_${filled}');
-        var cachedPath = vectorSpace.getCachedPath(cacheKey);
-        
-        if (cachedPath == null) {
-            cachedPath = generateRoundedRectPath(x, y, width, height, topLeft, topRight, bottomRight, bottomLeft);
-            vectorSpace.setCachedPath(cacheKey, cachedPath);
-        }
-        
-        var scaledStrength = vectorSpace.transformDistance(strength);
-        
-        if (filled) {
-            drawFilledPath(g2, cachedPath);
-        } else {
-            drawTessellatedPath(g2, cachedPath, scaledStrength, true);
-        }
-    }
-    
     private static function drawQuarterCircle(g2:Graphics, cx:Float, cy:Float, radius:Float, quadrant:Int, strength:Float) {
         var segments = Math.floor(Math.max(8, radius * 0.3));
         var startAngle = quadrant * Math.PI * 0.5;
@@ -1773,8 +1747,10 @@ class Graphics2
             g2.drawLine(x1, y1, x2, y2, strength);
         }
     }
-    
-    private static function drawFilledPath(g2:Graphics, points:Array<FastVector2>) {
+
+	private static function drawFilledPath(points:Array<FastVector2>) {
+        var g2 = getGraphics();
+
         // Simple triangle fan fill from center
         if (points.length < 3) return;
         
