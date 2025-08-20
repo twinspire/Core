@@ -4,10 +4,16 @@ import kha.Image;
 import kha.math.FastVector2;
 
 import twinspire.events.Buttons;
+import twinspire.render.vector.VectorSpace;
 import twinspire.math.UnitMeasurement;
 
 class Container {
 
+
+    public var vectorSpace:VectorSpace;
+    public var useVectorSpace:Bool;
+    public var zoom:Float;
+    public var translation:FastVector2;
     /**
     * The index of the container dim in `GraphicsContext`.
     **/
@@ -74,7 +80,6 @@ class Container {
         offset = new FastVector2(0, 0);
         measurement = UNIT_POINTS;
         bufferIndex = -1;
-        bufferZoomFactor = 1.0;
     }
 
     /**

@@ -2,6 +2,7 @@ package twinspire.extensions;
 
 import twinspire.utils.ExtraMath;
 
+import twinspire.render.vector.VectorSpace;
 import twinspire.render.Sprite;
 import twinspire.geom.Dim;
 import twinspire.render.Patch;
@@ -306,15 +307,15 @@ class Graphics2
         g2.drawString(text, destination.x, destination.y);
 	}
 
-	public static function forceMultilineUpdate() {
+	public static function forceMultilineUpdate(g2:Graphics) {
 		_forceMultilineUpdate = true;
 	}
 
-	public static function disableMultilineUpdate() {
+	public static function disableMultilineUpdate(g2:Graphics) {
 		_forceMultilineUpdate = false;
 	}
 
-	public static function useCRLF(crlf:Bool) {
+	public static function useCRLF(g2:Graphics, crlf:Bool) {
 		_useCrlf = crlf;
 	}
 
@@ -455,6 +456,10 @@ class Graphics2
             return;
         }
 
+		var cx = destination.x + (destination.width / 2);
+        var cy = destination.y + (destination.height / 2);
+        var radius = destination.width / 2;
+
         fillCircle(g2, cx, cy, radius);
 	}
 
@@ -537,17 +542,17 @@ class Graphics2
 		g2.fillTriangle(x1, y1, x2, y2, x3, y3);
 	}
 
-	public function drawRoundedRect(g2:Graphics, x:Float, y:Float, width:Float, height:Float, radius:Float, strength:Float = 1.0) {
+	public static function drawRoundedRect(g2:Graphics, x:Float, y:Float, width:Float, height:Float, radius:Float, strength:Float = 1.0) {
         var dim = new Dim(x, y, width, height);
         drawRoundedRectDim(g2, dim, radius, strength);
     }
 
-    public function fillRoundedRect(g2:Graphics, x:Float, y:Float, width:Float, height:Float, radius:Float) {
+    public static function fillRoundedRect(g2:Graphics, x:Float, y:Float, width:Float, height:Float, radius:Float) {
         var dim = new Dim(x, y, width, height);
         fillRoundedRectDim(g2, dim, radius);
     }
 
-	public function drawRoundedRectDim(g2:Graphics, destination:Dim, radius:Float, strength:Float = 1.0) {
+	public static function drawRoundedRectDim(g2:Graphics, destination:Dim, radius:Float, strength:Float = 1.0) {
 		if (destination == null) {
             return;
         }
@@ -555,7 +560,7 @@ class Graphics2
         drawPixelRoundedRect(g2, destination.x, destination.y, destination.width, destination.height, radius, strength, false);
 	}
 
-	public function fillRoundedRectDim(g2:Graphics, destination:Dim, radius:Float, strength:Float = 1.0) {
+	public static function fillRoundedRectDim(g2:Graphics, destination:Dim, radius:Float, strength:Float = 1.0) {
 		if (destination == null) {
             return;
         }
@@ -563,7 +568,7 @@ class Graphics2
     	drawPixelRoundedRect(g2, destination.x, destination.y, destination.width, destination.height, radius, 0, true);
 	}
 
-	public function drawRoundedRectCornersDim(g2:Graphics, destination:Dim, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
+	public static function drawRoundedRectCornersDim(g2:Graphics, destination:Dim, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
 		if (destination == null) {
 			return;
 		}
@@ -571,7 +576,7 @@ class Graphics2
 		drawPixelRoundedRectCorners(g2, destination.x, destination.y, destination.width, destination.height, topLeft, topRight, bottomRight, bottomLeft, strength, false);
 	}
 
-	public function fillRoundedRectCornersDim(g2:Graphics, destination:Dim, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
+	public static function fillRoundedRectCornersDim(g2:Graphics, destination:Dim, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
 		if (destination == null) {
 			return;
 		}
@@ -836,7 +841,7 @@ class Graphics2
 		}
 	}
 
-	public function generateVerticalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool):Image {
+	public static function generateVerticalGradient(g2:Graphics, width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool):Image {
 		var image = Image.create(width, height);
 		var pixels = image.lock();
 		var bytesPerPixel = 4; // RGBA
@@ -866,7 +871,7 @@ class Graphics2
 		return image;
 	}
 
-	public function generateHorizontalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool):Image {
+	public static function generateHorizontalGradient(g2:Graphics, width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, inverse:Bool):Image {
 		var image = Image.create(width, height);
 		var pixels = image.lock();
 		var bytesPerPixel = 4; // RGBA
@@ -896,7 +901,7 @@ class Graphics2
 		return image;
 	}
 
-	public function generateCircularGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>):Image {
+	public static function generateCircularGradient(g2:Graphics, width:Int, height:Int, colors:Array<Color>, stops:Array<Float>):Image {
 		var image = Image.create(width, height);
 		var pixels = image.lock();
 		var bytesPerPixel = 4; // RGBA
@@ -925,7 +930,7 @@ class Graphics2
 		return image;
 	}
 
-	public function generateConalGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, clockwise:Bool):Image {
+	public static function generateConalGradient(g2:Graphics, width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, clockwise:Bool):Image {
 		var image = Image.create(width, height);
 		var pixels = image.lock();
 		var bytesPerPixel = 4; // RGBA
@@ -964,7 +969,7 @@ class Graphics2
 		return image;
 	}
 
-	public function generatePolarGradient(width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, 
+	public static function generatePolarGradient(g2:Graphics, width:Int, height:Int, colors:Array<Color>, stops:Array<Float>, 
                                      scale:Float, offset:FastVector2, edge:PolarEdgeEffect):Image {
 		var image = Image.create(width, height);
 		var pixels = image.lock();
@@ -1024,7 +1029,7 @@ class Graphics2
 		return image;
 	}
 
-	private function interpolateColorFromStops(colors:Array<Color>, stops:Array<Float>, progress:Float):Color {
+	private static function interpolateColorFromStops(colors:Array<Color>, stops:Array<Float>, progress:Float):Color {
 		// Clamp progress to [0, 1]
 		progress = Math.max(0, Math.min(1, progress));
 		
@@ -1650,7 +1655,7 @@ class Graphics2
 
 
 
-    private static function generateRoundedRectPath(x:Float, y:Float, width:Float, height:Float, 
+    private static function generateRoundedRectPath(vectorSpace:VectorSpace, x:Float, y:Float, width:Float, height:Float, 
                                            topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float):Array<FastVector2> {
         var points = new Array<FastVector2>();
         var segments = Math.floor(vectorSpace.getOptimalSegments(ExtraMath.max([ topLeft, topRight, bottomRight, bottomLeft ]) * 2 * Math.PI) / 4);
@@ -1748,9 +1753,7 @@ class Graphics2
         }
     }
 
-	private static function drawFilledPath(points:Array<FastVector2>) {
-        var g2 = getGraphics();
-
+	private static function drawFilledPath(g2:Graphics, points:Array<FastVector2>) {
         // Simple triangle fan fill from center
         if (points.length < 3) return;
         

@@ -113,7 +113,7 @@ class InputRenderer {
         var x = dim.x - container.offset.x;
         var y = dim.y - container.offset.y;
 
-        gtx.g2.scissorDim(dim);
+        gtx.getCurrentGraphics().scissorDim(dim);
 
         switch (inputState.method) {
             case ImSingleLine: {
@@ -131,17 +131,17 @@ class InputRenderer {
                         }
 
                         var selWidth = font.widthOfCharacters(fontSize, state.getData(), cast lineSelStart, cast (lineSelEnd - lineSelStart));
-                        gtx.g2.color = selectionColor;
-                        gtx.g2.fillRectDim(new Dim(selX, y, selWidth, lineHeight));
+                        gtx.setColor(selectionColor);
+                        gtx.getCurrentGraphics().fillRect(selX, y, selWidth, lineHeight);
                     }
                 }
                 
-                gtx.g2.color = textColor;
-                gtx.g2.font = font;
-                gtx.g2.fontSize = fontSize;
+                gtx.setColor(textColor);
+                gtx.setFont(font);
+                gtx.setFontSize(fontSize);
                 
                 if (state.length > 0) {
-                    gtx.g2.drawCharacters(state.getData(), 0, state.length, x, y);
+                    gtx.getCurrentGraphics().drawCharacters(state.getData(), 0, state.length, x, y);
                 }
 
                 
@@ -163,12 +163,11 @@ class InputRenderer {
             var cursorCoord = getCursorCoordinates(inputState, cursorPos);
             var cursorHeight = fontSize;
             var cursorY = cursorCoord.y + y + (lineHeight - cursorHeight) / 2;
-            gtx.g2.color = cursorColor;
-            gtx.g2.fillRect(cursorCoord.x + x, cursorY, 2, cursorHeight);
+            gtx.setColor(cursorColor);
+            gtx.getCurrentGraphics().fillRect(cursorCoord.x + x, cursorY, 2, cursorHeight);
         }
 
-        gtx.g2.disableScissor();
-        
+        gtx.disableScissor();
     }
 
     public function end(gtx:GraphicsContext, utx:UpdateContext) {

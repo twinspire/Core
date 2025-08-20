@@ -1281,7 +1281,7 @@ class Dimensions {
 
             gtx.removeIndices(indicesToRemove);
             // adjust to re-position for the new stack
-            gtx.adjustComplex();
+            //gtx.adjustComplex();
         }
 
         return true;

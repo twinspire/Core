@@ -4,6 +4,7 @@
 
 package twinspire.layout;
 
+import twinspire.render.vector.VectorSpace;
 using twinspire.layout.LayoutTypes;
 
 import kha.Font;
@@ -18,6 +19,7 @@ using twinspire.extensions.ArrayExtensions;
 typedef NamedDimRef = {
     var index:Int;
     var type:Id;
+    var space:VectorSpace;
 }
 
 /**
@@ -48,12 +50,13 @@ class Layout {
     /**
      * Create a dimension with optional naming for later reference
      */
-    public function dim(width:Float, height:Float, ?name:String, ?type:Id):LayoutRef {
+    public function dim(width:Float, height:Float, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var d = new Dim(0, 0, width, height);
         var index = dims.push(d) - 1;
         var dimRef:NamedDimRef = {
             index: index,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -66,12 +69,13 @@ class Layout {
     /**
      * Create dimension from text measurement
      */
-    public function text(str:String, font:Font, size:Int, ?name:String, ?type:Id):LayoutRef {
+    public function text(str:String, font:Font, size:Int, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var textDim = Dimensions.getTextDim(font, size, str);
         var index = dims.push(textDim) - 1;
         var textRef:NamedDimRef = {
             index: index,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         // Store text content and font info for later updates
@@ -122,12 +126,13 @@ class Layout {
     /**
      * Create a horizontal box layout
      */
-    public function hbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String, ?type:Id):LayoutRef {
+    public function hbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
         var containerRef:NamedDimRef = {
             index: containerIndex,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -142,12 +147,13 @@ class Layout {
     /**
      * Create a vertical box layout
      */
-    public function vbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String, ?type:Id):LayoutRef {
+    public function vbox(items:Array<LayoutRef>, ?spacing:Float = 0, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
         var containerRef:NamedDimRef = {
             index: containerIndex,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -162,12 +168,13 @@ class Layout {
     /**
      * Create a grid layout with percentages or fixed sizes
      */
-    public function grid(columns:Array<GridSize>, rows:Array<GridSize>, items:Array<LayoutRef>, ?name:String, ?type:Id):LayoutRef {
+    public function grid(columns:Array<GridSize>, rows:Array<GridSize>, items:Array<LayoutRef>, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
         var containerRef:NamedDimRef = {
             index: containerIndex,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -182,12 +189,13 @@ class Layout {
     /**
      * Create a stack where items overlap
      */
-    public function stack(items:Array<LayoutRef>, ?name:String, ?type:Id):LayoutRef {
+    public function stack(items:Array<LayoutRef>, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var container = new Dim(0, 0, 0, 0);
         var containerIndex = dims.push(container) - 1;
         var containerRef:NamedDimRef = {
             index: containerIndex,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -202,12 +210,13 @@ class Layout {
     /**
      * Create a scrollable container
      */
-    public function scrollable(items:Array<LayoutRef>, width:Float, height:Float, ?name:String, ?type:Id):LayoutRef {
+    public function scrollable(items:Array<LayoutRef>, width:Float, height:Float, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var container = new Dim(0, 0, width, height);
         var containerIndex = dims.push(container) - 1;
         var containerRef:NamedDimRef = {
             index: containerIndex,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -229,12 +238,13 @@ class Layout {
     /**
      * Create a clipped container (no scroll)
      */
-    public function clipped(items:Array<LayoutRef>, width:Float, height:Float, ?name:String, ?type:Id):LayoutRef {
+    public function clipped(items:Array<LayoutRef>, width:Float, height:Float, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var container = new Dim(0, 0, width, height);
         var containerIndex = dims.push(container) - 1;
         var containerRef:NamedDimRef = {
             index: containerIndex,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -265,7 +275,8 @@ class Layout {
         var wrapperIndex = dims.push(wrapper) - 1;
         var wrapperRef:NamedDimRef = {
             index: wrapperIndex,
-            type: Id.None
+            type: Id.None,
+            space: null
         };
         
         constraints.push(Padding(wrapperIndex, ref.index.index, top, right, bottom, left));
@@ -368,7 +379,7 @@ class Layout {
     /**
      * Merge another layout into this one
      */
-    public function merge(other:Layout, ?at:LayoutRef, ?name:String, ?type:Id):LayoutRef {
+    public function merge(other:Layout, ?at:LayoutRef, ?name:String, ?type:Id, ?space:VectorSpace):LayoutRef {
         var baseIndex = dims.length;
         var indexMap:Map<Int, Int> = [];
         
@@ -398,7 +409,8 @@ class Layout {
             if (indexMap.exists(value.index)) {
                 namedDims[prefixedKey] = {
                     index: indexMap[value.index],
-                    type: value.type
+                    type: value.type,
+                    space: value.space
                 };
             }
         }
@@ -421,7 +433,8 @@ class Layout {
         var wrapperIndex = dims.push(wrapperDim) - 1;
         var wrapper:NamedDimRef = {
             index: wrapperIndex,
-            type: type != null ? type : Id.None
+            type: type != null ? type : Id.None,
+            space: space
         };
         
         if (name != null) {
@@ -506,6 +519,10 @@ class Layout {
                     containerIndices[i] = previous.containerIndices[i];
                 }
             } else {
+                if (nameRef != null) {
+                    ctx.beginVectorSpace(nameRef.space);
+                }
+
                 // Add new dimension
                 if (isContainer) {
                     var containerIdx = ctx.addContainer(dims[i], nameRef != null ? nameRef.type : Id.None);
@@ -513,6 +530,10 @@ class Layout {
                     containerIndices[i] = containerIdx.containerIndex;
                 } else {
                     indices[i] = ctx.addUI(dims[i], nameRef != null ? nameRef.type : Id.None);
+                }
+
+                if (nameRef != null) {
+                    ctx.endVectorSpace();
                 }
             }
         }

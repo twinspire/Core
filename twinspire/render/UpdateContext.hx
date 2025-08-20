@@ -295,6 +295,9 @@ class UpdateContext {
 
                 var query = _gctx.queries[i];
                 var actualDim = _gctx.getClientDimensionsAtIndex(Direct(i))[0];
+                if (actualDim == null) {
+                    continue;
+                }
 
                 var active = GlobalEvents.isMouseOverDim(actualDim);
 

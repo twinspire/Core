@@ -2,6 +2,7 @@ package twinspire.render;
 
 import twinspire.DimIndex;
 import twinspire.geom.Dim;
+import twinspire.render.vector.VectorSpace;
 import twinspire.render.UpdateContext;
 import twinspire.render.QueryType;
 import twinspire.render.RenderQuery;
@@ -10,11 +11,15 @@ import twinspire.text.TextInputState;
 import twinspire.text.TextInputMethod;
 import twinspire.Application;
 using twinspire.extensions.ArrayExtensions;
-import twinspire.extensions.Graphics2;
+using twinspire.extensions.Graphics2;
 
 import kha.graphics2.Graphics;
 import kha.math.FastVector2;
+import kha.math.Vector2;
 import kha.Image;
+import kha.Color;
+import kha.Font;
+import kha.Video;
 
 typedef ContainerResult = {
     var dimIndex:DimIndex;
@@ -168,7 +173,7 @@ class GraphicsContext {
     * Get current graphics context for advanced operations.
     * Use sparingly - prefer the wrapper methods.
     **/
-    public function getGraphics():Graphics {
+    public function getCurrentGraphics():Graphics {
         return getGraphics();
     }
 
@@ -240,7 +245,7 @@ class GraphicsContext {
     * @param index The position of the dimension when it is added into permanent storage.
     **/
     public function getTemporaryDimAtNewIndex(index:Int) {
-        var resolvedIndex = index - dimensions.length;
+        var resolvedIndex = index - _dimRecords.length;
         return _dimTemp[resolvedIndex];
     }
 
@@ -250,11 +255,11 @@ class GraphicsContext {
     * @param index The position of the dimension.
     **/
     public function getTempOrCurrentDimAtIndex(index:Int) {
-        if (index >= dimensions.length - 1) {
+        if (index >= _dimRecords.length - 1) {
             return getTemporaryDimAtNewIndex(index);
         }
         else {
-            return dimensions[index];
+            return _dimRecords[index].dim;
         }
     }
 
@@ -296,11 +301,11 @@ class GraphicsContext {
             for (child in container.childIndices) {
                 switch (child) {
                     case Direct(index): {
-                        dimensions[index].scale = container.bufferZoomFactor;
+                        _dimRecords[index].dim.scale = container.zoom;
                     }
                     case Group(index): {
                         for (item in _groups[index]) {
-                            dimensions[item].scale = container.bufferZoomFactor;
+                            _dimRecords[item].dim.scale = container.zoom;
                         }
                     }
                 }
@@ -380,7 +385,7 @@ class GraphicsContext {
                 }
             }
             else if (indexInt != null) {
-                if (indexInt < 0 || indexInt > dimensions.length) {
+                if (indexInt < 0 || indexInt > _dimRecords.length) {
                     return;
                 }
 
@@ -582,11 +587,11 @@ class GraphicsContext {
     public function isDimIndexValid(index:DimIndex) {
         switch (index) {
             case Direct(item): {
-                return item > -1 && item < dimensions.length && !_dormantDimIndices.contains(item);
+                return item > -1 && item < _dimRecords.length && !_dormantDimIndices.contains(item);
             }
             case Group(group): {
                 for (item in _groups[group]) {
-                    if (item < 0 || item > dimensions.length - 1 || _dormantDimIndices.contains(item)) {
+                    if (item < 0 || item > _dimRecords.length - 1 || _dormantDimIndices.contains(item)) {
                         return false;
                     }
                 }
@@ -649,15 +654,15 @@ class GraphicsContext {
             }
 
             if (containerIndex == -1) {
-                results.push(dimensions[actual]);
+                results.push(_dimRecords[actual].dim);
             }
             else {
                 var c = containers[containerIndex];
-                var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
-                var d = dimensions[actual];
+                var scale = (c.bufferIndex == -1 ? 1.0 : c.zoom);
+                var d = _dimRecords[actual].dim;
                 var value = new Dim(d.x + c.offset.x * scale, d.y + c.offset.y * scale, d.width, d.height, d.order);
-                value.visible = dimensions[actual].visible;
-                value.scale = dimensions[actual].scale;
+                value.visible = _dimRecords[actual].dim.visible;
+                value.scale = _dimRecords[actual].dim.scale;
                 results.push(value);
             }
         }
@@ -699,16 +704,16 @@ class GraphicsContext {
             }
 
             if (containerIndex == -1) {
-                results.push(dimensions[actual]);
+                results.push(_dimRecords[actual].dim);
             }
             else {
                 var c = containers[containerIndex];
-                var scale = (c.bufferIndex == -1 ? 1.0 : c.bufferZoomFactor);
-                var d = dimensions[actual].get();
-                var cDim = dimensions[c.dimIndex];
+                var scale = (c.bufferIndex == -1 ? 1.0 : c.zoom);
+                var d = _dimRecords[actual].dim.get();
+                var cDim = _dimRecords[c.dimIndex].dim;
                 var value = new Dim(d.x - cDim.x + c.offset.x * scale, d.y - cDim.y + c.offset.y * scale, d.width, d.height, d.order);
-                value.visible = dimensions[actual].visible;
-                value.scale = dimensions[actual].scale;
+                value.visible = _dimRecords[actual].dim.visible;
+                value.scale = _dimRecords[actual].dim.scale;
                 results.push(value); 
             }
         }
@@ -930,7 +935,7 @@ class GraphicsContext {
         var removeIndex = toRemove.length - 1; 
         while (removeIndex > -1) {
             var index = toRemove[removeIndex];
-            dimensions[index] = null;
+            _dimRecords[index] = null;
             queries[index] = null;
             activities[index] = null;
             _activeDimensions[index] = false;
@@ -1007,8 +1012,10 @@ class GraphicsContext {
             var copiedContainer = new Container();
             copiedContainer.dimIndex = ref.dimIndex;
             copiedContainer.bufferIndex = ref.bufferIndex;
-            copiedContainer.bufferReceivesEvents = ref.bufferReceivesEvents;
-            copiedContainer.bufferZoomFactor = ref.bufferZoomFactor;
+            copiedContainer.vectorSpace = ref.vectorSpace;
+            copiedContainer.useVectorSpace = ref.useVectorSpace;
+            copiedContainer.translation = new FastVector2(ref.translation.x, ref.translation.y);
+            copiedContainer.zoom = ref.zoom;
             copiedContainer.content = new FastVector2();
             copiedContainer.enableScrollWithClick = ref.enableScrollWithClick;
             copiedContainer.increment = ref.increment;
@@ -1023,7 +1030,7 @@ class GraphicsContext {
             var first = true;
             for (child in ref.childIndices) {
                 var childIndex = getIndicesFromDimIndex(child)[0];
-                var childDim = dimensions[childIndex];
+                var childDim = _dimRecords[childIndex].dim;
                 var childLink = dimensionLinks[childIndex];
 
                 var link = -1;
@@ -1040,7 +1047,7 @@ class GraphicsContext {
 
                 for (i in 0...length) {    
                     results.push(_dimTemp.length - 1);
-                    var newIndex = dimensions.length + _dimTemp.length - 1;
+                    var newIndex = _dimRecords.length + _dimTemp.length - 1;
                     newIndices.push(newIndex);
                     if (child.getName() == "Group") {
                         addDimensionIndexToGroup(newIndex);
@@ -1085,11 +1092,11 @@ class GraphicsContext {
     public function copyDimIndex(index:DimIndex, ?withLink:Int = -1):Int {
         switch (index) {
             case Direct(item): {
-                var dim = dimensions[item];
+                var dim = _dimRecords[item].dim;
                 var clonedQuery = queries[item].clone();
                 var offset = _dimTemp.push(dim.clone());
 
-                var newIndex = dimensions.length + offset - 1;
+                var newIndex = _dimRecords.length + offset - 1;
                 queries.push(clonedQuery);
                 activities.push([]);
 
@@ -1141,8 +1148,8 @@ class GraphicsContext {
         var vectorContext:VectorContext = {
             active: _vectorActive,
             zoom: _vectorZoom,
-            translation: _vectorTranslation != null ? _vectorTranslation.clone() : new FastVector2(0, 0),
-            space: _vectorSpace
+            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
+            space: vectorSpace
         };
 
         // Store as a unified record in temporary storage
@@ -1158,7 +1165,7 @@ class GraphicsContext {
         
         var index = getNewIndex(_dimTemp.length - 1);
         if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
-            index += dimensions.length;
+            index += _dimRecords.length;
         }
 
         var query = new RenderQuery();
@@ -1205,8 +1212,8 @@ class GraphicsContext {
         var vectorContext:VectorContext = {
             active: _vectorActive,
             zoom: _vectorZoom,
-            translation: _vectorTranslation != null ? _vectorTranslation.clone() : new FastVector2(0, 0),
-            space: _vectorSpace
+            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
+            space: vectorSpace
         };
 
         // Store as a unified record in temporary storage
@@ -1222,7 +1229,7 @@ class GraphicsContext {
 
         var index = getNewIndex(_dimTemp.length - 1);
         if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
-            index += dimensions.length;
+            index += _dimRecords.length;
         }
 
         var query = new RenderQuery();
@@ -1272,8 +1279,8 @@ class GraphicsContext {
         var vectorContext:VectorContext = {
             active: _vectorActive,
             zoom: _vectorZoom,
-            translation: _vectorTranslation != null ? _vectorTranslation.clone() : new FastVector2(0, 0),
-            space: _vectorSpace
+            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
+            space: vectorSpace
         };
 
         // Store as a unified record in temporary storage
@@ -1289,7 +1296,7 @@ class GraphicsContext {
 
         var index = getNewIndex(_dimTemp.length - 1);
         if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
-            index += dimensions.length;
+            index += _dimRecords.length;
         }
 
         var query = new RenderQuery();
@@ -1431,6 +1438,7 @@ class GraphicsContext {
     public function end() {
         if (!noVirtualSceneChange) {
             if (_dimRecordsTemp.length > 0) {
+                _dimRecords = _dimRecordsTemp.map((record) -> record);
                 dimensions = _dimRecordsTemp.map((record) -> record.dim);
                 dimensionLinks = _dimTempLinkTo.copy();
             }
@@ -1446,13 +1454,13 @@ class GraphicsContext {
                     index = _dormantDimIndices.shift();
                     if (index < _dimRecords.length) {
                         _dimRecords[index] = _dimRecordsTemp[i];
-                        dimensions[index] = _dimRecordsTemp[i].dim;
+                        //dimensions[index] = _dimRecordsTemp[i].dim;
                         dimensionLinks[index] = _dimTempLinkTo[i];
                     }
                 }
                 else {
                     _dimRecords.push(_dimRecordsTemp[i]);
-                    dimensions.push(_dimRecordsTemp[i].dim);
+                    //dimensions.push(_dimRecordsTemp[i].dim);
                     dimensionLinks.push(_dimTempLinkTo[i]);
                 }
             }
@@ -1485,7 +1493,7 @@ class GraphicsContext {
             var container = containers[i];
             var maxWidth = 0.0;
             var maxHeight = 0.0;
-            var containerDim = dimensions[container.dimIndex];
+            var containerDim = _dimRecords[container.dimIndex].dim;
             var gap = containerDim.width * 0.3;
 
             for (child in container.childIndices) {
@@ -1586,7 +1594,7 @@ class GraphicsContext {
     * Begin vector space rendering. All subsequent dimension operations will be transformed.
     **/
     public function beginVectorSpace(space:VectorSpace, zoom:Float = 1.0, ?translation:FastVector2 = null) {
-        _vectorSpace = space;
+        vectorSpace = space;
         _vectorZoom = zoom;
         _vectorTranslation = translation ?? new FastVector2(0, 0);
         _vectorActive = true;
@@ -1604,7 +1612,7 @@ class GraphicsContext {
     * Use this for input handling when you need vector space coordinates.
     **/
     public function transformScreenToVector(screenPos:FastVector2):FastVector2 {
-        if (!_vectorActive || _vectorSpace == null) {
+        if (!_vectorActive || vectorSpace == null) {
             return screenPos;
         }
         
@@ -1619,11 +1627,11 @@ class GraphicsContext {
     * Transform vector space coordinates to screen coordinates.
     **/
     public function transformVectorToScreen(vectorPos:FastVector2):FastVector2 {
-        if (!_vectorActive || _vectorSpace == null) {
+        if (!_vectorActive || vectorSpace == null) {
             return vectorPos;
         }
         
-        return _vectorSpace.transformPoint(vectorPos.x, vectorPos.y);
+        return vectorSpace.transformPoint(vectorPos.x, vectorPos.y);
     }
 
     public function setColor(color:Color) {
@@ -1639,16 +1647,21 @@ class GraphicsContext {
     }
 
     public function drawImage(index:DimIndex, img:Image) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
 
-        getGraphics().drawImageDim(img, dims[0]);
+        if (vectorSpace != null && _vectorActive) {
+            getGraphics().drawScaledImageDim(img, dims[0]);
+        }
+        else {
+            getGraphics().drawImageDim(img, dims[0]);
+        }
     }
 
     public function drawSubImage(index:DimIndex, img:Image, source:Dim) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1657,7 +1670,7 @@ class GraphicsContext {
     }
 
     public function drawScaledImage(index:DimIndex, img:Image) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1666,7 +1679,7 @@ class GraphicsContext {
     }
 
     public function drawScaledSubImage(index:DimIndex, img:Image, source:Dim) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1675,7 +1688,7 @@ class GraphicsContext {
     }
 
     public function drawPatchedImage(index:DimIndex, img:Image, patch:Patch) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1684,7 +1697,7 @@ class GraphicsContext {
     }
 
     public function drawImageRepeat(index:DimIndex, img:Image, source:Dim, axis:Int = 0) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1693,7 +1706,7 @@ class GraphicsContext {
     }
 
     public function drawRect(index:DimIndex, lineThickness:Float = 1.0) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1702,7 +1715,7 @@ class GraphicsContext {
     }
 
     public function drawBorders(index:DimIndex, lineThickness:Float = 1.0, borders:Int = BORDER_ALL) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1711,7 +1724,7 @@ class GraphicsContext {
     }
 
     public function fillRect(index:DimIndex) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1720,7 +1733,7 @@ class GraphicsContext {
     }
 
     public function drawString(index:DimIndex, text:String) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1741,16 +1754,16 @@ class GraphicsContext {
     }
 
     public function drawCharacters(index:DimIndex, characters:Array<Int>, start:Int, length:Int, autoWrap:Bool = false, clipping:Bool = false, breaks:Array<Int> = null) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
-            return;
+            return null;
         }
 
         return getGraphics().drawCharactersDim(characters, start, length, dims[0], autoWrap, clipping, breaks);
     }
 
     public function drawVideo(index:DimIndex, video:Video) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1759,7 +1772,7 @@ class GraphicsContext {
     }
 
     public function drawCircle(index:DimIndex, strength:Float = 1.0) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1777,7 +1790,7 @@ class GraphicsContext {
     }
 
     public function fillCircle(index:DimIndex) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1787,7 +1800,7 @@ class GraphicsContext {
             var cy = dims[0].y + (dims[0].height / 2);
             var radius = dims[0].width / 2;
 
-            getGraphics().drawTessellatedCircle(cx, cy, radius, strength, true);
+            getGraphics().drawTessellatedCircle(cx, cy, radius, 0, true);
         }
         else {
             getGraphics().fillCircleDim(dims[0]);
@@ -1795,7 +1808,7 @@ class GraphicsContext {
     }
 
     public function drawTriangle(index:DimIndex, direction:Int, strength:Float = 1.0) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1812,7 +1825,7 @@ class GraphicsContext {
     }
 
     public function drawPolygon(index:DimIndex, vertices:Array<Vector2>, strength:Float = 1) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1821,7 +1834,7 @@ class GraphicsContext {
     }
 
     public function fillPolygon(index:DimIndex, vertices:Array<Vector2>) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1831,7 +1844,7 @@ class GraphicsContext {
     }
 
     public function fillTriangle(index:DimIndex, direction:Int) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1840,7 +1853,7 @@ class GraphicsContext {
     }
 
     public function drawRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1849,7 +1862,7 @@ class GraphicsContext {
     }
 
     public function fillRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1858,7 +1871,7 @@ class GraphicsContext {
     }
 
     public function drawRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1867,7 +1880,7 @@ class GraphicsContext {
     }
 
     public function fillRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1884,7 +1897,7 @@ class GraphicsContext {
     }
 
     public function scissor(index:DimIndex) {
-        var dims = getClientDimensionsAt(index);
+        var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
@@ -1896,8 +1909,8 @@ class GraphicsContext {
         getGraphics().disableScissor();
     }
 
-    public function drawSprite(index:DimIndex, sprite:Sprite, index:Int) {
-        var dims = getClientDimensionsAt(index);
+    public function drawSprite(dimindex:DimIndex, sprite:Sprite, index:Int) {
+        var dims = getClientDimensionsAtIndex(dimindex);
         if (dims[0] == null) {
             return;
         }
@@ -1905,8 +1918,8 @@ class GraphicsContext {
         getGraphics().drawSprite(sprite, index, dims[0]);
     }
 
-    public function drawSpritePatch(index:DimIndex, sprite:Sprite, stateIndex:Int, patchIndex:Int) {
-        var dims = getClientDimensionsAt(index);
+    public function drawSpritePatch(dimindex:DimIndex, sprite:Sprite, stateIndex:Int, patchIndex:Int) {
+        var dims = getClientDimensionsAtIndex(dimindex);
         if (dims[0] == null) {
             return;
         }
@@ -1914,8 +1927,8 @@ class GraphicsContext {
         getGraphics().drawSpritePatch(sprite, stateIndex, patchIndex, dims[0]);
     }
 
-    public function drawSpriteGroup(index:DimIndex, sprite:Sprite, index:Int, group:String) {
-        var dims = getClientDimensionsAt(index);
+    public function drawSpriteGroup(dimindex:DimIndex, sprite:Sprite, index:Int, group:String) {
+        var dims = getClientDimensionsAtIndex(dimindex);
         if (dims[0] == null) {
             return;
         }
@@ -1958,13 +1971,13 @@ class GraphicsContext {
     * Apply vector transformation to a dimension.
     **/
     private function applyVectorTransform(dim:Dim):Dim {
-        if (!_vectorActive || _vectorSpace == null) {
+        if (!_vectorActive || vectorSpace == null) {
             return dim;
         }
         
-        var transformedPos = _vectorSpace.transformPoint(dim.x, dim.y);
-        var transformedWidth = _vectorSpace.transformDistance(dim.width);
-        var transformedHeight = _vectorSpace.transformDistance(dim.height);
+        var transformedPos = vectorSpace.transformPoint(dim.x, dim.y);
+        var transformedWidth = vectorSpace.transformDistance(dim.width);
+        var transformedHeight = vectorSpace.transformDistance(dim.height);
         
         var result = new Dim(transformedPos.x, transformedPos.y, transformedWidth, transformedHeight, dim.order);
         result.visible = dim.visible;
@@ -1987,7 +2000,7 @@ class GraphicsContext {
         var cachedPath = vectorSpace.getCachedPath(cacheKey);
         
         if (cachedPath == null) {
-            cachedPath = @:privateAccess(Graphics2) Graphics2.generateRoundedRectPath(x, y, width, height, topLeft, topRight, bottomRight, bottomLeft);
+            cachedPath = @:privateAccess(Graphics2) Graphics2.generateRoundedRectPath(vectorSpace, x, y, width, height, topLeft, topRight, bottomRight, bottomLeft);
             vectorSpace.setCachedPath(cacheKey, cachedPath);
         }
         
