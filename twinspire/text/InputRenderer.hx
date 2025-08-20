@@ -106,14 +106,15 @@ class InputRenderer {
 
         var container = gtx.containers[containerIndex];
         var inputState = gtx.textInputs[inputIndex];
-        var dim = gtx.getClientDimensionsAtIndex(Direct(container.dimIndex))[0];
+        var dimIndex:DimIndex = Direct(container.dimIndex); 
+        var dim = gtx.getClientDimensionsAtIndex(dimIndex)[0];
         
         var lineHeight = fontSize * 1.1;
         var select = inputState.inputHandler.sortedSelection();
         var x = dim.x - container.offset.x;
         var y = dim.y - container.offset.y;
 
-        gtx.getCurrentGraphics().scissorDim(dim);
+        gtx.scissor(dimIndex);
 
         switch (inputState.method) {
             case ImSingleLine: {
