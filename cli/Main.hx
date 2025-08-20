@@ -290,19 +290,23 @@ class SceneManager implements ISceneManager {
     }
     
     public function init(gtx:GraphicsContext) {
-
+        // manage scene initialisation, create dimensions and render types
     }
 
     public function update(utx:UpdateContext) {
-
+        // update loop, check for events on dimensions
+        utx.begin();
     }
     
     public function render(gtx:GraphicsContext) {
-
+        // render dimensions/scenes
+        gtx.begin();
     }
     
     public function end(gtx:GraphicsContext, utx:UpdateContext) {
-
+        // end the current frame and check activities from update loop
+        gtx.end();
+        utx.end();
     }
 }'
         };
@@ -327,19 +331,23 @@ class SceneManager {
     }
     
     public static function init(gtx:GraphicsContext) {
-
+        // manage scene initialisation, create dimensions and render types
     }
 
     public static function update(utx:UpdateContext) {
-
+        // update loop, check for events on dimensions
+        utx.begin();
     }
     
     public static function render(gtx:GraphicsContext) {
-
+        // render dimensions/scenes
+        gtx.begin();
     }
     
     public static function end(gtx:GraphicsContext, utx:UpdateContext) {
-
+        // end the current frame and check activities from update loop
+        gtx.end();
+        utx.end();
     }
 }'          
         };
