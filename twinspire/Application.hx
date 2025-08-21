@@ -1123,4 +1123,15 @@ class Application
 		return new Id();
 	}
 
+	/**
+	* Gets a `Dim` representing the position and size of the current client bounds.
+	**/
+	public static function getScreenDim() {
+		if (instance != null) {
+			return new Dim(0, 0, System.windowWidth(), System.windowHeight());
+		}
+
+		return null;
+	}
+
 }
