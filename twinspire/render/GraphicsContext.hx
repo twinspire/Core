@@ -1,5 +1,7 @@
 package twinspire.render;
 
+import kha.math.FastMatrix3;
+import kha.math.Matrix3;
 import twinspire.DimIndex;
 import twinspire.geom.Dim;
 import twinspire.render.vector.VectorSpace;
@@ -79,6 +81,8 @@ class GraphicsContext {
     private var _dimRecordsTemp:Array<DimensionRecord>;
     private var _dimRecords:Array<DimensionRecord>;
 
+    private var _animations:Map<DimIndex, AnimationState>;
+
     /**
     * A collection of dimensions within this context. Do not write directly.
     **/
@@ -148,6 +152,7 @@ class GraphicsContext {
         _groups = [];
         _currentGroup = -1;
         _currentGroupRenderType = null;
+        _animations = [];
 
         containers = [];
         dimensions = [];
@@ -155,6 +160,8 @@ class GraphicsContext {
         queries = [];
         activities = [];
         textInputs = [];
+
+        transforms = [];
     }
 
     /**
@@ -208,6 +215,54 @@ class GraphicsContext {
                 return _groups[item].map((grp) -> activities[grp]);
             }
         }
+    }
+
+    /**
+    * Create a continuous animation for the given index. Transforms are applied prior to rendering
+    * and updated each frame automatically.
+    *
+    * Use this for static or UI render types. For complex animations or sprite-related animations, use Game Events.
+    *
+    * @param index The index of the animation.
+    * @param speed The speed of the animation based on frame rate.
+    * @param anim The animation object representing how the animation should transform. Only `transform` and `rotation` applies for continuous animations.
+    **/
+    public function createAnimationContinuous(index:DimIndex, speed:Float, anim:AnimObject) {
+        if (_animations.exists(index)) {
+            _animations[index] = null;
+        }
+
+        var state = new AnimationState();
+        state.current = {};
+        state.to = anim;
+        state.time = Frames(speed);
+
+        _animations[index] = state;
+    }
+
+    /**
+    * Create a tween animation going from one state to another for the given index.
+    *
+    * Use this for static or UI render types. For complex animations or sprite-related animations, use Game Events.
+    *
+    * @param index The index of the animation.
+    * @param duration The time (in seconds) for this animation to complete.
+    * @param from The state from.
+    * @param to The completion state.
+    **/
+    public function createAnimationTween(index:DimIndex, duration:Float, from:AnimObject, to:AnimObject) {
+        if (_animations.exists(index)) {
+            _animations[index] = null;
+        }
+
+        var state = new AnimationState();
+        state.current = from;
+        state.from = from;
+        state.to = to;
+        state.time = Seconds(duration);
+        state.index = Animate.animateCreateTick();
+
+        _animations[index] = state;
     }
 
     /**
@@ -1585,6 +1640,140 @@ class GraphicsContext {
     * GRAPHICS / RENDERING FUNCTIONS
     **/
 
+    private var transforms:Array<FastMatrix3>;
+
+    public function pushRotate3D(index:DimIndex, x:Float, y:Float, z:Float) {
+        var dims = getClientDimensionsAtIndex(index);
+        if (dims[0] == null) {
+            return;
+        }
+
+        // Calculate the center of the object (this is our anchor/pivot point)
+        var centerX = dims[0].x + (dims[0].width / 2);
+        var centerY = dims[0].y + (dims[0].height / 2);
+        
+        // The x, y, z parameters represent the rotation angles in 3D space
+        // x = pitch (rotation around X-axis, up/down)
+        // y = yaw (rotation around Y-axis, left/right) 
+        // z = roll (rotation around Z-axis, clockwise/counter-clockwise)
+        
+        var pitch = x * Math.PI / 180; // Convert to radians
+        var yaw = y * Math.PI / 180;
+        var roll = z * Math.PI / 180;
+        
+        // Create 3D rotation matrices
+        // Note: In 2D, we can only approximate 3D rotations
+        
+        // Roll (Z-axis rotation) - this is pure 2D rotation
+        var cosRoll = Math.cos(roll);
+        var sinRoll = Math.sin(roll);
+        
+        // Yaw (Y-axis rotation) - creates horizontal skewing and scaling
+        var cosYaw = Math.cos(yaw);
+        var sinYaw = Math.sin(yaw);
+        
+        // Pitch (X-axis rotation) - creates vertical skewing and scaling
+        var cosPitch = Math.cos(pitch);
+        var sinPitch = Math.sin(pitch);
+        
+        // Create the combined 3D transformation matrix
+        // This approximates 3D rotation in 2D space
+        var perspectiveMatrix = FastMatrix3.identity();
+        
+        // Apply rotations in order: Roll -> Pitch -> Yaw
+        // Roll (pure 2D rotation)
+        perspectiveMatrix._00 = cosRoll * cosYaw;
+        perspectiveMatrix._01 = -sinRoll * cosPitch + cosRoll * sinYaw * sinPitch;
+        perspectiveMatrix._10 = sinRoll * cosYaw;
+        perspectiveMatrix._11 = cosRoll * cosPitch + sinRoll * sinYaw * sinPitch;
+        
+        // Add perspective foreshortening based on rotation angles
+        // Objects rotated away from the viewer appear smaller
+        var foreshortening = Math.abs(cosYaw * cosPitch);
+        perspectiveMatrix._00 *= foreshortening;
+        perspectiveMatrix._11 *= foreshortening;
+        
+        // Create translation to center, apply rotation, then translate back
+        var finalTransform = FastMatrix3.translation(centerX, centerY)
+            .multmat(perspectiveMatrix)
+            .multmat(FastMatrix3.translation(-centerX, -centerY));
+
+        transforms.push(finalTransform);
+    }
+
+    private function pushAnimationState(index:DimIndex):Bool {
+        if (!_animations.exists(index)) {
+            return false;
+        }
+
+        var g2 = getGraphics();
+        var dim = getClientDimensionsAtIndex(index);
+        if (dim[0] == null) {
+            return false;
+        }
+
+        var state = _animations[index];
+        switch (state.time) {
+            case Seconds(value): {
+
+            }
+            case Frames(factor): {
+                var deltaSpeed = UpdateContext.deltaTime * factor;
+                if (state.to.rotation != null) {
+                    if (state.current.rotation == null) {
+                        state.current.rotation = 0.0;
+                    }
+                    state.current.rotation += state.to.rotation * deltaSpeed;
+                }
+
+                if (state.to.transform != null) {
+                    if (state.current.transform == null) {
+                        state.current.transform = FastMatrix3.identity();
+                    }
+                    // Apply incremental transform changes
+                    var deltaTransform = state.to.transform.mult(deltaSpeed);
+                    state.current.transform = state.current.transform.multmat(deltaTransform);
+                }
+
+                var finalTransform = FastMatrix3.identity();
+
+                if (state.current.transform != null) {
+                    finalTransform = finalTransform.multmat(state.current.transform);
+                }
+
+                if (state.current.rotation != null) {
+                    if (state.to.rotationPivot == null) {
+                        state.to.rotationPivot = new FastVector2(0.5, 0.5);
+                    }
+
+                    var pivotX = dim[0].x + dim[0].width * state.to.rotationPivot.x;
+                    var pivotY = dim[0].y + dim[0].height * state.to.rotationPivot.y;
+                    
+                    var rotationTransform = FastMatrix3.translation(pivotX, pivotY)
+                        .multmat(FastMatrix3.rotation(state.current.rotation))
+                        .multmat(FastMatrix3.translation(-pivotX, -pivotY));
+                    
+                    finalTransform = finalTransform.multmat(rotationTransform);
+                }
+
+                while (transforms.length > 0) {
+                    finalTransform = finalTransform.multmat(transforms.pop());
+                }
+
+                g2.pushTransformation(finalTransform);
+            }
+        }
+
+        return true;
+    }
+
+    public function popAnimationState() {
+        var g2 = getGraphics();
+        g2.popTransformation();
+    }
+
+
+
     private var vectorSpace:VectorSpace;
     private var _vectorZoom:Float = 1.0;
     private var _vectorTranslation:FastVector2;
@@ -1652,11 +1841,17 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         if (vectorSpace != null && _vectorActive) {
             getGraphics().drawScaledImageDim(img, dims[0]);
         }
         else {
             getGraphics().drawImageDim(img, dims[0]);
+        }
+
+        if (transformed) {
+            popAnimationState();
         }
     }
 
@@ -1666,7 +1861,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawSubImageDim(img, source, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawScaledImage(index:DimIndex, img:Image) {
@@ -1675,7 +1876,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawScaledImageDim(img, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawScaledSubImage(index:DimIndex, img:Image, source:Dim) {
@@ -1684,7 +1891,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawScaledSubImageDim(img, source, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawPatchedImage(index:DimIndex, img:Image, patch:Patch) {
@@ -1693,7 +1906,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawPatchedImage(img, patch, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawImageRepeat(index:DimIndex, img:Image, source:Dim, axis:Int = 0) {
@@ -1702,7 +1921,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawImageRepeat(img, source, dims[0], axis);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawRect(index:DimIndex, lineThickness:Float = 1.0) {
@@ -1711,7 +1936,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawRectDim(dims[0], lineThickness);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawBorders(index:DimIndex, lineThickness:Float = 1.0, borders:Int = BORDER_ALL) {
@@ -1720,7 +1951,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawBorders(dims[0], lineThickness, borders);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function fillRect(index:DimIndex) {
@@ -1729,7 +1966,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().fillRectDim(dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawString(index:DimIndex, text:String) {
@@ -1738,7 +1981,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawStringDim(text, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function forceMultilineUpdate() {
@@ -1759,7 +2008,15 @@ class GraphicsContext {
             return null;
         }
 
-        return getGraphics().drawCharactersDim(characters, start, length, dims[0], autoWrap, clipping, breaks);
+        var transformed = pushAnimationState(index);
+
+        var result = getGraphics().drawCharactersDim(characters, start, length, dims[0], autoWrap, clipping, breaks);
+
+        if (transformed) {
+            popAnimationState();
+        }
+
+        return result;
     }
 
     public function drawVideo(index:DimIndex, video:Video) {
@@ -1768,7 +2025,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawVideoDim(video, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawCircle(index:DimIndex, strength:Float = 1.0) {
@@ -1776,6 +2039,8 @@ class GraphicsContext {
         if (dims[0] == null) {
             return;
         }
+
+        var transformed = pushAnimationState(index);
 
         if (vectorSpace != null && _vectorActive) {
             var cx = dims[0].x + (dims[0].width / 2);
@@ -1787,6 +2052,10 @@ class GraphicsContext {
         else {
             getGraphics().drawCircleDim(dims[0], strength);
         }
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function fillCircle(index:DimIndex) {
@@ -1794,6 +2063,8 @@ class GraphicsContext {
         if (dims[0] == null) {
             return;
         }
+
+        var transformed = pushAnimationState(index);
 
         if (vectorSpace != null && _vectorActive) {
             var cx = dims[0].x + (dims[0].width / 2);
@@ -1805,6 +2076,10 @@ class GraphicsContext {
         else {
             getGraphics().fillCircleDim(dims[0]);
         }
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawTriangle(index:DimIndex, direction:Int, strength:Float = 1.0) {
@@ -1813,7 +2088,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawTriangleDim(dims[0], direction, strength);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawEquilateralTriangleRaw(centerX:Float, centerY:Float, radius:Float, rotation:Float = 0.0, strength:Float = 1.0) {
@@ -1830,7 +2111,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawPolygon(dims[0].x, dims[0].y, vertices, strength);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function fillPolygon(index:DimIndex, vertices:Array<Vector2>) {
@@ -1839,8 +2126,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
 
         getGraphics().fillPolygon(dims[0].x, dims[0].y, vertices);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function fillTriangle(index:DimIndex, direction:Int) {
@@ -1849,7 +2141,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().fillTriangleDim(dims[0], direction);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
@@ -1858,7 +2156,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawRoundedRectDim(dims[0], radius, strength);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function fillRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
@@ -1867,7 +2171,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().fillRoundedRectDim(dims[0], radius, strength);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
@@ -1876,7 +2186,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().drawRoundedRectCornersDim(dims[0], topLeft, topRight, bottomRight, bottomLeft, strength);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function fillRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float) {
@@ -1885,7 +2201,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(index);
+
         getGraphics().fillRoundedRectCornersDim(dims[0], topLeft, topRight, bottomRight, bottomLeft);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawCubicBezier(x:Array<Float>, y:Array<Float>, segments:Int = 20, strength:Float = 1.0) {
@@ -1915,7 +2237,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(dimindex);
+        
         getGraphics().drawSprite(sprite, index, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawSpritePatch(dimindex:DimIndex, sprite:Sprite, stateIndex:Int, patchIndex:Int) {
@@ -1924,7 +2252,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(dimindex);
+        
         getGraphics().drawSpritePatch(sprite, stateIndex, patchIndex, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawSpriteGroup(dimindex:DimIndex, sprite:Sprite, index:Int, group:String) {
@@ -1933,7 +2267,13 @@ class GraphicsContext {
             return;
         }
 
+        var transformed = pushAnimationState(dimindex);
+        
         getGraphics().drawSpriteGroup(sprite, index, group, dims[0]);
+
+        if (transformed) {
+            popAnimationState();
+        }
     }
 
     public function drawArc(cx:Float, cy:Float, radius:Float, sAngle:Float, eAngle:Float, strength:Float = 1, ccw:Bool = false,
