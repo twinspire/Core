@@ -1,5 +1,8 @@
 package twinspire.render;
 
+import twinspire.maps.Tile;
+import twinspire.maps.TileMap;
+import twinspire.maps.TileMapLayer;
 import kha.math.FastMatrix3;
 import kha.math.Matrix3;
 import twinspire.DimIndex;
@@ -1833,6 +1836,55 @@ class GraphicsContext {
 
     public function setFontSize(fontSize:Int) {
         getGraphics().fontSize = fontSize;
+    }
+
+
+    private var _currentTileMap:TileMap;
+    private var _tileMapActive:Bool;
+    /**
+    * An array of indices referring to rendered objects
+    * within the map, collected from all `draw` calls
+    * in this class.
+    **/
+    private var _tileMapIndices:Array<Int>;
+    /**
+    * A copy of `_tileMapIndices` when `endTileMap` is called.
+    **/
+    private var _tileMapLastIndices:Array<Int>;
+
+    /**
+    * Gets the last rendered objects within the tilemap as an array
+    * of `DimIndex`, assuming they are of `SPRITE` render type.
+    **/
+    public function getTileMapRenderedObjects() {
+
+    }
+
+
+    /**
+    * Render a tile map to a given dim index and optional callbacks.
+    * For correct movement and positioning of the map, ensure the `index` value is assigned to a vector space, using `beginVectorSpace` / `endVectorSpace`.
+    *
+    * If supplying a `layerCallback`, each layer drawn is supplied to you before it is rendered. Return `true` from this function to finish rendering. Change
+    * or adjust tiles as needed.
+    * 
+    * If the tile map is drawn with chunks, it is more efficient to use the `chunkCallback` parameter as this will automatically acquire a reference to all tiles
+    * expected to be drawn. You can safely ignore `layerCallback` if layers do not need adjusting prior to rendering. You do not need to return a value with this callback.
+    *
+    * @param index The dim index for the position.
+    * @param map The tile map to render.
+    * @param layerCallback Optional callback for layer manipulation.
+    * @param chunkCallback Optional callback for tile manipulation.
+    **/
+    public function beginTileMap(index:DimIndex, map:TileMap, ?layerCallback:(TileMapLayer) -> Bool, ?chunkCallback:(Array<Tile>) -> Void) {
+
+    }
+
+    /**
+    * End the currently drawn tile map.
+    **/
+    public function endTileMap() {
+
     }
 
     public function drawImage(index:DimIndex, img:Image) {

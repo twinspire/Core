@@ -19,4 +19,8 @@ class Tile {
     **/
     public var transform:FastMatrix3;
 
+    public function new() {
+        
+    }
+
 }
