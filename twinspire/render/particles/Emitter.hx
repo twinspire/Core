@@ -233,14 +233,20 @@ class Emitter {
                 removeParticleAtIndex(i);
                 // Don't increment i since we swapped a new particle to this position
             } else {
-                // Update particle position based on velocity
-                if (i < _bezierPaths.length && _bezierPaths[i] != null) {
-                    // Update position along bezier curve
-                    updateParticleAlongBezierPath(i, deltaTime);
-                } else {
+                if (_bezierPaths == null) {
                     // Standard linear movement for non-spark particles
                     _particles[i].x += _velocities[i].x * deltaTime;
                     _particles[i].y += _velocities[i].y * deltaTime;
+                } else {
+                    // Update particle position based on velocity
+                    if (i < _bezierPaths.length && _bezierPaths[i] != null) {
+                        // Update position along bezier curve
+                        updateParticleAlongBezierPath(i, deltaTime);
+                    } else {
+                        // Standard linear movement for non-spark particles
+                        _particles[i].x += _velocities[i].x * deltaTime;
+                        _particles[i].y += _velocities[i].y * deltaTime;
+                    }   
                 }
                 
                 // Apply fade out if enabled
