@@ -7,6 +7,7 @@ import kha.math.FastMatrix3;
 import kha.math.Matrix3;
 import twinspire.DimIndex;
 import twinspire.geom.Dim;
+import twinspire.render.particles.Engine;
 import twinspire.render.vector.VectorSpace;
 import twinspire.render.UpdateContext;
 import twinspire.render.QueryType;
@@ -1643,6 +1644,26 @@ class GraphicsContext {
     * GRAPHICS / RENDERING FUNCTIONS
     **/
 
+    //
+    // Particle System
+    //
+
+    public function getParticleEngine():Engine {
+        return Engine.instance;
+    }
+
+    public function drawParticles() {
+        var engine = Engine.instance;
+        engine.update(UpdateContext.deltaTime);
+        engine.render(this);
+    }
+
+
+
+    //
+    // Animations
+    //
+
     private var transforms:Array<FastMatrix3>;
 
     public function pushRotate3D(index:DimIndex, x:Float, y:Float, z:Float) {
@@ -1704,15 +1725,24 @@ class GraphicsContext {
         transforms.push(finalTransform);
     }
 
-    private function pushAnimationState(index:DimIndex):Bool {
-        if (!_animations.exists(index)) {
-            return false;
-        }
-
+    private function pushAnimationState(index:DimIndex) {
         var g2 = getGraphics();
+
         var dim = getClientDimensionsAtIndex(index);
         if (dim[0] == null) {
-            return false;
+            return;
+        }
+        
+        if (!_animations.exists(index)) {
+            var finalTransform = FastMatrix3.identity();
+
+            while (transforms.length > 0) {
+                finalTransform = finalTransform.multmat(transforms.pop());
+            }
+
+            g2.pushTransformation(finalTransform);
+
+            return;
         }
 
         var state = _animations[index];
@@ -1766,8 +1796,6 @@ class GraphicsContext {
                 g2.pushTransformation(finalTransform);
             }
         }
-
-        return true;
     }
 
     public function popAnimationState() {
@@ -1839,6 +1867,10 @@ class GraphicsContext {
     }
 
 
+    //
+    // Tile Maps
+    //
+
     private var _currentTileMap:TileMap;
     private var _tileMapActive:Bool;
     /**
@@ -1887,13 +1919,21 @@ class GraphicsContext {
 
     }
 
+
+
+    //
+    // Drawing Routines
+    // 
+
+
+
     public function drawImage(index:DimIndex, img:Image) {
         var dims = getClientDimensionsAtIndex(index);
         if (dims[0] == null) {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         if (vectorSpace != null && _vectorActive) {
             getGraphics().drawScaledImageDim(img, dims[0]);
@@ -1902,9 +1942,7 @@ class GraphicsContext {
             getGraphics().drawImageDim(img, dims[0]);
         }
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawSubImage(index:DimIndex, img:Image, source:Dim) {
@@ -1913,13 +1951,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawSubImageDim(img, source, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawScaledImage(index:DimIndex, img:Image) {
@@ -1928,13 +1964,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawScaledImageDim(img, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawScaledSubImage(index:DimIndex, img:Image, source:Dim) {
@@ -1943,13 +1977,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawScaledSubImageDim(img, source, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawPatchedImage(index:DimIndex, img:Image, patch:Patch) {
@@ -1958,13 +1990,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawPatchedImage(img, patch, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawImageRepeat(index:DimIndex, img:Image, source:Dim, axis:Int = 0) {
@@ -1973,13 +2003,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawImageRepeat(img, source, dims[0], axis);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawRect(index:DimIndex, lineThickness:Float = 1.0) {
@@ -1988,13 +2016,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawRectDim(dims[0], lineThickness);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawBorders(index:DimIndex, lineThickness:Float = 1.0, borders:Int = BORDER_ALL) {
@@ -2003,13 +2029,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawBorders(dims[0], lineThickness, borders);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function fillRect(index:DimIndex) {
@@ -2018,13 +2042,26 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().fillRectDim(dims[0]);
 
-        if (transformed) {
-            popAnimationState();
+        popAnimationState();
+    }
+
+    static var frameCount:Int = 0;
+    static var frameTimeAnimIndex:Int = -1;
+
+    public function drawFrameRate() {
+        if (frameTimeAnimIndex == -1) {
+            frameTimeAnimIndex = Animate.animateCreateTick();
         }
+
+        if (Animate.animateTickLoop(frameTimeAnimIndex, 0.5)) {
+            frameCount = cast Math.round(UpdateContext.getFrameCount());
+        }
+
+        getGraphics().drawString("FPS: " + Std.string(frameCount), 10, 10);
     }
 
     public function drawString(index:DimIndex, text:String) {
@@ -2033,13 +2070,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawStringDim(text, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function forceMultilineUpdate() {
@@ -2060,13 +2095,11 @@ class GraphicsContext {
             return null;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         var result = getGraphics().drawCharactersDim(characters, start, length, dims[0], autoWrap, clipping, breaks);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
 
         return result;
     }
@@ -2077,13 +2110,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawVideoDim(video, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawCircle(index:DimIndex, strength:Float = 1.0) {
@@ -2092,7 +2123,7 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         if (vectorSpace != null && _vectorActive) {
             var cx = dims[0].x + (dims[0].width / 2);
@@ -2105,9 +2136,7 @@ class GraphicsContext {
             getGraphics().drawCircleDim(dims[0], strength);
         }
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function fillCircle(index:DimIndex) {
@@ -2116,7 +2145,7 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         if (vectorSpace != null && _vectorActive) {
             var cx = dims[0].x + (dims[0].width / 2);
@@ -2129,9 +2158,7 @@ class GraphicsContext {
             getGraphics().fillCircleDim(dims[0]);
         }
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawTriangle(index:DimIndex, direction:Int, strength:Float = 1.0) {
@@ -2140,13 +2167,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawTriangleDim(dims[0], direction, strength);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawEquilateralTriangleRaw(centerX:Float, centerY:Float, radius:Float, rotation:Float = 0.0, strength:Float = 1.0) {
@@ -2163,13 +2188,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawPolygon(dims[0].x, dims[0].y, vertices, strength);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function fillPolygon(index:DimIndex, vertices:Array<Vector2>) {
@@ -2178,13 +2201,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().fillPolygon(dims[0].x, dims[0].y, vertices);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function fillTriangle(index:DimIndex, direction:Int) {
@@ -2193,13 +2214,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().fillTriangleDim(dims[0], direction);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
@@ -2208,13 +2227,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawRoundedRectDim(dims[0], radius, strength);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function fillRoundedRect(index:DimIndex, radius:Float, strength:Float = 1.0) {
@@ -2223,13 +2240,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().fillRoundedRectDim(dims[0], radius, strength);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float, strength:Float = 1.0) {
@@ -2238,13 +2253,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().drawRoundedRectCornersDim(dims[0], topLeft, topRight, bottomRight, bottomLeft, strength);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function fillRoundedRectCorners(index:DimIndex, topLeft:Float, topRight:Float, bottomRight:Float, bottomLeft:Float) {
@@ -2253,13 +2266,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(index);
+        pushAnimationState(index);
 
         getGraphics().fillRoundedRectCornersDim(dims[0], topLeft, topRight, bottomRight, bottomLeft);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawCubicBezier(x:Array<Float>, y:Array<Float>, segments:Int = 20, strength:Float = 1.0) {
@@ -2289,13 +2300,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(dimindex);
+        pushAnimationState(dimindex);
         
         getGraphics().drawSprite(sprite, index, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawSpritePatch(dimindex:DimIndex, sprite:Sprite, stateIndex:Int, patchIndex:Int) {
@@ -2304,13 +2313,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(dimindex);
+        pushAnimationState(dimindex);
         
         getGraphics().drawSpritePatch(sprite, stateIndex, patchIndex, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawSpriteGroup(dimindex:DimIndex, sprite:Sprite, index:Int, group:String) {
@@ -2319,13 +2326,11 @@ class GraphicsContext {
             return;
         }
 
-        var transformed = pushAnimationState(dimindex);
+        pushAnimationState(dimindex);
         
         getGraphics().drawSpriteGroup(sprite, index, group, dims[0]);
 
-        if (transformed) {
-            popAnimationState();
-        }
+        popAnimationState();
     }
 
     public function drawArc(cx:Float, cy:Float, radius:Float, sAngle:Float, eAngle:Float, strength:Float = 1, ccw:Bool = false,
