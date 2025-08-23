@@ -1,8 +1,14 @@
 package twinspire.maps;
 
 import twinspire.geom.Dim;
-import kha.math.FastVector2;
 import twinspire.Id;
+
+import kha.math.FastMatrix3;
+import kha.math.FastVector2;
+import kha.Image;
+import kha.Color;
+
+using StringTools;
 
 class TileMap {
 
@@ -82,7 +88,7 @@ class TileMap {
     * from memory. Call this function as many times as necessary.
     **/
     public function loadChunksDynamic(centerX:Float, centerY:Float):Array<Int> {
-        
+        return null;
     }
 
     /**
@@ -98,7 +104,7 @@ class TileMap {
                 return null;
             }
             
-            var csvText = blob.getUtf8String();
+            var csvText = blob.readUtf8String();
             if (csvText == null || csvText.length == 0) {
                 trace('CSV resource is empty: $resource');
                 return null;
@@ -289,7 +295,7 @@ class TileMap {
                 return null;
             }
             
-            var jsonText = blob.getUtf8String();
+            var jsonText = blob.readUtf8String();
             if (jsonText == null || jsonText.length == 0) {
                 trace('Tileset resource is empty: $resource');
                 return null;
@@ -320,7 +326,7 @@ class TileMap {
             // Parse collisions array
             if (jsonData.collisions != null) {
                 tileset.collisions = [];
-                for (collisionData in jsonData.collisions) {
+                for (collisionData in cast(jsonData.collisions, Array<Dynamic>)) {
                     if (collisionData == null) {
                         tileset.collisions.push(null);
                     } else {
@@ -342,7 +348,7 @@ class TileMap {
             // Parse colliderFlags array
             if (jsonData.colliderFlags != null) {
                 tileset.colliderFlags = [];
-                for (flagData in jsonData.colliderFlags) {
+                for (flagData in cast (jsonData.colliderFlags, Array<Dynamic>)) {
                     if (flagData == null) {
                         tileset.colliderFlags.push(0); // Default to 0 for null flags
                     } else {
@@ -383,7 +389,7 @@ class TileMap {
     * Twinspire and Tiled.
     **/
     public static function loadMapFromTiled(resource:String, ?convert:Bool):TileMap {
-        
+        return null;
     }
 
     /**
