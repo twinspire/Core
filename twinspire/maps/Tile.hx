@@ -1,5 +1,9 @@
 package twinspire.maps;
 
+import kha.math.FastMatrix3;
+import kha.math.FastVector2;
+import kha.Color;
+
 class Tile {
     
     /**
