@@ -69,7 +69,7 @@ class Patch {
     }
 
     private function createSegments() {
-        if (top < 0 || top > source.height || bottom < 0 || bottom > source.height || left < 0 || left > source.width || right < 0 || right > source.width) {
+        if (top <= 0 || top > source.height || bottom <= 0 || bottom > source.height || left <= 0 || left > source.width || right <= 0 || right > source.width) {
             // @TODO: log
             return;
         }
