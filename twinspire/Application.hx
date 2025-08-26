@@ -118,7 +118,7 @@ class Application
 	/**
 	* A resize callback used when the client resizes.
 	**/
-	public var resize:() -> Void;
+	public var resize:(GraphicsContext) -> Void;
 
 	/**
 	* Gets the currently polled event.
@@ -216,17 +216,6 @@ class Application
 	}
 
 	private function app_render(buffers:Array<Framebuffer>) {
-		if (_lastClientSize.x != System.windowWidth() || _lastClientSize.y != System.windowHeight()) {
-			if (sceneManager != null) {
-				sceneManager.resize();
-			}
-			else {
-				resize();
-			}
-
-			_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
-		}
-
 		var g2 = buffers[0].g2;
 		var deltaTime = System.time - _lastTime;
 		Animate.animateTime(deltaTime);
@@ -259,6 +248,17 @@ class Application
 
 		@:privateAccess(GraphicsContext) {
 			_graphicsContext._inRenderContext = false;
+		}
+
+		if (_lastClientSize.x != System.windowWidth() || _lastClientSize.y != System.windowHeight()) {
+			if (sceneManager != null) {
+				sceneManager.resize(_graphicsContext);
+			}
+			else {
+				resize(_graphicsContext);
+			}
+
+			_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
 		}
 
 		if (sceneManager != null) {

@@ -294,6 +294,10 @@ class UpdateContext {
                 }
 
                 var query = _gctx.queries[i];
+                if (query == null) {
+                    continue;
+                }
+
                 var actualDim = _gctx.getClientDimensionsAtIndex(Direct(i))[0];
                 if (actualDim == null) {
                     continue;
@@ -1590,7 +1594,7 @@ class UpdateContext {
             if (_gctx.menuCursorRenderId != null) {
                 var menuItemDim = _gctx.dimensions[menu.indices[menu.cursorIndex]];
                 var temp = _gctx.dimensions[menu.cursorIndex].clone();
-                dimAlign(menuItemDim, temp, VALIGN_CENTRE, HALIGN_LEFT);
+                dimAlign(Direct(menu.indices[menu.cursorIndex]), Direct(menu.cursorIndex), VALIGN_CENTRE, HALIGN_LEFT);
                 submitGameEventById(GameEvent.SetDimPosition, [ temp ]);
             }
         }

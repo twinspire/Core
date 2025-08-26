@@ -42,8 +42,6 @@ typedef TextInputResult = {
 typedef DimensionRecord = {
     var dim:Dim;
     var vectorContext:VectorContext;
-    var ?initCommand:DimInitCommand;
-    var ?commands:Array<DimCommand>;
 }
 
 typedef VectorContext = {
@@ -308,9 +306,9 @@ class GraphicsContext {
     *
     * @param index The position of the dimension when it is added into permanent storage.
     **/
-    public function getTemporaryDimAtNewIndex(index:Int) {
+    public function getTemporaryDimAtNewIndex(index:Int):Dim {
         var resolvedIndex = index - _dimRecords.length;
-        return _dimTemp[resolvedIndex];
+        return _dimRecordsTemp[resolvedIndex].dim;
     }
 
     /**
@@ -318,8 +316,8 @@ class GraphicsContext {
     *
     * @param index The position of the dimension.
     **/
-    public function getTempOrCurrentDimAtIndex(index:Int) {
-        if (index >= _dimRecords.length - 1) {
+    public function getTempOrCurrentDimAtIndex(index:Int):Dim {
+        if (index > _dimRecords.length - 1) {
             return getTemporaryDimAtNewIndex(index);
         }
         else {
@@ -1195,14 +1193,218 @@ class GraphicsContext {
     * exactly in the way they were defined.
     **/
     public function recalculateDimensions() {
-        for (i in 0..._dimRecords.length) {
-            var record = _dimRecords[i];
-            if (record != null && record.initCommand != null) {
-                // Recalculate the dimension based on the init command
-                
-                
+        // Process all dimension records
+        var commands = Dimensions.getCommandResultList();
+        Dimensions.beginEdit();
+        for (i in 0...commands.length) {
+            var result = commands[i];
+            var index = -1;
+            switch (result.index) {
+                case Direct(j, _): {
+                    index = j;
+                }
+                case Group(j, _): {
+                    index = _groups[j][_groups[j].length - 1];
+                }
+            }
+
+            recalculateDimensionAtIndex(index, result);
+        }
+        Dimensions.endEdit();
+    }
+
+    private function recalculateDimensionAtIndex(index:Int, command:CommandResult) {
+        var dimIndex = Direct(index);
+        var record = _dimRecords[index];
+        
+        if (command.init != null) {
+            var newDim = executeInitCommand(command.init, dimIndex);
+            if (newDim != null) {
+                record.dim.x = newDim.x;
+                record.dim.y = newDim.y;
+                record.dim.width = newDim.width;
+                record.dim.height = newDim.height;
             }
         }
+
+        if (command.cmd != null) {
+            executeCommand(command.cmd, dimIndex, record);
+        }
+    }
+
+    private function executeInitCommand(command:DimInitCommand, targetIndex:DimIndex):Null<Dim> {
+        switch (command) {
+            case CentreScreenY(width, height, offsetY): {
+                var result = Dimensions.centreScreenY(width, height, offsetY, null);
+                return result.dim;
+            }
+            case CentreScreenX(width, height, offsetX): {
+                var result = Dimensions.centreScreenX(width, height, offsetX, null);
+                return result.dim;
+            }
+            case CentreScreenFromSize(width, height): {
+                var result = Dimensions.centreScreenFromSize(width, height, null);
+                return result.dim;
+            }
+            case CreateDimAlignScreen(width, height, valign, halign, offset): {
+                var result = Dimensions.createDimAlignScreen(width, height, valign, halign, offset.x, offset.y, null);
+                return result.dim;
+            }
+            case CreateFromOffset(from, offset): {
+                var result = Dimensions.createFromOffset(from, offset, null);
+                return result.dim;
+            }
+            case MeasureText(font, fontSize, text, id): {
+                var result = Dimensions.getTextDim(font, fontSize, text);
+                return result.dim;
+            }
+            case DimOffsetX(a, offsetX): {
+                var result = Dimensions.dimOffsetX(a, offsetX);
+                return result.dim;
+            }
+            case DimOffsetY(a, offsetY): {
+                var result = Dimensions.dimOffsetY(a, offsetY);
+                return result.dim;
+            }
+            case CreateGridEquals(container, columns, rows, indices): {
+                var results = Dimensions.dimGridEquals(container, columns, rows);
+                return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
+            }
+            case CreateGridFloats(container, columns, rows, indices): {
+                var results = Dimensions.dimGridFloats(container, columns, rows);
+                return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
+            }
+            case CreateGrid(container, columns, rows, indices): {
+                var results = Dimensions.dimGrid(container, columns, rows);
+                return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
+            }
+        }
+        
+        return null;
+    }
+
+    private function executeCommand(command:DimCommand, targetIndex:DimIndex, record:DimensionRecord) {
+        switch (command) {
+            case ScreenAlignX(halign, offset): {
+                Dimensions.screenAlignX(targetIndex, halign, offset);
+            }
+            case ScreenAlignY(valign, offset): {
+                Dimensions.screenAlignY(targetIndex, valign, offset);
+            }
+            case DimAlign(to, halign, valign): {
+                Dimensions.dimAlign(targetIndex, to, valign, halign);
+            }
+            case DimAlignOffset(to, halign, valign, hoffset, voffset): {
+                Dimensions.dimAlignOffset(targetIndex, to, halign, valign, hoffset, voffset);
+            }
+            case DimVAlign(to, valign): {
+                Dimensions.dimVAlign(targetIndex, to, valign);
+            }
+            case DimHAlign(to, halign): {
+                Dimensions.dimHAlign(targetIndex, to, halign);
+            }
+            case DimVAlignOffset(to, valign, offset): {
+                Dimensions.dimVAlignOffset(targetIndex, to, valign, offset);
+            }
+            case DimHAlignOffset(to, halign, offset): {
+                Dimensions.dimHAlignOffset(targetIndex, to, halign, offset);
+            }
+            case DimScale(scaleX, scaleY): {
+                Dimensions.dimScale(targetIndex, scaleX, scaleY);
+            }
+            case DimScaleX(scaleX): {
+                Dimensions.dimScaleX(targetIndex, scaleX);
+            }
+            case DimScaleY(scaleY): {
+                Dimensions.dimScaleY(targetIndex, scaleY);
+            }
+            case DimShrink(amount): {
+                Dimensions.dimShrink(targetIndex, amount);
+            }
+            case DimShrinkW(amount): {
+                Dimensions.dimShrinkW(targetIndex, amount);
+            }
+            case DimShrinkH(amount): {
+                Dimensions.dimShrinkH(targetIndex, amount);
+            }
+            case DimGrow(amount): {
+                Dimensions.dimGrow(targetIndex, amount);
+            }
+            case DimGrowW(amount): {
+                Dimensions.dimGrowW(targetIndex, amount);
+            }
+            case DimGrowH(amount): {
+                Dimensions.dimGrowH(targetIndex, amount);
+            }
+            case CreateFixedFlow(container, itemSize, dir, indices): {
+                // Flow commands need special handling as they affect multiple dimensions
+                handleFlowRecalculation(container, itemSize, dir, indices);
+            }
+            case CreateVariableFlow(container, dir, indices): {
+                handleVariableFlowRecalculation(container, dir, indices);
+            }
+        }
+    }
+
+    private function handleFlowRecalculation(container:DimIndex, itemSize:DimSize, dir:Direction, indices:Array<DimIndex>) {
+        // Temporarily set up the flow context
+        Dimensions.beginEdit();
+        var containerDim = getClientDimensionsAtIndex(container)[0];
+        if (containerDim != null) {
+            Dimensions.dimFixedFlow(container, new Dim(containerDim.x, containerDim.y, itemSize.width, itemSize.height), dir);
+            
+            // Recalculate each dimension in the flow
+            for (index in indices) {
+                var newDim = Dimensions.getNewDim();
+                if (newDim != null) {
+                    var actualIndex = switch (index) {
+                        case Direct(i): i;
+                        case Group(i): _groups[i][0]; // Use first item in group
+                    };
+                    
+                    if (actualIndex < _dimRecords.length && _dimRecords[actualIndex] != null) {
+                        _dimRecords[actualIndex].dim.x = newDim.x;
+                        _dimRecords[actualIndex].dim.y = newDim.y;
+                        _dimRecords[actualIndex].dim.width = newDim.width;
+                        _dimRecords[actualIndex].dim.height = newDim.height;
+                    }
+                }
+            }
+            
+            Dimensions.endFlow();
+        }
+        Dimensions.endEdit();
+    }
+
+    private function handleVariableFlowRecalculation(container:DimIndex, dir:Direction, indices:Array<DimIndex>) {
+        Dimensions.beginEdit();
+        var containerDim = getClientDimensionsAtIndex(container)[0];
+        if (containerDim != null) {
+            Dimensions.dimVariableFlow(container, dir);
+            
+            for (index in indices) {
+                var actualIndex = switch (index) {
+                    case Direct(i): i;
+                    case Group(i): _groups[i][0];
+                };
+                
+                if (actualIndex < _dimRecords.length && _dimRecords[actualIndex] != null) {
+                    var originalDim = _dimRecords[actualIndex].dim;
+                    Dimensions.dimVariableSetNextDim(originalDim);
+                    var newDim = Dimensions.getNewDim();
+                    
+                    if (newDim != null) {
+                        originalDim.x = newDim.x;
+                        originalDim.y = newDim.y;
+                        originalDim.width = newDim.width;
+                        originalDim.height = newDim.height;
+                    }
+                }
+            }
+            
+            Dimensions.endFlow();
+        }
+        Dimensions.endEdit();
     }
 
     /**
@@ -1234,14 +1436,6 @@ class GraphicsContext {
             dim: dim.clone(),
             vectorContext: vectorContext
         };
-
-        if (Dimensions.getInitCommand() != null) {
-            record.dim.initCommand = Dimensions.getInitCommand();
-        }
-
-        if (Dimensions.getCommands().length > 0) {
-            record.dim.commands = Dimensions.getCommands();
-        }
         
         _dimRecordsTemp.push(record);
 
@@ -1292,14 +1486,6 @@ class GraphicsContext {
             dim: dim.clone(),
             vectorContext: vectorContext
         };
-
-        if (Dimensions.getInitCommand() != null) {
-            record.dim.initCommand = Dimensions.getInitCommand();
-        }
-
-        if (Dimensions.getCommands().length > 0) {
-            record.dim.commands = Dimensions.getCommands();
-        }
         
         _dimRecordsTemp.push(record);
 
@@ -1366,14 +1552,6 @@ class GraphicsContext {
             dim: dim.clone(),
             vectorContext: vectorContext
         };
-
-        if (Dimensions.getInitCommand() != null) {
-            record.dim.initCommand = Dimensions.getInitCommand();
-        }
-
-        if (Dimensions.getCommands().length > 0) {
-            record.dim.commands = Dimensions.getCommands();
-        }
         
         _dimRecordsTemp.push(record);
 
@@ -1443,14 +1621,6 @@ class GraphicsContext {
             dim: dim.clone(),
             vectorContext: vectorContext
         };
-
-        if (Dimensions.getInitCommand() != null) {
-            record.dim.initCommand = Dimensions.getInitCommand();
-        }
-
-        if (Dimensions.getCommands().length > 0) {
-            record.dim.commands = Dimensions.getCommands();
-        }
         
         _dimRecordsTemp.push(record);
 
