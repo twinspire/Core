@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.DimIndex;
 import haxe.ds.ArraySort;
 
 import kha.AssetError;
@@ -68,11 +69,6 @@ enum abstract DimBehaviourFlags(Int) from Int to Int {
     var DIM_SCROLL_EVENTS       =   0x02;
 }
 
-typedef DimIndexResult = {
-    var dimIndex:Int;
-    var groupIndex:Int;
-}
-
 enum abstract ContainerMethods(Int) from Int to Int {
     var FLOW_FIXED      =   0;
     var FLOW_VARIABLE   =   1;
@@ -85,69 +81,40 @@ enum DimAlignment {
     DimAlign(valign:VerticalAlign, halign:HorizontalAlign);
 }
 
-enum FlowSpacing {
-    SpaceBetween;
-    SpaceAround;
-    SpaceEqual(space:Float);
-}
-
-enum DimFlow {
-    FlowNone;
-    FlowVertical(?maxWidth:Float, ?span:Bool, ?inverse:Bool, ?spacing:FlowSpacing);
-    FlowHorizontal(?maxHeight:Float, ?span:Bool, ?inverse:Bool, ?spacing:FlowSpacing);
-    FlowGrid(columns:Int, rows:Int, width:Float, height:Float);
-}
-
 enum DimInitCommand {
-    CreateEmpty(then:Array<DimCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateWrapper(inside:Array<DimInitCommand>, then:Array<DimCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateOnInit(dim:Dim, init:DimInitCommand, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CentreScreenY(width:Float, height:Float, offsetY:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CentreScreenX(width:Float, height:Float, offsetX:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CentreScreenFromSize(width:Float, height:Float, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateDimAlignScreen(width:Float, height:Float, align:DimAlignment, offset:FastVector2, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateFromOffset(offset:FastVector2, inside:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateGridEquals(columns:Int, rows:Int, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateGridFloats(columns:Array<Float>, rows:Array<Float>, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateFixedFlow(itemSize:DimSize, dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateVariableFlow(dir:Direction, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
-    CreateFlowComplex(flow:DimFlow, items:Array<DimInitCommand>, ?ident:String, ?id:Id, ?bindings:DimBindingOptions);
+    CentreScreenY(width:Float, height:Float, offsetY:Float);
+    CentreScreenX(width:Float, height:Float, offsetX:Float);
+    CentreScreenFromSize(width:Float, height:Float);
+    CreateDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offset:FastVector2);
+    CreateFromOffset(from:DimIndex, offset:FastVector2);
+    CreateGridEquals(container:DimIndex, columns:Int, rows:Int, indices:Array<DimIndex>);
+    CreateGridFloats(container:DimIndex, columns:Array<Float>, rows:Array<Float>, indices:Array<DimIndex>);
+    CreateGrid(container:DimIndex, columns:Array<DimCellSize>, rows:Array<DimCellSize>, indices:Array<DimIndex>);
+    MeasureText(font:Font, fontSize:Int, text:String, ?id:Id);
+    DimOffsetX(a:DimIndex, offsetX:Float);
+    DimOffsetY(a:DimIndex, offsetY:Float);
 }
 
 enum DimCommand {
-    ScreenAlign(align:DimAlignment, offset:FastVector2);
-    Align(against:Int, align:DimAlignment, ?offset:FastVector2);
-    MeasureText(text:String, font:Font, fontSize:Int, ?fixedSize:Bool);
-    MinOf(texts:Array<String>, font:Font, fontSize:Int);
-    MaxOf(texts:Array<String>, font:Font, fontSize:Int);
-    AddSpacingAround(space:Float);
-    AddSpacing(space:Float, dir:Direction);
-    SetSize(width:Float, height:Float);
-    SetWidth(width:Float);
-    SetHeight(height:Float);
-    Scale(scale:Float);
-    ScaleX(scale:Float);
-    ScaleY(scale:Float);
-    Shrink(value:Float);
-    ShrinkW(value:Float);
-    ShrinkH(value:Float);
-    Grow(value:Float);
-    GrowW(value:Float);
-    GrowH(value:Float);
-    SpanParentWidth;
-    SpanParentHeight;
-    Offset(x:Float, y:Float);
-    OffsetX(value:Float);
-    OffsetY(value:Float);
-    PositionToParent;
-}
-
-typedef SceneMap = {
-    var ?stack:Array<Array<DimObjectResult>>;
-    var ?objects:Array<SceneObject>;
-    var ?root:DimInitCommand;
-    var ?removeObjCallback:(Int) -> Void;
+    CreateFixedFlow(container:DimIndex, itemSize:DimSize, dir:Direction, indices:Array<DimIndex>);
+    CreateVariableFlow(container:DimIndex, dir:Direction, indices:Array<DimIndex>);
+    ScreenAlignX(halign:HorizontalAlign, offset:FastVector2);
+    ScreenAlignY(valign:VerticalAlign, offset:FastVector2);
+    DimAlign(to:DimIndex, halign:HorizontalAlign, valign:VerticalAlign);
+    DimAlignOffset(to:DimIndex, halign:HorizontalAlign, valign:VerticalAlign, hoffset:Float, voffset:Float);
+    DimVAlign(to:DimIndex, valign:VerticalAlign);
+    DimHAlign(to:DimIndex, halign:HorizontalAlign);
+    DimVAlignOffset(to:DimIndex, valign:VerticalAlign, offset:Float);
+    DimHAlignOffset(to:DimIndex, halign:HorizontalAlign, offset:Float);
+    DimScale(scaleX:Float, scaleY:Float);
+    DimScaleX(scaleX:Float);
+    DimScaleY(scaleY:Float);
+    DimShrink(amount:Float);
+    DimShrinkW(amount:Float);
+    DimShrinkH(amount:Float);
+    DimGrow(amount:Float);
+    DimGrowW(amount:Float);
+    DimGrowH(amount:Float);
 }
 
 typedef CommandResult = {
@@ -155,8 +122,92 @@ typedef CommandResult = {
     var ?children:Array<DimInitCommand>;
 }
 
+enum ContainerAddLogic {
+    Empty(?linked:Bool);
+    Ui(?id:Id, ?linked:Bool);
+    Static(?id:Id, ?linked:Bool);
+    Sprite(?id:Id, ?linked:Bool);
+}
+
 class Dimensions {
-    
+
+    private var _lastDimensions:Array<DimIndex>;
+
+    private var _currentDim:Dim;
+    private var _currentDimInitCommand:DimInitCommand;
+    private var _currentDimCommands:Array<DimCommand>;
+
+    private var _editMode:Bool = false;
+
+    /**
+    * Used internally to store information about constructed dimensions before an `add` is called.
+    **/
+    public static function initContext() {
+        resetContext();
+        _lastDimensions = [];
+    }
+
+    /**
+    * Resets the current context of dimensions, clearing the current dimension and any commands.
+    **/
+    public static function resetContext() {
+        _currentDim = null;
+        _currentDimInitCommand = null;
+        _currentDimCommands = [];
+    }
+
+    public static function getCommands():Array<DimCommand> {
+        return _currentDimCommands;
+    }
+
+    public static function getInitCommand():DimInitCommand {
+        return _currentDimInitCommand;
+    }
+
+    public static function addDimIndex(dim:DimIndex) {
+        if (_lastDimensions == null)
+            _lastDimensions = [];
+        _lastDimensions.push(dim);
+    }
+
+    static function addCommand(command:DimCommand) {
+        if (_currentDimCommands == null)
+            _currentDimCommands = [];
+        _currentDimCommands.push(command);
+    }
+
+    static function setInitCommand(command:DimInitCommand) {
+        _currentDimInitCommand = command;
+    }
+
+    static function getDimensionIndicesFromGroup(group:Array<Dim>, addLogic:ContainerAddLogic):Array<DimIndex> {
+        var resultIndices = new Array<DimIndex>();
+
+        for (i in 0...group.length) {
+            var dim = group[i];
+            switch (addLogic) {
+                case Ui(id, linked):
+                    resultIndices.push(gtx.addUI(dim, id ?? Id.None, linked != null ? DimIndexUtils.getIndex(linked) : -1));
+                case Static(id, linked):
+                    resultIndices.push(gtx.addStatic(dim, id ?? Id.None, linked != null ? DimIndexUtils.getIndex(linked) : -1));
+                case Sprite(id, linked):
+                    resultIndices.push(gtx.addSprite(dim, id ?? Id.None, linked != null ? DimIndexUtils.getIndex(linked) : -1));
+                case Empty:
+                    resultIndices.push(gtx.addEmpty(dim, linked != null ? DimIndexUtils.getIndex(linked) : -1));
+            }
+        }
+
+        return resultIndices;
+    }
+
+    public static function beginEdit() {
+        _editMode = true;
+    }
+
+    public static function endEdit() {
+        _editMode = false;
+    }
+
     /**
 	 * Create a dimension block from the given width and height, centering in the middle of the screen.
 	 * @param width The width of the object to centre.
@@ -165,7 +216,10 @@ class Dimensions {
 	public static function centreScreenFromSize(width:Float, height:Float) {
         var x = (System.windowWidth() - width) / 2;
         var y = (System.windowHeight() - height) / 2;
-        return new Dim(x, y, width, height);
+        var result = new Dim(x, y, width, height);
+        _currentDim = result;
+        _currentDimInitCommand = CentreScreenFromSize(width, height);
+        return result;
     }
 
     /**
@@ -176,7 +230,13 @@ class Dimensions {
      */
     public static function centreScreenY(width:Float, height:Float, offsetY:Float) {
         var x = (System.windowWidth() - width) / 2;
-        return new Dim(x, offsetY, width, height);
+        var result = new Dim(x, offsetY, width, height)
+
+        if (!_editMode) {
+            _currentDim = result;
+            _currentDimInitCommand = CentreScreenY(width, height, offsetY);
+        }
+        return result;
     }
 
     /**
@@ -187,15 +247,23 @@ class Dimensions {
      */
     public static function centreScreenX(width:Float, height:Float, offsetX:Float) {
         var y = (System.windowHeight() - height) / 2;
-        return new Dim(offsetX, y, width, height);
+        var result = new Dim(offsetX, y, width, height);
+
+        if (!_editMode) {
+            _currentDim = result;
+            _currentDimInitCommand = CentreScreenX(width, height, offsetX);
+        }
+        return result;
     }
 
     /**
-     * 
-     * @param width 
-     * @param height 
-     * @param offsetX 
-     * @param offsetY 
+     * Create a dimension block aligned to the screen, with the given width and height, and the given vertical and horizontal alignment.
+     * @param width The width of the dimension.
+     * @param height The height of the dimension.
+     * @param valign The vertical alignment to use.
+     * @param halign The horizontal alignment to use.
+     * @param offsetX The offset from the left of the screen.
+     * @param offsetY The offset from the top of the screen.
      */
     public static function createDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offsetX:Float, offsetY:Float) {
         var x = 0.0;
@@ -230,7 +298,14 @@ class Dimensions {
             x -= offsetX;
         }
 
-        return new Dim(x, y, width, height);
+        var result = new Dim(x, y, width, height);
+
+        if (!_editMode) {
+            _currentDim = result;
+            _currentDimInitCommand = CreateDimAlignScreen(width, height, valign, halign, new FastVector2(offsetX, offsetY));
+        }
+
+        return result;
     }
 
     /**
@@ -239,19 +314,17 @@ class Dimensions {
     * @param from The dim to reference.
     * @param offset The offset value from the given dimension.
     **/
-    public static function createFromOffset(from:Dim, offset:FastVector2) {
-        return new Dim(from.x + offset.x, from.y + offset.y, from.width, from.height, from.order);
-    }
+    public static function createFromOffset(fromIndex:DimIndex, offset:FastVector2) {
+        var gtx = Application.instance.graphicsCtx;
+        var from = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(fromIndex));
 
-    /**
-     * Create a dimension block from the given width and given offset on the Y-axis.
-     * @param width The width of the object.
-     * @param height The height of the object.
-     * @param offsetY The offset from the top of the screen.
-     */
-    public static function centreBufferY(width:Float, height:Float, offsetY:Float) {
-        var x = (Application.getBufferSize().x - width) / 2;
-        return new Dim(x, offsetY, width, height);
+        var result = new Dim(from.x + offset.x, from.y + offset.y, from.width, from.height);
+
+        if (!_editMode) {
+            _currentDim = result;
+            _currentDimInitCommand = CreateFromOffset(fromIndex, offset);
+        }
+        return result;
     }
 
     /**
@@ -260,7 +333,10 @@ class Dimensions {
      * @param halign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    public static inline function screenAlignX(a:Dim, halign:Int, offset:FastVector2) {
+    public static inline function screenAlignX(aIndex:DimIndex, halign:Int, offset:FastVector2) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         if (halign == HALIGN_LEFT)
         {
             a.x = offset.x;
@@ -276,6 +352,10 @@ class Dimensions {
             a.x = System.windowWidth() - a.width - offset.x;
             a.y = offset.y;
         }
+
+        if (!_editMode) {
+            addCommand(ScreenAlignX(halign, offset));
+        }
     }
 
     /**
@@ -284,7 +364,10 @@ class Dimensions {
      * @param valign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
-    public static inline function screenAlignY(a:Dim, valign:Int, offset:FastVector2) {
+    public static inline function screenAlignY(aIndex:DimIndex, valign:Int, offset:FastVector2) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         if (valign == VALIGN_TOP)
         {
             a.x = offset.x;
@@ -299,52 +382,9 @@ class Dimensions {
             a.y = System.windowHeight() - a.height - offset.y;
             a.x = System.windowHeight() - a.width - offset.x;
         }
-    }
 
-    /**
-     * Align the given dimension along the x-axis of the current back buffer.
-     * @param a The dimension.
-     * @param halign The alignment to give to the dimension.
-     * @param offset A `FastVector2` offset from the anchor point of the alignment.
-     */
-    public static inline function bufferAlignX(a:Dim, halign:Int, offset:FastVector2) {
-        if (halign == HALIGN_LEFT)
-        {
-            a.x = offset.x;
-            a.y = offset.y;
-        }
-        else if (halign == HALIGN_MIDDLE)
-        {
-            a = centreBufferY(a.width, a.height, offset.y);
-            a.x = offset.x;
-        }
-        else if (halign == HALIGN_RIGHT)
-        {
-            a.x = Application.getBufferSize().x - a.width - offset.x;
-            a.y = offset.y;
-        }
-    }
-
-    /**
-     * Align the given dimension along the y-axis of the current back buffer.
-     * @param a The dimension.
-     * @param valign The alignment to give to the dimension.
-     * @param offset A `FastVector2` offset from the anchor point of the alignment.
-     */
-    public static inline function bufferAlignY(a:Dim, valign:Int, offset:FastVector2) {
-        if (valign == VALIGN_TOP)
-        {
-            a.x = offset.x;
-            a.y = offset.y;
-        }
-        else if (valign == VALIGN_CENTRE)
-        {
-            a = centreBufferX(a.width, a.height, offset.x);
-        }
-        else if (valign == VALIGN_BOTTOM)
-        {
-            a.y = Application.getBufferSize().y - a.height - offset.y;
-            a.x = Application.getBufferSize().y - a.width - offset.x;
+        if (!_editMode) {
+            addCommand(ScreenAlignY(valign, offset));
         }
     }
 
@@ -355,7 +395,10 @@ class Dimensions {
      * @param columns The number of equally sized columns.
      * @param rows The number of equally sized rows.
      */
-    public static function dimGridEquals(container:Dim, columns:Int, rows:Int):Array<Dim> {
+    public static function dimGridEquals(containerIndex:DimIndex, columns:Int, rows:Int, ?addLogic:ContainerAddLogic):Array<DimIndex> {
+        var gtx = Application.instance.graphicsCtx;
+        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(containerIndex));
+
         var cellWidth = container.width / columns;
         var cellHeight = container.height / rows;
         var results = [];
@@ -368,7 +411,14 @@ class Dimensions {
             }
         }
 
-        return results;
+        var resultIndices:Array<DimIndex>;
+
+        if (!_editMode) {
+            _currentDim = container.clone();
+            _currentDimInitCommand = CreateGridEquals(containerIndex, columns, rows, resultIndices);
+        }
+
+        return resultIndices;
     }
 
     /**
@@ -377,7 +427,10 @@ class Dimensions {
      * @param columns An array representing the ratios for the columns in the grid.
      * @param rows An array representing the ratios for the rows in the grid.
      */
-    public static function dimGridFloats(container:Dim, columns:Array<Float>, rows:Array<Float>):Array<Dim> {
+    public static function dimGridFloats(containerIndex:DimIndex, columns:Array<Float>, rows:Array<Float>, ?addLogic:ContainerAddLogic):Array<DimIndex> {
+        var gtx = Application.instance.graphicsCtx;
+        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(containerIndex));
+
         var results = [];
         var startY = 0.0;
         for (r in 0...rows.length)
@@ -393,7 +446,16 @@ class Dimensions {
 
             startY += cellHeight;
         }
-        return results;
+
+        
+        var resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty());
+        
+        if (!_editMode) {
+            _currentDim = container.clone();
+            _currentDimInitCommand = CreateGridFloats(containerIndex, columns, rows, resultIndices);
+        }
+
+        return resultIndices;
     }
 
     /**
@@ -405,7 +467,10 @@ class Dimensions {
      * @param columns An array of column sizes.
      * @param rows An array of row sizes.
      */
-    public static function dimGrid(container:Dim, columns:Array<DimCellSize>, rows:Array<DimCellSize>):Array<Dim> {
+    public static function dimGrid(containerIndex:DimIndex, columns:Array<DimCellSize>, rows:Array<DimCellSize>, ?addLogic:ContainerAddLogic):Array<DimIndex> {
+        var gtx = Application.instance.graphicsCtx;
+        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(containerIndex));
+
         var totalPreciseWidth = 0.0;
         var totalPreciseHeight = 0.0;
         for (c in columns)
@@ -484,7 +549,15 @@ class Dimensions {
             }
         }
 
-        return results;
+        
+        var resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty());
+
+        if (!_editMode) {
+            _currentDim = container.clone();
+            _currentDimInitCommand = CreateGrid(container, columns, rows, resultIndices);
+        }
+
+        return resultIndices;
     }
 
     public static function dimMultiCellSize(cellSize:DimCellSize, count:Int):Array<DimCellSize> {
@@ -501,6 +574,10 @@ class Dimensions {
     static var containerMethod:Int;
     static var containerOffset:FastVector2;
 
+    static var flowContainerIndex:DimIndex;
+    static var flowResults:Array<Dim>;
+    static var flowAddLogic:ContainerAddLogic;
+
     /**
      * Create a dimension column, within which each time the function `getNewDim` is called,
      * a row is created within this column below the last row created.
@@ -508,13 +585,19 @@ class Dimensions {
      * @param size The dim of each cell.
      * @param direction 1 for up, 2 for down, 3 for left, 4 for right
      */
-    public static function dimFixedFlow(container:Dim, size:Dim, direction:Int) {
+    public static function dimFixedFlow(containerIndex:DimIndex, size:Dim, direction:Int, ?addLogic:ContainerAddLogic) {
+        var gtx = Application.instance.graphicsCtx;
+        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(containerIndex));
+
+        flowContainerIndex = containerIndex;
         containerColumnOrRow = container;
         containerCellSize = size;
         containerDirection = direction;
         containerMethod = FLOW_FIXED;
         containerCell = 0;
         containerOffset = new FastVector2();
+        flowAddLogic = addLogic != null ? addLogic : Empty();
+        flowResults = [];
 
         if (direction == Direction.Up) {
             containerOffset = new FastVector2(0, containerColumnOrRow.getHeight() + containerColumnOrRow.getY());
@@ -522,6 +605,8 @@ class Dimensions {
         else if (direction == Direction.Left) {
             containerOffset = new FastVector2(containerColumnOrRow.getWidth() + containerColumnOrRow.getX(), 0);
         }
+
+        _currentDim = container.clone();
     }
 
     /**
@@ -529,7 +614,11 @@ class Dimensions {
      * @param container The container to use for creating new rows.
      * @param direction 1 for up, 2 for down, 3 for left, 4 for right
      */
-    public static function dimVariableFlow(container:Dim, direction:Int) {
+    public static function dimVariableFlow(containerIndex:DimIndex, direction:Int) {
+        var gtx = Application.instance.graphicsCtx;
+        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(containerIndex));
+
+        flowContainerIndex = containerIndex;
         containerColumnOrRow = container;
         containerDirection = direction;
         containerOffset = new FastVector2();
@@ -543,6 +632,10 @@ class Dimensions {
         containerMethod = FLOW_VARIABLE;
         containerCellSize = new Dim(0, 0, 0, 0);
         containerCell = 0;
+        flowAddLogic = addLogic != null ? addLogic : Empty();
+        flowResults = [];
+
+        _currentDim = container.clone();
     }
 
     public static function dimVariableSetNextDim(dim:Dim) {
@@ -552,8 +645,7 @@ class Dimensions {
     }
 
     public static function getNewDim(padding:Float = 0) {
-        if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize != null)
-        {
+        if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize != null) {
             var x = containerColumnOrRow.getX();
             var y = containerColumnOrRow.getY();
             var width = containerColumnOrRow.getWidth();
@@ -585,21 +677,29 @@ class Dimensions {
                 width = containerCellSize.width;
             }
 
-            return new Dim(x, y, width, height);
+            var result = new Dim(x, y, width, height);
+            flowResults.push(result);
         }
 
         return null;
     }
 
     /**
-     * Create a dimension block from the given width and given offset on the X-axis.
-     * @param width The width of the object.
-     * @param height The height of the object.
-     * @param offsetX The offset from the top of the screen.
-     */
-    public static function centreBufferX(width:Float, height:Float, offsetX:Float) {
-        var y = (Application.getBufferSize().y - height) / 2;
-        return new Dim(offsetX, y, width, height);
+    * Ends the current flow of dimensions, returning an array of dimension indices that were created during the flow.
+    * This function should be called after all dimensions have been created using `getNewDim`.
+    * @return An array of `DimIndex` representing the dimensions created during the flow.
+    **/
+    public static function endFlow():Array<DimIndex> {
+        var results = getDimensionIndicesFromGroup(flowResults, flowAddLogic);
+        if (containerMethod == FLOW_FIXED) {
+            addCommand(CreateFixedFlow(flowContainerIndex, containerCellSize, containerDirection, results));
+        }
+        else if (containerMethod == FLOW_VARIABLE) {
+            addCommand(CreateVariableFlow(flowContainerIndex, containerDirection, results));
+        }
+
+        flowResults = [];
+        return results;
     }
 
     /**
@@ -608,14 +708,22 @@ class Dimensions {
      * If `offsetX` is equal to `0`, the new dimension will be to the right with no margin.
      * @param a The current dimension to use.
      * @param offsetX The value to offset the new dimension.
-     */
-    public static function dimOffsetX(a:Dim, offsetX:Float) {
+     */ 
+    public static function dimOffsetX(aIndex:DimIndex, offsetX:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
+        var result:Dim;
+
         if (offsetX >= 0)
-            return new Dim(a.x + a.width + offsetX, a.y, a.width, a.height);
+            result = new Dim(a.x + a.width + offsetX, a.y, a.width, a.height);
         else if (offsetX < 0)
-            return new Dim(a.x - a.width - offsetX, a.y, a.width, a.height);
+            result = new Dim(a.x - a.width - offsetX, a.y, a.width, a.height);
+
+        _currentDim = result;
+        _currentDimInitCommand = DimOffsetX(a, offsetX);
         
-        return null;
+        return result;
     }
 
     /**
@@ -625,13 +733,21 @@ class Dimensions {
      * @param a The current dimension to use.
      * @param offsetY The value to offset the new dimension.
      */
-    public static function dimOffsetY(a:Dim, offsetY:Float) {
-        if (offsetY >= 0)
-            return new Dim(a.x, a.y + a.height + offsetY, a.width, a.height);
-        else if (offsetY < 0)
-            return new Dim(a.x, a.y - a.height - offsetY, a.width, a.height);
+    public static function dimOffsetY(aIndex:DimIndex, offsetY:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
 
-        return null;
+        var result:Dim;
+
+        if (offsetY >= 0)
+            result = new Dim(a.x, a.y + a.height + offsetY, a.width, a.height);
+        else if (offsetY < 0)
+            result = new Dim(a.x, a.y - a.height - offsetY, a.width, a.height);
+
+        _currentDim = result;
+        _currentDimInitCommand = DimOffsetY(a, offsetY);
+
+        return result;
     }
 
     /**
@@ -641,9 +757,15 @@ class Dimensions {
      * @param valign The vertical alignment `b` should be to `a`.
      * @param halign The horizontal alignment `b` should be to `a`.
      */
-    public static inline function dimAlign(a:Dim, b:Dim, valign:Int, halign:Int) {
-        dimVAlign(a, b, valign);
-        dimHAlign(a, b, halign);
+    public static inline function dimAlign(aIndex:DimIndex, bIndex:DimIndex, valign:Int, halign:Int) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(bIndex));
+
+        dimVAlign(a, b, valign, true);
+        dimHAlign(a, b, halign, true);
+
+        addCommand(DimAlign(b, halign, valign));
     }
 
     /**
@@ -652,7 +774,11 @@ class Dimensions {
      * @param b The second dimension.
      * @param valign The vertical alignment `b` should be to `a`.
      */
-    public static inline function dimVAlign(a:Dim, b:Dim, valign:Int) {
+    public static inline function dimVAlign(aIndex:DimIndex, bIndex:DimIndex, valign:Int, noCommandCreation:Bool = false) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(bIndex));
+
         if (valign == VALIGN_TOP)
         {
             b.y = a.y;
@@ -665,6 +791,10 @@ class Dimensions {
         {
             b.y = a.y + ((a.height - b.height) / 2);
         }
+
+        if (!noCommandCreation) {
+            addCommand(DimVAlign(b, valign));
+        }
     }
 
     /**
@@ -673,7 +803,11 @@ class Dimensions {
      * @param b The second dimension.
      * @param valign The horizontal alignment `b` should be to `a`.
      */
-    public static inline function dimHAlign(a:Dim, b:Dim, halign:Int) {
+    public static inline function dimHAlign(aIndex:DimIndex, bIndex:DimIndex, halign:Int, noCommandCreation:Bool = false) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(bIndex));
+
         if (halign == HALIGN_LEFT)
         {
             b.x = a.x;
@@ -686,14 +820,24 @@ class Dimensions {
         {
             b.x = a.x + ((a.width - b.width) / 2);
         }
+
+        if (!noCommandCreation) {
+            addCommand(DimHAlign(b, halign));
+        }
     }
 
-    public static inline function dimAlignOffset(a:Dim, b:Dim, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0) {
-        dimVAlignOffset(a, b, valign, voffset);
-        dimHAlignOffset(a, b, halign, hoffset);
+    public static inline function dimAlignOffset(a:DimIndex, b:DimIndex, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0) {
+        dimVAlignOffset(a, b, valign, voffset, true);
+        dimHAlignOffset(a, b, halign, hoffset, true);
+
+        addCommand(DimAlignOffset(b, halign, valign, hoffset, voffset));
     }
 
-    public static inline function dimVAlignOffset(a:Dim, b:Dim, valign:Int, offset:Float = 0.0) {
+    public static inline function dimVAlignOffset(aIndex:DimIndex, bIndex:DimIndex, valign:Int, offset:Float = 0.0, noCommandCreation:Bool = false) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(bIndex));
+
         if (valign == VALIGN_TOP)
         {
             b.y = a.y - b.height - offset;
@@ -706,9 +850,17 @@ class Dimensions {
         {
             b.y = a.y - ((b.height - a.height) / 2);
         }
+
+        if (!noCommandCreation) {
+            addCommand(DimVAlignOffset(b, valign, offset));
+        }
     }
 
-    public static inline function dimHAlignOffset(a:Dim, b:Dim, halign:Int, offset:Float = 0.0) {
+    public static inline function dimHAlignOffset(aIndex:DimIndex, bIndex:DimIndex, halign:Int, offset:Float = 0.0, noCommandCreation:Bool = false) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(bIndex));
+
         if (halign == HALIGN_LEFT)
         {
             b.x = a.x - b.width - offset;
@@ -721,6 +873,10 @@ class Dimensions {
         {
             b.x = a.x - ((b.width - a.width) / 2);
         }
+
+        if (!noCommandCreation) {
+            addCommand(DimHAlignOffset(bIndex, halign, offset));
+        }
     }
 
     /**
@@ -729,7 +885,10 @@ class Dimensions {
      * @param scaleX How much to scale, as a percentage (0-1), along the X-Axis.
      * @param scaleY How much to scale, as a percentage (0-1), along the Y-Axis.
      */
-    public static inline function dimScale(a:Dim, scaleX:Float, scaleY:Float) {
+    public static inline function dimScale(aIndex:DimIndex, scaleX:Float, scaleY:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         var ratioWidth = a.width * scaleX;
         var ratioX = a.x + ((a.width - ratioWidth) / 2);
         var ratioHeight = a.height * scaleY;
@@ -738,6 +897,8 @@ class Dimensions {
         a.y = ratioY;
         a.width = ratioWidth;
         a.height = ratioHeight;
+
+        addCommand(DimScale(scaleX, scaleY));
     }
 
     /**
@@ -745,11 +906,16 @@ class Dimensions {
      * @param a The dimension to scale.
      * @param scaleX How much to scale, as a percentage (0-1), along the X-Axis.
      */
-    public static inline function dimScaleX(a:Dim, scaleX:Float) {
+    public static inline function dimScaleX(aIndex:DimIndex, scaleX:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         var ratioWidth = a.width * scaleX;
         var ratioX = a.x + ((a.width - ratioWidth) / 2);
         a.x = ratioX;
         a.width = ratioWidth;
+
+        addCommand(DimScaleX(scaleX));
     }
 
     /**
@@ -757,55 +923,90 @@ class Dimensions {
      * @param a The dimension to scale.
      * @param scaleY How much to scale, as a percentage (0-1), along the Y-Axis.
      */
-    public static inline function dimScaleY(a:Dim, scaleY:Float) {
+    public static inline function dimScaleY(a:DimIndex, scaleY:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         var ratioHeight = a.height * scaleY;
         var ratioY = a.y + ((a.height - ratioHeight) / 2);
         a.y = ratioY;
         a.height = ratioHeight;
+
+        addCommand(DimScaleY(scaleY));
     }
 
     /**
     * Shrink the given dimension by an `amount` in pixels.
     **/
-    public static inline function dimShrink(a:Dim, amount:Float) {
+    public static inline function dimShrink(aIndex:DimIndex, amount:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         a.width = a.width - amount;
         a.height = a.height - amount;
+
+        addCommand(DimShrink(amount));
     }
 
     /**
     * Shrink the width of a given dimension by an `amount` in pixels.
     **/
-    public static inline function dimShrinkW(a:Dim, amount:Float) {
+    public static inline function dimShrinkW(aIndex:DimIndex, amount:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         a.width = a.width - amount;
+
+        addCommand(DimShrinkW(amount));
     }
 
     /**
     * Shrink the height of a given dimension by an `amount` in pixels.
     **/
-    public static inline function dimShrinkH(a:Dim, amount:Float) {
+    public static inline function dimShrinkH(aIndex:DimIndex, amount:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         a.height = a.height - amount;
+
+        addCommand(DimShrinkH(amount));
     }
 
     /**
     * Grow the given dimension by an `amount` in pixels.
     **/
-    public static inline function dimGrow(a:Dim, amount:Float) {
+    public static inline function dimGrow(aIndex:DimIndex, amount:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         a.width = a.width + amount;
         a.height = a.height + amount;
+
+        addCommand(DimGrow(amount));
     }
 
     /**
     * Grow the width of a given dimension by an `amount` in pixels.
     **/
-    public static inline function dimGrowW(a:Dim, amount:Float) {
+    public static inline function dimGrowW(aIndex:DimIndex, amount:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         a.width = a.width + amount;
+
+        addCommand(DimGrowW(amount));
     }
 
     /**
     * Grow the height of a given dimension by an `amount` in pixels.
     **/
-    public static inline function dimGrowH(a:Dim, amount:Float) {
+    public static inline function dimGrowH(aIndex:DimIndex, amount:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getIndex(aIndex));
+
         a.height = a.height + amount;
+
+        addCommand(DimGrowH(amount));
     }
 
     /**
@@ -815,9 +1016,11 @@ class Dimensions {
      * @param fontSize The size of the font.
      * @param text The text to measure.
      */
-    public static function getTextDim(font:Font, fontSize:Int, text:String)
-	{
-		return new Dim(0, 0, font.width(fontSize, text), font.height(fontSize));
+    public static function getTextDim(font:Font, fontSize:Int, text:String) {
+        var result = new Dim(0, 0, font.width(fontSize, text), font.height(fontSize));
+        _currentDim = result;
+        _currentDimInitCommand = MeasureText(font, fontSize, text);
+		return result;
 	}
 
 }

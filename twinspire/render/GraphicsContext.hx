@@ -16,6 +16,7 @@ import twinspire.text.InputRenderer;
 import twinspire.text.TextInputState;
 import twinspire.text.TextInputMethod;
 import twinspire.Application;
+import twinspire.Dimensions;
 using twinspire.extensions.ArrayExtensions;
 using twinspire.extensions.Graphics2;
 
@@ -41,6 +42,8 @@ typedef TextInputResult = {
 typedef DimensionRecord = {
     var dim:Dim;
     var vectorContext:VectorContext;
+    var ?initCommand:DimInitCommand;
+    var ?commands:Array<DimCommand>;
 }
 
 typedef VectorContext = {
@@ -136,6 +139,8 @@ class GraphicsContext {
     private var _g2:Graphics;
 
     public function new() {
+        Dimensions.initContext();
+
         _dimTemp = [];
         _dimTempLinkTo = [];
         _dimForceChangeIndices = [];
@@ -1185,6 +1190,77 @@ class GraphicsContext {
     }
 
     /**
+    * Iterates through all dimensions and recalculates their dimensions based on their commands
+    * if they have any. Call this function from `resize()` to automatically recalculate dimensions
+    * exactly in the way they were defined.
+    **/
+    public function recalculateDimensions() {
+        for (i in 0..._dimRecords.length) {
+            var record = _dimRecords[i];
+            if (record != null && record.initCommand != null) {
+                // Recalculate the dimension based on the init command
+                
+                
+            }
+        }
+    }
+
+    /**
+    * Add an empty dimension to the context. This function is used to reserve a dimension index
+    * for later use, such as when you want to add a dimension later in the frame.
+    *
+    * Dimensions added with this function cannot be added to groups or buffers.
+    *
+    * @param dim The dimension to add. This dimension is not rendered and is not considered
+    * affected by user input or physics simulations.
+    * @param linkTo An optional index specifying that this dimension should be linked to another index.
+    * @return Returns the index of the dimension in the context.
+    **/
+    public function addEmpty(dim:Dim, linkTo:Int = -1) {
+        if (_ended) {
+            throw "Cannot add to context once the current frame has ended.";
+        }
+
+        // Create vector context snapshot
+        var vectorContext:VectorContext = {
+            active: _vectorActive,
+            zoom: _vectorZoom,
+            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
+            space: vectorSpace
+        };
+
+        // Store as a unified record in temporary storage
+        var record:DimensionRecord = {
+            dim: dim.clone(),
+            vectorContext: vectorContext
+        };
+
+        if (Dimensions.getInitCommand() != null) {
+            record.dim.initCommand = Dimensions.getInitCommand();
+        }
+
+        if (Dimensions.getCommands().length > 0) {
+            record.dim.commands = Dimensions.getCommands();
+        }
+        
+        _dimRecordsTemp.push(record);
+
+        _dimTemp.push(dim);
+        _dimTempLinkTo.push(linkTo);
+
+        var index = getNewIndex(_dimTemp.length - 1);
+        if (noVirtualSceneChange && _dormantDimIndices.length == 0) {
+            index += _dimRecords.length;
+        }
+
+        queries[index] = null;
+        activities[index] = null;
+        _activeDimensions[index] = true;
+        
+        return DimIndex.Direct(index);
+    }
+
+    /**
     * Add a static dimension with the given render type. Static dimensions are not considered to be
     * affected by user input or physics simulations.
     *
@@ -1216,6 +1292,14 @@ class GraphicsContext {
             dim: dim.clone(),
             vectorContext: vectorContext
         };
+
+        if (Dimensions.getInitCommand() != null) {
+            record.dim.initCommand = Dimensions.getInitCommand();
+        }
+
+        if (Dimensions.getCommands().length > 0) {
+            record.dim.commands = Dimensions.getCommands();
+        }
         
         _dimRecordsTemp.push(record);
 
@@ -1246,6 +1330,8 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
+        Dimensions.addDimIndex(result);
+        Dimensions.resetContext();
         return result;
     }
 
@@ -1280,6 +1366,14 @@ class GraphicsContext {
             dim: dim.clone(),
             vectorContext: vectorContext
         };
+
+        if (Dimensions.getInitCommand() != null) {
+            record.dim.initCommand = Dimensions.getInitCommand();
+        }
+
+        if (Dimensions.getCommands().length > 0) {
+            record.dim.commands = Dimensions.getCommands();
+        }
         
         _dimRecordsTemp.push(record);
 
@@ -1313,6 +1407,8 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
+        Dimensions.addDimIndex(result);
+        Dimensions.resetContext();
         return result;
     }
 
@@ -1347,6 +1443,14 @@ class GraphicsContext {
             dim: dim.clone(),
             vectorContext: vectorContext
         };
+
+        if (Dimensions.getInitCommand() != null) {
+            record.dim.initCommand = Dimensions.getInitCommand();
+        }
+
+        if (Dimensions.getCommands().length > 0) {
+            record.dim.commands = Dimensions.getCommands();
+        }
         
         _dimRecordsTemp.push(record);
 
@@ -1376,6 +1480,8 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
+        Dimensions.addDimIndex(result);
+        Dimensions.resetContext();
         return result;
     }
 
