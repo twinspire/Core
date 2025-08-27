@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import kha.System;
 import twinspire.maps.Tile;
 import twinspire.maps.TileMap;
 import twinspire.maps.TileMapLayer;
@@ -1222,8 +1223,19 @@ class GraphicsContext {
             if (newDim != null) {
                 record.dim.x = newDim.x;
                 record.dim.y = newDim.y;
-                record.dim.width = newDim.width;
-                record.dim.height = newDim.height;
+                if (command.matchScreenWidth) {
+                    record.dim.width = System.windowWidth();
+                }
+                else {
+                    record.dim.width = newDim.width;
+                }
+                
+                if (command.matchScreenHeight) {
+                    record.dim.height = System.windowHeight();
+                }
+                else {
+                    record.dim.height = newDim.height;
+                }
             }
         }
 
@@ -1232,8 +1244,33 @@ class GraphicsContext {
         }
     }
 
+    private function changeIndicesFromResults(results:Array<DimResult>, indices:Array<DimIndex>) {
+        for (i in 0...indices.length) {
+            var result = results[i];
+            var index = indices[i];
+
+            switch (index) {
+                case Direct(item): {
+                    var temp = _dimRecords[item].dim.clone();
+                    _dimRecords[item].dim = result.dim.clone();
+                    _dimRecords[item].dim.order = temp.order;
+                    _dimRecords[item].dim.visible = temp.visible;
+                }
+                case Group(item): {
+                    var temp = _dimRecords[item].dim.clone();
+                    _dimRecords[_groups[item][0]].dim = result.dim.clone();
+                    _dimRecords[_groups[item][0]].dim.order = temp.order;
+                    _dimRecords[_groups[item][0]].dim.visible = temp.visible;
+                }
+            }
+        }
+    }
+
     private function executeInitCommand(command:DimInitCommand, targetIndex:DimIndex):Null<Dim> {
         switch (command) {
+            case FromDim(dim): {
+                return dim;
+            }
             case CentreScreenY(width, height, offsetY): {
                 var result = Dimensions.centreScreenY(width, height, offsetY, null);
                 return result.dim;
@@ -1268,14 +1305,17 @@ class GraphicsContext {
             }
             case CreateGridEquals(container, columns, rows, indices): {
                 var results = Dimensions.dimGridEquals(container, columns, rows);
+                changeIndicesFromResults(results, indices);
                 return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
             }
             case CreateGridFloats(container, columns, rows, indices): {
                 var results = Dimensions.dimGridFloats(container, columns, rows);
+                changeIndicesFromResults(results, indices);
                 return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
             }
             case CreateGrid(container, columns, rows, indices): {
                 var results = Dimensions.dimGrid(container, columns, rows);
+                changeIndicesFromResults(results, indices);
                 return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
             }
         }

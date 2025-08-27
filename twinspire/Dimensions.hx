@@ -82,6 +82,7 @@ enum DimAlignment {
 }
 
 enum DimInitCommand {
+    FromDim(dim:Dim);
     CentreScreenY(width:Float, height:Float, offsetY:Float);
     CentreScreenX(width:Float, height:Float, offsetX:Float);
     CentreScreenFromSize(width:Float, height:Float);
@@ -121,13 +122,15 @@ typedef CommandResult = {
     var ?index:DimIndex;
     var ?init:DimInitCommand;
     var ?cmd:DimCommand;
+    var ?matchScreenWidth:Bool;
+    var ?matchScreenHeight:Bool;
 }
 
 enum ContainerAddLogic {
-    Empty(?linked:Bool);
-    Ui(?id:Id, ?linked:Bool);
-    Static(?id:Id, ?linked:Bool);
-    Sprite(?id:Id, ?linked:Bool);
+    Empty(?linked:DimIndex);
+    Ui(?id:Id, ?linked:DimIndex);
+    Static(?id:Id, ?linked:DimIndex);
+    Sprite(?id:Id, ?linked:DimIndex);
 }
 
 typedef DimResult = {
@@ -137,6 +140,8 @@ typedef DimResult = {
 
 class Dimensions {
 
+    private static var _order:Int;
+    private static var _visibility:Bool;
     private static var _lastDimensions:Array<DimIndex>;
 
     private static var _currentDim:Dim;
@@ -153,6 +158,8 @@ class Dimensions {
         resetContext();
         _lastDimensions = [];
         _commandResults = [];
+        _order = 0;
+        _visibility = true;
     }
 
     /**
@@ -193,13 +200,20 @@ class Dimensions {
     }
 
     static function addCommandResultInit(index:DimIndex, init:DimInitCommand) {
+        var result:CommandResult = {};
+
+        var gtx = Application.instance.graphicsCtx;
+        var dim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(index));
+        result.matchScreenWidth = dim.width == Application.getScreenDim().width;
+        result.matchScreenHeight = dim.height == Application.getScreenDim().height;
+        result.index = index;
+        result.init = init;
+
         if (_commandResults == null) {
             _commandResults = [];
         }
-        _commandResults.push({
-            index: index,
-            init: init
-        });
+
+        _commandResults.push(result);
     }
 
     static function addCommandResult(index:DimIndex, cmd:DimCommand) {
@@ -217,16 +231,16 @@ class Dimensions {
         var result:DimIndex = null;
         switch (addLogic) {
             case Empty(linked): {
-                result = gtx.addEmpty(dim, linked != false && parent != null ? DimIndexUtils.getDirectIndex(parent) : -1);
+                result = gtx.addEmpty(dim, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1));
             }
             case Ui(id, linked): {
-                result = gtx.addUI(dim, id ?? Id.None, linked != false && parent != null ? DimIndexUtils.getDirectIndex(parent) : -1);
+                result = gtx.addUI(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1));
             }
             case Static(id, linked): {
-                result = gtx.addStatic(dim, id ?? Id.None, linked != false && parent != null ? DimIndexUtils.getDirectIndex(parent) : -1);
+                result = gtx.addStatic(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1));
             }
             case Sprite(id, linked): {
-                result = gtx.addSprite(dim, id ?? Id.None, linked != false && parent != null ? DimIndexUtils.getDirectIndex(parent) : -1);
+                result = gtx.addSprite(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1));
             }
         }
         return result;
@@ -240,13 +254,13 @@ class Dimensions {
             var dim = group[i];
             switch (addLogic) {
                 case Ui(id, linked):
-                    resultIndices.push(gtx.addUI(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(parent) : -1));
+                    resultIndices.push(gtx.addUI(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1)));
                 case Static(id, linked):
-                    resultIndices.push(gtx.addStatic(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(parent) : -1));
+                    resultIndices.push(gtx.addStatic(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1)));
                 case Sprite(id, linked):
-                    resultIndices.push(gtx.addSprite(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(parent) : -1));
+                    resultIndices.push(gtx.addSprite(dim, id ?? Id.None, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1)));
                 case Empty(linked):
-                    resultIndices.push(gtx.addEmpty(dim, linked != null ? DimIndexUtils.getDirectIndex(parent) : -1));
+                    resultIndices.push(gtx.addEmpty(dim, linked != null ? DimIndexUtils.getDirectIndex(linked) : (parent != null ? DimIndexUtils.getDirectIndex(parent) : -1)));
             }
         }
 
@@ -261,6 +275,39 @@ class Dimensions {
         _editMode = false;
     }
 
+    public static function advanceOrder() {
+        _order += 1;
+    }
+
+    public static function reduceOrder() {
+        _order -= 1;
+    }
+
+    public static function beginInvisible() {
+        _visibility = false;
+    }
+
+    public static function endInvisible() {
+        _visibility = true;
+    }
+
+    public static function createFromDim(dim:Dim, addLogic:ContainerAddLogic):DimResult {
+        var result = dim.clone();
+        result.order = _order;
+        result.visible = _visibility;
+
+        var resultIndex:DimIndex = null;
+        if (!_editMode) {
+            resultIndex = addDimToGraphicsContext(result, addLogic);
+            addCommandResultInit(resultIndex, FromDim(dim));
+        }
+
+        return {
+            dim: result,
+            index: resultIndex
+        };
+    }
+
     /**
 	 * Create a dimension block from the given width and height, centering in the middle of the screen.
 	 * @param width The width of the object to centre.
@@ -269,7 +316,8 @@ class Dimensions {
 	public static function centreScreenFromSize(width:Float, height:Float, addLogic:ContainerAddLogic):DimResult {
         var x = (System.windowWidth() - width) / 2;
         var y = (System.windowHeight() - height) / 2;
-        var result = new Dim(x, y, width, height);
+        var result = new Dim(x, y, width, height, _order);
+        result.visible = _visibility;
 
         var resultIndex:DimIndex = null;
         if (!_editMode) {
@@ -291,7 +339,8 @@ class Dimensions {
      */
     public static function centreScreenY(width:Float, height:Float, offsetY:Float, addLogic:ContainerAddLogic):DimResult {
         var x = (System.windowWidth() - width) / 2;
-        var result = new Dim(x, offsetY, width, height);
+        var result = new Dim(x, offsetY, width, height, _order);
+        result.visible = _visibility;
 
         var resultIndex:DimIndex = null;
         if (!_editMode) {
@@ -313,7 +362,8 @@ class Dimensions {
      */
     public static function centreScreenX(width:Float, height:Float, offsetX:Float, addLogic:ContainerAddLogic):DimResult {
         var y = (System.windowHeight() - height) / 2;
-        var result = new Dim(offsetX, y, width, height);
+        var result = new Dim(offsetX, y, width, height, _order);
+        result.visible = _visibility;
 
         var resultIndex:DimIndex = null;
         if (!_editMode) {
@@ -369,7 +419,8 @@ class Dimensions {
             x -= offsetX;
         }
 
-        var result = new Dim(x, y, width, height);
+        var result = new Dim(x, y, width, height, _order);
+        result.visible = _visibility;
         var resultIndex:DimIndex = null;
 
         if (!_editMode) {
@@ -393,7 +444,8 @@ class Dimensions {
         var gtx = Application.instance.graphicsCtx;
         var from = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(fromIndex));
 
-        var result = new Dim(from.x + offset.x, from.y + offset.y, from.width, from.height);
+        var result = new Dim(from.x + offset.x, from.y + offset.y, from.width, from.height, _order);
+        result.visible = _visibility;
         var resultIndex:DimIndex = null;
 
         if (!_editMode) {
@@ -482,14 +534,16 @@ class Dimensions {
         {
             for (c in 0...columns)
             {
-                results.push(new Dim(c * cellWidth + container.x, r * cellHeight + container.y, cellWidth, cellHeight));
+                var cell = new Dim(c * cellWidth + container.x, r * cellHeight + container.y, cellWidth, cellHeight, _order);
+                cell.visible = _visibility;
+                results.push(cell);
             }
         }
 
         var resultIndices:Array<DimIndex> = [];
 
         if (!_editMode) {
-            resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(true), containerIndex);
+            resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
             addCommandResultInit(containerIndex, CreateGridEquals(containerIndex, columns, rows, resultIndices));
         }
 
@@ -528,7 +582,9 @@ class Dimensions {
             for (c in 0...columns.length)
             {
                 var cellWidth = container.width * columns[c];
-                results.push(new Dim(startX + container.x, startY + container.y, cellWidth, cellHeight));
+                var cell = new Dim(startX + container.x, startY + container.y, cellWidth, cellHeight, _order);
+                cell.visible = _visibility;
+                results.push(cell);
                 startX += cellWidth;
             }
 
@@ -538,7 +594,7 @@ class Dimensions {
         var resultIndices:Array<DimIndex> = [];
 
         if (!_editMode) {
-            resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(true), containerIndex);
+            resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
             addCommandResultInit(containerIndex, CreateGridFloats(containerIndex, columns, rows, resultIndices));
         }
 
@@ -645,7 +701,9 @@ class Dimensions {
                     startX += width;
                 }
 
-                results.push(new Dim(x, y, width, height));
+                var cell = new Dim(x, y, width, height, _order);
+                cell.visible = _visibility;
+                results.push(cell);
             }
         }
 
@@ -653,7 +711,7 @@ class Dimensions {
         var resultIndices:Array<DimIndex> = [];
 
         if (!_editMode) {
-            resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(true), containerIndex);
+            resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
             addCommandResultInit(containerIndex, CreateGrid(containerIndex, columns, rows, resultIndices));
         }
 
@@ -720,6 +778,8 @@ class Dimensions {
         }
 
         _currentDim = container.clone();
+        _currentDim.order = _order;
+        _currentDim.visible = _visibility;
     }
 
     /**
@@ -790,7 +850,8 @@ class Dimensions {
                 width = containerCellSize.width;
             }
 
-            var result = new Dim(x, y, width, height);
+            var result = new Dim(x, y, width, height, _order);
+            result.visible = _visibility;
             flowResults.push(result);
         }
 
@@ -848,9 +909,11 @@ class Dimensions {
         var result:Dim = null;
 
         if (offsetX >= 0)
-            result = new Dim(a.x + a.width + offsetX, a.y, a.width, a.height);
+            result = new Dim(a.x + a.width + offsetX, a.y, a.width, a.height, _order);
         else if (offsetX < 0)
-            result = new Dim(a.x - a.width - offsetX, a.y, a.width, a.height);
+            result = new Dim(a.x - a.width - offsetX, a.y, a.width, a.height, _order);
+
+        result.visible = _visibility;
 
         var resultIndex:DimIndex = null;
         if (!_editMode) {
@@ -878,9 +941,11 @@ class Dimensions {
         var result:Dim = null;
 
         if (offsetY >= 0)
-            result = new Dim(a.x, a.y + a.height + offsetY, a.width, a.height);
+            result = new Dim(a.x, a.y + a.height + offsetY, a.width, a.height, _order);
         else if (offsetY < 0)
-            result = new Dim(a.x, a.y - a.height - offsetY, a.width, a.height);
+            result = new Dim(a.x, a.y - a.height - offsetY, a.width, a.height, _order);
+
+        result.visible = _visibility;
 
         var resultIndex:DimIndex = null;
         if (!_editMode) {
@@ -1179,7 +1244,8 @@ class Dimensions {
      * @param text The text to measure.
      */
     public static function getTextDim(font:Font, fontSize:Int, text:String, ?addLogic:ContainerAddLogic):DimResult {
-        var result = new Dim(0, 0, font.width(fontSize, text), font.height(fontSize));
+        var result = new Dim(0, 0, font.width(fontSize, text), font.height(fontSize), _order);
+        result.visible = _visibility;
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic ?? Empty());
