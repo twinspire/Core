@@ -138,18 +138,70 @@ typedef DimResult = {
     var ?dim:Dim;
 }
 
+typedef DependencyRecord = {
+    var id:Int;                           // The unique ID for this dimension
+    var dependsOn:Array<Int>;            // IDs this dimension depends on
+    var dependents:Array<Int>;           // IDs that depend on this dimension  
+    var originalCommands:Array<DimCommand>; // Commands as originally defined
+    var resolvedCommands:Array<DimCommand>; // Commands with dependencies resolved
+}
+
+typedef CommandGroup = {
+    var id:Int;                          // Unique ID for this group
+    var initCommand:Null<DimInitCommand>; // Initial creation command
+    var commands:Array<DimCommand>;      // Transformation commands
+    var dependencies:DependencyRecord;   // Dependency information
+}
+
+typedef GridFlowGroup = {
+    var containerId:Int;                    // The container this grid/flow belongs to
+    var type:GridFlowType;                  // Grid or Flow type
+    var parameters:GridFlowParameters;      // Specific parameters for recreation
+    var memberIds:Array<Int>;               // IDs of all dimensions in this grid/flow
+    var memberIndices:Array<DimIndex>;      // Current indices (may change)
+}
+
+enum GridFlowType {
+    GridEquals(columns:Int, rows:Int);
+    GridFloats(columns:Array<Float>, rows:Array<Float>);
+    GridCustom(columns:Array<DimCellSize>, rows:Array<DimCellSize>);
+    FlowFixed(itemSize:DimSize, direction:Direction);
+    FlowVariable(direction:Direction);
+}
+
+typedef GridFlowParameters = {
+    var ?columns:Dynamic;        // Int, Array<Float>, or Array<DimCellSize>
+    var ?rows:Dynamic;           // Int, Array<Float>, or Array<DimCellSize>
+    var ?itemSize:DimSize;       // For fixed flows
+    var ?direction:Direction;    // For flows
+}
+
+typedef EnhancedCommandGroup = {
+    > CommandGroup,
+    var ?gridFlowGroup:GridFlowGroup;    // Present if this is part of a grid/flow
+    var ?isGridFlowContainer:Bool;       // True if this dimension contains grid/flow items
+}
+
 class Dimensions {
 
     private static var _order:Int;
     private static var _visibility:Bool;
     private static var _lastDimensions:Array<DimIndex>;
 
-    private static var _currentDim:Dim;
-    private static var _currentDimInitCommand:DimInitCommand;
-    private static var _currentDimCommands:Array<DimCommand>;
     private static var _commandResults:Array<CommandResult>;
+    private static var _currentDimCommands:Array<DimCommand>;
+    private static var _idCommand:Array<Int>;
+    private static var _currentId:Int;
+    private static var _idStack:Array<Int>;
 
     private static var _editMode:Bool = false;
+
+    private static var _commandGroups:Map<Int, CommandGroup>;
+    private static var _dependencyGraph:Map<Int, DependencyRecord>;
+    private static var _idToIndex:Map<Int, DimIndex>;
+
+    private static var _gridFlowGroups:Map<Int, GridFlowGroup>; // Container ID -> GridFlowGroup
+    private static var _memberToGridFlow:Map<Int, Int>;         // Member ID -> Container ID
 
     /**
     * Used internally to store information about constructed dimensions before an `add` is called.
@@ -157,26 +209,120 @@ class Dimensions {
     public static function initContext() {
         resetContext();
         _lastDimensions = [];
-        _commandResults = [];
-        _order = 0;
-        _visibility = true;
+        _commandGroups = new Map();
+        _dependencyGraph = new Map();
+        _idToIndex = new Map();
+        _gridFlowGroups = new Map();
+        _memberToGridFlow = new Map();
+    }
+
+    /**
+    * Push an ID to the current stack. Use either a `String` or `Int`, but not both.
+    **/
+    public static function pushId(?ident:String, ?value:Int) {
+        if (_idStack == null) {
+            _idStack = [];
+        }
+
+        var newId:Int;
+        
+        if (value != null) {
+            // For integer values, combine with current stack depth for uniqueness
+            newId = hashCombine(_currentId, value);
+        }
+        else if (ident != null) {
+            // Use the string-to-seed function for consistent hashing
+            var stringHash = stringToSeed(ident);
+            newId = hashCombine(_currentId, stringHash);
+        }
+        else {
+            // Auto-increment if no identifier provided
+            newId = hashCombine(_currentId, _idStack.length + 1);
+        }
+        
+        // Ensure uniqueness by checking against existing commands
+        while (_idCommand.contains(newId)) {
+            newId = hashCombine(newId, 1);
+        }
+        
+        _idStack.push(_currentId); // Push the previous ID
+        _currentId = newId;        // Set new current ID
+    }
+
+    /**
+    * Hash combine function for creating composite hash values.
+    * This ensures good distribution.
+    */
+    static function hashCombine(seed:Int, value:Int):Int {
+        // Based on boost::hash_combine algorithm
+        var result = seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+        return result & 0x7FFFFFFF; // Keep positive
+}
+
+    /**
+    * Generate a seed integer from a string using DJB2 hash.
+    */
+    static function stringToSeed(input:String):Int {
+        if (input == null || input.length == 0) {
+            return 0;
+        }
+        
+        var hash = 5381;
+        
+        for (i in 0...input.length) {
+            var char = input.charCodeAt(i);
+            hash = ((hash << 5) + hash) + char; // hash * 33 + char
+            hash = hash & 0x7FFFFFFF; // Keep positive
+        }
+        
+        return hash;
+    }
+
+    static function advanceId() {
+        // Return because we have an ID pushed manually by the user
+        if (_idStack.length > 0) {
+            return;
+        }
+        
+        // Generate next sequential ID
+        var nextId = hashCombine(_currentId, 1);
+        
+        // Ensure uniqueness
+        while (_idCommand.contains(nextId)) {
+            nextId = hashCombine(nextId, 1);
+        }
+        
+        _currentId = nextId;
+    }
+
+    static function addCommandId() {
+        advanceId();
+        _idCommand.push(_currentId);
+    }
+
+    /**
+    * Remove the last identifier pushed to the stack.
+    **/
+    public static function popId():Int {
+        if (_idStack.length == 0) {
+            return -1;
+        }
+        
+        var poppedId = _currentId;
+        _currentId = _idStack.pop(); // Restore previous ID
+        return poppedId;
     }
 
     /**
     * Resets the current context of dimensions, clearing the current dimension and any commands.
     **/
     public static function resetContext() {
-        _currentDim = null;
-        _currentDimInitCommand = null;
-        _currentDimCommands = [];
-    }
-
-    public static function getCommands():Array<DimCommand> {
-        return _currentDimCommands;
-    }
-
-    public static function getInitCommand():DimInitCommand {
-        return _currentDimInitCommand;
+        _idStack = [];
+        _idCommand = [];
+        _commandResults = [];
+        _order = 0;
+        _visibility = true;
+        _currentId = 0;
     }
 
     public static function getCommandResultList() {
@@ -189,31 +335,75 @@ class Dimensions {
         _lastDimensions.push(dim);
     }
 
-    static function addCommand(command:DimCommand) {
-        if (_currentDimCommands == null)
-            _currentDimCommands = [];
-        _currentDimCommands.push(command);
-    }
-
-    static function setInitCommand(command:DimInitCommand) {
-        _currentDimInitCommand = command;
-    }
-
     static function addCommandResultInit(index:DimIndex, init:DimInitCommand) {
         var result:CommandResult = {};
-
+        
         var gtx = Application.instance.graphicsCtx;
         var dim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(index));
         result.matchScreenWidth = dim.width == Application.getScreenDim().width;
         result.matchScreenHeight = dim.height == Application.getScreenDim().height;
         result.index = index;
         result.init = init;
-
+        
         if (_commandResults == null) {
             _commandResults = [];
         }
-
+        
         _commandResults.push(result);
+        
+        // Handle grid/flow creation commands
+        handleGridFlowInit(init, index);
+        
+        // Create standard command group
+        if (!_commandGroups.exists(_currentId)) {
+            var group:EnhancedCommandGroup = {
+                id: _currentId,
+                initCommand: init,
+                commands: [],
+                dependencies: {
+                    id: _currentId,
+                    dependsOn: [],
+                    dependents: [],
+                    originalCommands: [],
+                    resolvedCommands: []
+                }
+            };
+            
+            _commandGroups.set(_currentId, group);
+            _idToIndex.set(_currentId, index);
+        }
+        
+        analyzeDependencies(_currentId, init);
+    }
+
+    static function handleGridFlowInit(init:DimInitCommand, containerIndex:DimIndex) {
+        switch (init) {
+            case CreateGridEquals(container, columns, rows, indices): {
+                createGridFlowGroup(
+                    getIdFromDimIndex(container),
+                    GridEquals(columns, rows),
+                    {columns: columns, rows: rows},
+                    indices
+                );
+            }
+            case CreateGridFloats(container, columns, rows, indices): {
+                createGridFlowGroup(
+                    getIdFromDimIndex(container),
+                    GridFloats(columns, rows),
+                    {columns: columns, rows: rows},
+                    indices
+                );
+            }
+            case CreateGrid(container, columns, rows, indices): {
+                createGridFlowGroup(
+                    getIdFromDimIndex(container),
+                    GridCustom(columns, rows),
+                    {columns: columns, rows: rows},
+                    indices
+                );
+            }
+            default: // Not a grid/flow command
+        }
     }
 
     static function addCommandResult(index:DimIndex, cmd:DimCommand) {
@@ -224,6 +414,472 @@ class Dimensions {
             index: index,
             cmd: cmd
         });
+        
+        // Handle flow commands
+        handleGridFlowCommand(cmd, index);
+        
+        if (_commandGroups.exists(_currentId)) {
+            var group = _commandGroups.get(_currentId);
+            group.commands.push(cmd);
+            group.dependencies.originalCommands.push(cmd);
+            
+            analyzeDependencies(_currentId, null, cmd);
+        }
+    }
+
+    static function handleGridFlowCommand(cmd:DimCommand, containerIndex:DimIndex) {
+        switch (cmd) {
+            case CreateFixedFlow(container, itemSize, dir, indices): {
+                createGridFlowGroup(
+                    getIdFromDimIndex(container),
+                    FlowFixed(itemSize, dir),
+                    {itemSize: itemSize, direction: dir},
+                    indices
+                );
+            }
+            case CreateVariableFlow(container, dir, indices): {
+                createGridFlowGroup(
+                    getIdFromDimIndex(container),
+                    FlowVariable(dir),
+                    {direction: dir},
+                    indices
+                );
+            }
+            default: // Not a flow command
+        }
+    }
+    
+    static function createGridFlowGroup(containerId:Int, type:GridFlowType, parameters:GridFlowParameters, indices:Array<DimIndex>) {
+        var memberIds:Array<Int> = [];
+        
+        // Generate IDs for all members if they don't exist
+        for (i in 0...indices.length) {
+            var memberId = _currentId + i + 1; // Generate sequential IDs
+            memberIds.push(memberId);
+            _memberToGridFlow.set(memberId, containerId);
+            _idToIndex.set(memberId, indices[i]);
+        }
+        
+        var gridFlowGroup:GridFlowGroup = {
+            containerId: containerId,
+            type: type,
+            parameters: parameters,
+            memberIds: memberIds,
+            memberIndices: indices.copy()
+        };
+        
+        _gridFlowGroups.set(containerId, gridFlowGroup);
+        
+        // Mark container as having grid/flow
+        if (_commandGroups.exists(containerId)) {
+            var containerGroup:EnhancedCommandGroup = cast _commandGroups.get(containerId);
+            containerGroup.isGridFlowContainer = true;
+            containerGroup.gridFlowGroup = gridFlowGroup;
+        }
+        
+        // Create dependency records for all members
+        for (memberId in memberIds) {
+            createGridFlowMemberDependencies(memberId, containerId, memberIds);
+        }
+    }
+    
+    static function createGridFlowMemberDependencies(memberId:Int, containerId:Int, allMemberIds:Array<Int>) {
+        // Each member depends on the container
+        addDependency(memberId, containerId);
+        
+        // For flows, each member (except first) also depends on layout order
+        var gridFlowGroup = _gridFlowGroups.get(containerId);
+        if (gridFlowGroup != null) {
+            switch (gridFlowGroup.type) {
+                case FlowFixed(_, _) | FlowVariable(_): {
+                    var memberIndex = allMemberIds.indexOf(memberId);
+                    if (memberIndex > 0) {
+                        // Flow items depend on previous item for positioning
+                        addDependency(memberId, allMemberIds[memberIndex - 1]);
+                    }
+                }
+                default: {
+                    // Grid items only depend on container
+                }
+            }
+        }
+    }
+
+    static function analyzeDependencies(currentId:Int, ?initCmd:DimInitCommand, ?cmd:DimCommand) {
+        var dependencies:Array<Int> = [];
+        
+        if (initCmd != null) {
+            dependencies = extractDependenciesFromInit(initCmd);
+        } else if (cmd != null) {
+            dependencies = extractDependenciesFromCommand(cmd);
+        }
+        
+        // Update dependency records
+        for (depId in dependencies) {
+            addDependency(currentId, depId);
+        }
+    }
+
+    static function extractDependenciesFromInit(cmd:DimInitCommand):Array<Int> {
+        return switch (cmd) {
+            case CreateFromOffset(from, offset): [getIdFromDimIndex(from)];
+            case DimOffsetX(a, offsetX): [getIdFromDimIndex(a)];
+            case DimOffsetY(a, offsetY): [getIdFromDimIndex(a)];
+            default: [];
+        };
+    }
+
+    static function extractDependenciesFromCommand(cmd:DimCommand):Array<Int> {
+        return switch (cmd) {
+            case DimAlign(to, halign, valign): [getIdFromDimIndex(to)];
+            case DimAlignOffset(to, halign, valign, hoffset, voffset): [getIdFromDimIndex(to)];
+            case DimVAlign(to, valign): [getIdFromDimIndex(to)];
+            case DimHAlign(to, halign): [getIdFromDimIndex(to)];
+            case DimVAlignOffset(to, valign, offset): [getIdFromDimIndex(to)];
+            case DimHAlignOffset(to, halign, offset): [getIdFromDimIndex(to)];
+            case CreateFixedFlow(container, itemSize, dir, indices): [getIdFromDimIndex(container)];
+            case CreateVariableFlow(container, dir, indices): [getIdFromDimIndex(container)];
+            default: [];
+        };
+    }
+
+    static function getIdFromDimIndex(dimIndex:DimIndex):Int {
+        // Look up the ID from the index
+        for (id => idx in _idToIndex) {
+            if (DimIndexUtils.equals(idx, dimIndex)) {
+                return id;
+            }
+        }
+        return -1; // No dependency found
+    }
+
+    static function addDependency(dependentId:Int, dependsOnId:Int) {
+        if (dependsOnId == -1) return; // No valid dependency
+        
+        // Update dependent record
+        if (!_dependencyGraph.exists(dependentId)) {
+            _dependencyGraph.set(dependentId, {
+                id: dependentId,
+                dependsOn: [],
+                dependents: [],
+                originalCommands: [],
+                resolvedCommands: []
+            });
+        }
+        
+        var dependentRecord = _dependencyGraph.get(dependentId);
+        if (!dependentRecord.dependsOn.contains(dependsOnId)) {
+            dependentRecord.dependsOn.push(dependsOnId);
+        }
+        
+        // Update dependency provider record
+        if (!_dependencyGraph.exists(dependsOnId)) {
+            _dependencyGraph.set(dependsOnId, {
+                id: dependsOnId,
+                dependsOn: [],
+                dependents: [],
+                originalCommands: [],
+                resolvedCommands: []
+            });
+        }
+        
+        var providerRecord = _dependencyGraph.get(dependsOnId);
+        if (!providerRecord.dependents.contains(dependentId)) {
+            providerRecord.dependents.push(dependentId);
+        }
+    }
+
+    public static function removeDimensionGroup(id:Int) {
+        if (!_commandGroups.exists(id)) {
+            return;
+        }
+        
+        var gtx = Application.instance.graphicsCtx;
+        
+        // Check if this is part of a grid/flow
+        if (_memberToGridFlow.exists(id)) {
+            removeGridFlowMember(id); // This calls removeIndex internally
+            return;
+        }
+        
+        // Check if this is a container with grid/flow
+        if (_gridFlowGroups.exists(id)) {
+            removeGridFlowContainer(id); // This calls removeIndex internally
+            return;
+        }
+        
+        // Standard removal for individual dimensions
+        var removedGroup = _commandGroups.get(id);
+        var dependencyRecord = _dependencyGraph.get(id);
+        
+        // Update dependent dimensions first
+        for (dependentId in dependencyRecord.dependents) {
+            resolveDependencyAfterRemoval(dependentId, id, removedGroup);
+            gtx.recalculateIndividualDimensionDirect(dependentId);
+        }
+        
+        // Clean up tracking
+        _commandGroups.remove(id);
+        _dependencyGraph.remove(id);
+        
+        var dimIndex = _idToIndex.get(id);
+        if (dimIndex != null) {
+            gtx.removeIndex(dimIndex);
+        }
+        
+        _idToIndex.remove(id);
+    }
+
+    static function removeGridFlowMember(memberId:Int) {
+        var containerId = _memberToGridFlow.get(memberId);
+        var gridFlowGroup = _gridFlowGroups.get(containerId);
+        
+        if (gridFlowGroup == null) return;
+        
+        // Remove from member arrays
+        gridFlowGroup.memberIds.remove(memberId);
+        var memberIndex = gridFlowGroup.memberIds.indexOf(memberId);
+        if (memberIndex >= 0) {
+            gridFlowGroup.memberIndices.splice(memberIndex, 1);
+        }
+        
+        // Update dependencies for flow items
+        switch (gridFlowGroup.type) {
+            case FlowFixed(_, _) | FlowVariable(_): {
+                var removedIndex = gridFlowGroup.memberIds.indexOf(memberId);
+                if (removedIndex > 0 && removedIndex < gridFlowGroup.memberIds.length - 1) {
+                    var prevId = gridFlowGroup.memberIds[removedIndex - 1];
+                    var nextId = gridFlowGroup.memberIds[removedIndex + 1];
+                    addDependency(nextId, prevId);
+                }
+            }
+            default: // Grid items don't need chain repair
+        }
+        
+        // Clean up tracking
+        _memberToGridFlow.remove(memberId);
+        _commandGroups.remove(memberId);
+        _dependencyGraph.remove(memberId);
+        _idToIndex.remove(memberId);
+        
+        var gtx = Application.instance.graphicsCtx;
+        var dimIndex = _idToIndex.get(memberId);
+        if (dimIndex != null) {
+            gtx.removeIndex(dimIndex);
+        }
+        
+        // Recalculate the grid/flow
+        gtx.recalculateGridFlowGroupDirect(containerId);
+    }
+
+    static function removeGridFlowContainer(containerId:Int) {
+        var gridFlowGroup = _gridFlowGroups.get(containerId);
+        if (gridFlowGroup == null) return;
+        
+        var gtx = Application.instance.graphicsCtx;
+        
+        for (memberId in gridFlowGroup.memberIds.copy()) {
+            _memberToGridFlow.remove(memberId);
+            _commandGroups.remove(memberId);
+            _dependencyGraph.remove(memberId);
+            
+            var dimIndex = _idToIndex.get(memberId);
+            if (dimIndex != null) {
+                gtx.removeIndex(dimIndex);
+            }
+            
+            _idToIndex.remove(memberId);
+        }
+        
+        // Remove the container group
+        _gridFlowGroups.remove(containerId);
+        _commandGroups.remove(containerId);
+        _dependencyGraph.remove(containerId);
+        
+        var containerIndex = _idToIndex.get(containerId);
+        if (containerIndex != null) {
+            gtx.removeIndex(containerIndex);
+        }
+        
+        _idToIndex.remove(containerId);
+    }
+
+    static function resolveDependencyAfterRemoval(dependentId:Int, removedId:Int, removedGroup:CommandGroup) {
+        var dependentGroup = _commandGroups.get(dependentId);
+        var dependentRecord = _dependencyGraph.get(dependentId);
+        
+        // Find what the removed dimension was depending on
+        var removedDependencies = _dependencyGraph.get(removedId).dependsOn;
+        
+        // Update commands that referenced the removed dimension
+        var updatedCommands:Array<DimCommand> = [];
+        
+        for (cmd in dependentGroup.commands) {
+            var updatedCmd = redirectCommand(cmd, removedId, removedDependencies, removedGroup);
+            updatedCommands.push(updatedCmd);
+        }
+        
+        // Update the group's commands
+        dependentGroup.commands = updatedCommands;
+        dependentGroup.dependencies.resolvedCommands = updatedCommands;
+        
+        // Update dependency relationships
+        dependentRecord.dependsOn.remove(removedId);
+        for (newDepId in removedDependencies) {
+            if (newDepId != dependentId) { // Avoid self-dependency
+                addDependency(dependentId, newDepId);
+            }
+        }
+    }
+
+    static function redirectCommand(cmd:DimCommand, removedId:Int, newDependencies:Array<Int>, removedGroup:CommandGroup):DimCommand {
+        return switch (cmd) {
+            case DimAlign(to, halign, valign): {
+                if (getIdFromDimIndex(to) == removedId) {
+                    // Redirect to what the removed dimension was aligned to
+                    var newTarget = findBestAlignmentTarget(newDependencies, removedGroup.commands);
+                    DimAlign(getIndexFromId(newTarget), halign, valign);
+                } else {
+                    cmd;
+                }
+            }
+            case DimVAlign(to, valign): {
+                if (getIdFromDimIndex(to) == removedId) {
+                    var newTarget = findBestAlignmentTarget(newDependencies, removedGroup.commands);
+                    DimVAlign(getIndexFromId(newTarget), valign);
+                } else {
+                    cmd;
+                }
+            }
+            case DimHAlign(to, halign): {
+                if (getIdFromDimIndex(to) == removedId) {
+                    var newTarget = findBestAlignmentTarget(newDependencies, removedGroup.commands);
+                    DimHAlign(getIndexFromId(newTarget), halign);
+                } else {
+                    cmd;
+                }
+            }
+            // Add similar cases for other alignment commands
+            default: cmd;
+        };
+    }
+
+    static function findBestAlignmentTarget(dependencies:Array<Int>, removedCommands:Array<DimCommand>):Int {
+        // Strategy: Find the most "primary" dependency
+        // Priority: containers > positioned elements > other elements
+        
+        for (depId in dependencies) {
+            if (_commandGroups.exists(depId)) {
+                var group = _commandGroups.get(depId);
+                // Prefer containers or screen-aligned elements
+                if (isContainerOrScreenAligned(group)) {
+                    return depId;
+                }
+            }
+        }
+        
+        // Fallback to first available dependency
+        return dependencies.length > 0 ? dependencies[0] : -1;
+    }
+
+    static function isContainerOrScreenAligned(group:CommandGroup):Bool {
+        // Check if this is likely a container or screen-aligned element
+        if (group.initCommand != null) {
+            return switch (group.initCommand) {
+                case CentreScreenY(_, _, _): true;
+                case CentreScreenX(_, _, _): true;
+                case CentreScreenFromSize(_, _): true;
+                case CreateDimAlignScreen(_, _, _, _, _): true;
+                default: false;
+            };
+        }
+        
+        // Check for screen alignment commands
+        for (cmd in group.commands) {
+            switch (cmd) {
+                case ScreenAlignX(_, _): return true;
+                case ScreenAlignY(_, _): return true;
+                default: continue;
+            }
+        }
+        
+        return false;
+    }
+
+    public static function getIndexFromId(id:Int):DimIndex {
+        return _idToIndex.exists(id) ? _idToIndex.get(id) : Direct(-1);
+    }
+
+    /**
+    * Get IDs in topological order (dependencies first)
+    * @param targetIds Optional array of specific IDs to order. If null, orders all IDs.
+    */
+    public static function getTopologicalOrder(?targetIds:Array<Int>):Array<Int> {
+        if (targetIds == null) {
+            targetIds = [for (id in _commandGroups.keys()) id];
+        }
+        
+        var visited:Map<Int, Bool> = new Map();
+        var result:Array<Int> = [];
+        
+        function visit(id:Int) {
+            if (visited.get(id) || !targetIds.contains(id)) return;
+            visited.set(id, true);
+            
+            if (_dependencyGraph.exists(id)) {
+                var record = _dependencyGraph.get(id);
+                for (depId in record.dependsOn) {
+                    if (targetIds.contains(depId)) { // Only visit dependencies in our target set
+                        visit(depId);
+                    }
+                }
+            }
+            
+            result.push(id);
+        }
+        
+        for (id in targetIds) {
+            visit(id);
+        }
+        
+        return result;
+    }
+
+    public static function getCommandGroup(id:Int):Null<CommandGroup> {
+        return _commandGroups.get(id);
+    }
+
+    public static function getGridFlowGroup(containerId:Int):Null<GridFlowGroup> {
+        return _gridFlowGroups.get(containerId);
+    }
+
+    public static function getGridFlowContainerIds():Array<Int> {
+        var ids:Array<Int> = [];
+        for (id in _gridFlowGroups.keys()) {
+            ids.push(id);
+        }
+        return ids;
+    }
+
+    public static function getContainerIds():Array<Int> {
+        var ids:Array<Int> = [];
+        for (group in _commandGroups) {
+            var enhancedGroup:EnhancedCommandGroup = cast group;
+            if (enhancedGroup.isGridFlowContainer == true) {
+                ids.push(group.id);
+            }
+        }
+        return ids;
+    }
+
+    public static function getNonGridFlowIds():Array<Int> {
+        var ids:Array<Int> = [];
+        for (id in _commandGroups.keys()) {
+            if (!_gridFlowGroups.exists(id) && !_memberToGridFlow.exists(id)) {
+                ids.push(id);
+            }
+        }
+        return ids;
     }
 
     static function addDimToGraphicsContext(dim:Dim, addLogic:ContainerAddLogic, ?parent:DimIndex) {
@@ -776,10 +1432,6 @@ class Dimensions {
         else if (direction == Direction.Left) {
             containerOffset = new FastVector2(containerColumnOrRow.getWidth() + containerColumnOrRow.getX(), 0);
         }
-
-        _currentDim = container.clone();
-        _currentDim.order = _order;
-        _currentDim.visible = _visibility;
     }
 
     /**
@@ -807,8 +1459,6 @@ class Dimensions {
         containerCell = 0;
         flowAddLogic = addLogic != null ? addLogic : Empty();
         flowResults = [];
-
-        _currentDim = container.clone();
     }
 
     public static function dimVariableSetNextDim(dim:Dim) {
@@ -817,7 +1467,7 @@ class Dimensions {
         }
     }
 
-    public static function getNewDim(padding:Float = 0) {
+    public static function getNewDim(padding:Float = 0):Dim {
         if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize != null) {
             var x = containerColumnOrRow.getX();
             var y = containerColumnOrRow.getY();
@@ -853,6 +1503,7 @@ class Dimensions {
             var result = new Dim(x, y, width, height, _order);
             result.visible = _visibility;
             flowResults.push(result);
+            return result;
         }
 
         return null;

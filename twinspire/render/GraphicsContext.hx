@@ -1244,6 +1244,263 @@ class GraphicsContext {
         }
     }
 
+    /**
+    * Recalculate dimensions using the improved dependency system
+    **/
+    public function recalculateDimensionsWithDependencies() {
+        // Get all command groups in dependency order
+        var orderedIds = Dimensions.getTopologicalOrder();
+        
+        for (id in orderedIds) {
+            var group = Dimensions.getCommandGroup(id);
+            var index = Dimensions.getIndexFromId(id);
+            
+            if (group != null && DimIndexUtils.getDirectIndex(index) >= 0) {
+                recalculateDimensionGroup(group, index);
+            }
+        }
+        
+        updateContainerContentBounds();
+    }
+
+    private function recalculateDimensionGroup(group:CommandGroup, index:DimIndex) {
+        var actualIndex = DimIndexUtils.getDirectIndex(index);
+        
+        // Skip if this dimension is inactive
+        if (actualIndex >= _activeDimensions.length || !_activeDimensions[actualIndex]) {
+            return;
+        }
+        
+        // Recalculate using resolved commands (which handle removed dependencies)
+        var commands = group.dependencies.resolvedCommands.length > 0 
+                    ? group.dependencies.resolvedCommands 
+                    : group.commands;
+        
+        // Execute init command first
+        if (group.initCommand != null) {
+            var newDim = executeInitCommand(group.initCommand, index);
+            if (newDim != null && actualIndex < _dimRecords.length) {
+                var record = _dimRecords[actualIndex];
+                if (record != null) {
+                    record.dim.x = newDim.x;
+                    record.dim.y = newDim.y;
+                    record.dim.width = newDim.width;
+                    record.dim.height = newDim.height;
+                }
+            }
+        }
+        
+        // Execute transformation commands
+        for (command in commands) {
+            executeCommand(command, index, _dimRecords[actualIndex]);
+        }
+    }
+
+    /**
+    * Recalculate all dimensions directly without intermediate marking
+    */
+    public function recalculateDimensionsWithGridFlow() {
+        // Process grid/flow groups first (as they depend on containers)
+        var gridFlowContainers = Dimensions.getGridFlowContainerIds();
+        for (containerId in gridFlowContainers) {
+            recalculateGridFlowGroupDirect(containerId);
+        }
+        
+        // Process individual dimensions in dependency order
+        var individualIds = Dimensions.getNonGridFlowIds();
+        var orderedIds = Dimensions.getTopologicalOrder();
+        for (id in orderedIds) {
+            recalculateIndividualDimensionDirect(id);
+        }
+        
+        // Final cleanup
+        updateContainerContentBounds();
+    }
+
+    public function recalculateIndividualDimensionDirect(id:Int) {
+        var group = Dimensions.getCommandGroup(id);
+        var index = Dimensions.getIndexFromId(id);
+        var actualIndex = DimIndexUtils.getDirectIndex(index);
+        
+        if (group == null || actualIndex < 0 || !_activeDimensions[actualIndex]) {
+            return;
+        }
+        
+        var record = _dimRecords[actualIndex];
+        if (record == null) return;
+        
+        // Execute init command first
+        if (group.initCommand != null) {
+            var newDim = executeInitCommand(group.initCommand, index);
+            if (newDim != null) {
+                record.dim.x = newDim.x;
+                record.dim.y = newDim.y;
+                record.dim.width = newDim.width;
+                record.dim.height = newDim.height;
+            }
+        }
+        
+        // Execute transformation commands
+        var commands = group.dependencies.resolvedCommands.length > 0 
+                    ? group.dependencies.resolvedCommands 
+                    : group.commands;
+                    
+        for (command in commands) {
+            executeCommand(command, index, record);
+        }
+    }
+
+    public function recalculateGridFlowGroupDirect(containerId:Int) {
+        var gridFlowGroup = Dimensions.getGridFlowGroup(containerId);
+        if (gridFlowGroup == null) return;
+        
+        var containerIndex = Dimensions.getIndexFromId(containerId);
+        var actualContainerIndex = DimIndexUtils.getDirectIndex(containerIndex);
+        
+        if (actualContainerIndex < 0 || !_activeDimensions[actualContainerIndex]) return;
+        
+        // Directly recreate and update the grid/flow dimensions
+        var newDimensions = recreateGridFlowDimensions(gridFlowGroup, containerIndex);
+        
+        // Update the actual dimension records directly
+        for (i in 0...cast Math.min(newDimensions.length, gridFlowGroup.memberIds.length)) {
+            var memberId = gridFlowGroup.memberIds[i];
+            var memberIndex = Dimensions.getIndexFromId(memberId);
+            var actualMemberIndex = DimIndexUtils.getDirectIndex(memberIndex);
+            
+            if (actualMemberIndex >= 0 && actualMemberIndex < _dimRecords.length && _dimRecords[actualMemberIndex] != null) {
+                var record = _dimRecords[actualMemberIndex];
+                record.dim.x = newDimensions[i].x;
+                record.dim.y = newDimensions[i].y;
+                record.dim.width = newDimensions[i].width;
+                record.dim.height = newDimensions[i].height;
+            }
+        }
+        
+        // Update container bounds immediately
+        updateContainerContentBounds();
+    }
+
+    private function recalculateFixedFlow(containerIndex:DimIndex, itemSize:DimSize, direction:Direction, itemCount:Int):Array<Dim> {
+        var results:Array<Dim> = [];
+        
+        Dimensions.beginEdit();
+        Dimensions.dimFixedFlow(containerIndex, new Dim(0, 0, itemSize.width, itemSize.height), direction);
+        
+        for (i in 0...itemCount) {
+            var newDim = Dimensions.getNewDim();
+            if (newDim != null) {
+                results.push(newDim);
+            }
+        }
+        
+        Dimensions.endFlow();
+        Dimensions.endEdit();
+        
+        return results;
+    }
+
+    private function recalculateVariableFlow(containerIndex:DimIndex, direction:Direction, gridFlowGroup:GridFlowGroup):Array<Dim> {
+        var results:Array<Dim> = [];
+        
+        Dimensions.beginEdit();
+        Dimensions.dimVariableFlow(containerIndex, direction);
+        
+        // Use original dimensions for variable flow
+        for (memberId in gridFlowGroup.memberIds) {
+            var memberIndex = Dimensions.getIndexFromId(memberId);
+            var actualMemberIndex = DimIndexUtils.getDirectIndex(memberIndex);
+            
+            if (actualMemberIndex >= 0 && actualMemberIndex < _dimRecords.length) {
+                var record = _dimRecords[actualMemberIndex];
+                if (record != null) {
+                    Dimensions.dimVariableSetNextDim(record.dim);
+                    var newDim = Dimensions.getNewDim();
+                    if (newDim != null) {
+                        results.push(newDim);
+                    }
+                }
+            }
+        }
+        
+        Dimensions.endFlow();
+        Dimensions.endEdit();
+        
+        return results;
+    }
+
+    private function recreateGridFlowDimensions(gridFlowGroup:GridFlowGroup, containerIndex:DimIndex):Array<Dim> {
+        var newDimensions:Array<Dim> = [];
+        
+        switch (gridFlowGroup.type) {
+            case GridEquals(columns, rows): {
+                Dimensions.beginEdit();
+                var results = Dimensions.dimGridEquals(containerIndex, columns, rows);
+                for (result in results) {
+                    newDimensions.push(result.dim);
+                }
+                Dimensions.endEdit();
+            }
+            case GridFloats(columns, rows): {
+                Dimensions.beginEdit();
+                var results = Dimensions.dimGridFloats(containerIndex, columns, rows);
+                for (result in results) {
+                    newDimensions.push(result.dim);
+                }
+                Dimensions.endEdit();
+            }
+            case GridCustom(columns, rows): {
+                Dimensions.beginEdit();
+                var results = Dimensions.dimGrid(containerIndex, columns, rows);
+                for (result in results) {
+                    newDimensions.push(result.dim);
+                }
+                Dimensions.endEdit();
+            }
+            case FlowFixed(itemSize, direction): {
+                // Use the existing flow system directly
+                Dimensions.beginEdit();
+                Dimensions.dimFixedFlow(containerIndex, new Dim(0, 0, itemSize.width, itemSize.height), direction);
+                
+                for (i in 0...gridFlowGroup.memberIds.length) {
+                    var newDim = Dimensions.getNewDim();
+                    if (newDim != null) {
+                        newDimensions.push(newDim);
+                    }
+                }
+                
+                Dimensions.endFlow();
+                Dimensions.endEdit();
+            }
+            case FlowVariable(direction): {
+                // Use the existing variable flow system directly
+                Dimensions.beginEdit();
+                Dimensions.dimVariableFlow(containerIndex, direction);
+                
+                for (memberId in gridFlowGroup.memberIds) {
+                    var memberIndex = Dimensions.getIndexFromId(memberId);
+                    var actualMemberIndex = DimIndexUtils.getDirectIndex(memberIndex);
+                    
+                    if (actualMemberIndex >= 0 && actualMemberIndex < _dimRecords.length) {
+                        var record = _dimRecords[actualMemberIndex];
+                        if (record != null) {
+                            Dimensions.dimVariableSetNextDim(record.dim);
+                            var newDim = Dimensions.getNewDim();
+                            if (newDim != null) {
+                                newDimensions.push(newDim);
+                            }
+                        }
+                    }
+                }
+                
+                Dimensions.endFlow();
+                Dimensions.endEdit();
+            }
+        }
+        
+        return newDimensions;
+    }
+
     private function changeIndicesFromResults(results:Array<DimResult>, indices:Array<DimIndex>) {
         for (i in 0...indices.length) {
             var result = results[i];

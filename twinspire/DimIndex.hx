@@ -15,6 +15,28 @@ enum DimIndex {
 
 class DimIndexUtils {
 
+    public static function equals(a:DimIndex, b:DimIndex) {
+        var gtx = Application.instance.graphicsCtx;
+
+        switch [a, b] {
+            case [ Direct(aResult), Direct(bResult) ]: {
+                return aResult == bResult;
+            }
+            case [ Direct(_), Group(_) ]: {
+                return false;
+            }
+            case [ Group(aResult), Direct(bResult) ]: {
+                var children = @:privateAccess(GraphicsContext) gtx._groups[aResult];
+                return children.contains(bResult);
+            }
+            case [ Group(aResult), Group(bResult) ]: {
+                return aResult == bResult;
+            }
+        }
+
+        return false;
+    }
+
     public static inline function getDirectIndex(index:DimIndex) {
         return switch (index) {
             case Direct(item): item;
