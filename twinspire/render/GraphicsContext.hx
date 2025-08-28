@@ -1194,54 +1194,7 @@ class GraphicsContext {
     * exactly in the way they were defined.
     **/
     public function recalculateDimensions() {
-        // Process all dimension records
-        var commands = Dimensions.getCommandResultList();
-        Dimensions.beginEdit();
-        for (i in 0...commands.length) {
-            var result = commands[i];
-            var index = -1;
-            switch (result.index) {
-                case Direct(j, _): {
-                    index = j;
-                }
-                case Group(j, _): {
-                    index = _groups[j][_groups[j].length - 1];
-                }
-            }
-
-            recalculateDimensionAtIndex(index, result);
-        }
-        Dimensions.endEdit();
-    }
-
-    private function recalculateDimensionAtIndex(index:Int, command:CommandResult) {
-        var dimIndex = Direct(index);
-        var record = _dimRecords[index];
-        
-        if (command.init != null) {
-            var newDim = executeInitCommand(command.init, dimIndex);
-            if (newDim != null) {
-                record.dim.x = newDim.x;
-                record.dim.y = newDim.y;
-                if (command.matchScreenWidth) {
-                    record.dim.width = System.windowWidth();
-                }
-                else {
-                    record.dim.width = newDim.width;
-                }
-                
-                if (command.matchScreenHeight) {
-                    record.dim.height = System.windowHeight();
-                }
-                else {
-                    record.dim.height = newDim.height;
-                }
-            }
-        }
-
-        if (command.cmd != null) {
-            executeCommand(command.cmd, dimIndex, record);
-        }
+        recalculateDimensionsWithGridFlow();
     }
 
     /**
@@ -1302,19 +1255,26 @@ class GraphicsContext {
     public function recalculateDimensionsWithGridFlow() {
         // Process grid/flow groups first (as they depend on containers)
         var gridFlowContainers = Dimensions.getGridFlowContainerIds();
+        
+        Dimensions.beginEdit();
         for (containerId in gridFlowContainers) {
             recalculateGridFlowGroupDirect(containerId);
         }
         
         // Process individual dimensions in dependency order
         var individualIds = Dimensions.getNonGridFlowIds();
+        
         var orderedIds = Dimensions.getTopologicalOrder();
         for (id in orderedIds) {
-            recalculateIndividualDimensionDirect(id);
+            if (individualIds.contains(id)) { // Only process non-grid/flow dimensions
+                recalculateIndividualDimensionDirect(id);
+            }
         }
         
         // Final cleanup
         updateContainerContentBounds();
+
+        Dimensions.endEdit();
     }
 
     public function recalculateIndividualDimensionDirect(id:Int) {
@@ -1326,17 +1286,32 @@ class GraphicsContext {
             return;
         }
         
+        // Skip if this is a grid/flow container - it's handled separately
+        if (Dimensions.isGridFlowContainer(id)) {
+            return;
+        }
+        
+        // Skip if this is a grid/flow member - it's handled by grid flow recalculation
+        if (Dimensions.isGridFlowMember(id)) {
+            return;
+        }
+        
         var record = _dimRecords[actualIndex];
         if (record == null) return;
         
-        // Execute init command first
+        // Execute init command first (but not for grid commands)
         if (group.initCommand != null) {
-            var newDim = executeInitCommand(group.initCommand, index);
-            if (newDim != null) {
-                record.dim.x = newDim.x;
-                record.dim.y = newDim.y;
-                record.dim.width = newDim.width;
-                record.dim.height = newDim.height;
+            switch (group.initCommand) {
+                case CreateGridEquals(_, _, _, _) | CreateGridFloats(_, _, _, _) | CreateGrid(_, _, _, _):
+                    // Skip grid commands - they're handled by grid flow recalculation
+                default:
+                    var newDim = executeInitCommand(group.initCommand, index);
+                    if (newDim != null) {
+                        record.dim.x = newDim.x;
+                        record.dim.y = newDim.y;
+                        record.dim.width = newDim.width;
+                        record.dim.height = newDim.height;
+                    }
             }
         }
         
@@ -1431,14 +1406,30 @@ class GraphicsContext {
 
     private function recreateGridFlowDimensions(gridFlowGroup:GridFlowGroup, containerIndex:DimIndex):Array<Dim> {
         var newDimensions:Array<Dim> = [];
+
+        var actualContainerIndex = DimIndexUtils.getDirectIndex(containerIndex);
+        
+        if (actualContainerIndex < 0 || actualContainerIndex >= _dimRecords.length) {
+            return newDimensions;
+        }
+        
+        var containerRecord = _dimRecords[actualContainerIndex];
+        if (containerRecord == null) {
+            return newDimensions;
+        }
         
         switch (gridFlowGroup.type) {
             case GridEquals(columns, rows): {
                 Dimensions.beginEdit();
+                
                 var results = Dimensions.dimGridEquals(containerIndex, columns, rows);
-                for (result in results) {
-                    newDimensions.push(result.dim);
+                
+                for (i in 0...results.length) {
+                    if (results[i] != null && results[i].dim != null) {
+                        newDimensions.push(results[i].dim);
+                    }
                 }
+                
                 Dimensions.endEdit();
             }
             case GridFloats(columns, rows): {
@@ -1561,19 +1552,13 @@ class GraphicsContext {
                 return result.dim;
             }
             case CreateGridEquals(container, columns, rows, indices): {
-                var results = Dimensions.dimGridEquals(container, columns, rows);
-                changeIndicesFromResults(results, indices);
-                return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
+                return null; // Don't return anything, let grid flow handle it
             }
             case CreateGridFloats(container, columns, rows, indices): {
-                var results = Dimensions.dimGridFloats(container, columns, rows);
-                changeIndicesFromResults(results, indices);
-                return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
+                return null;
             }
             case CreateGrid(container, columns, rows, indices): {
-                var results = Dimensions.dimGrid(container, columns, rows);
-                changeIndicesFromResults(results, indices);
-                return getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(container));
+                return null;
             }
         }
         

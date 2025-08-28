@@ -313,6 +313,14 @@ class Dimensions {
         return poppedId;
     }
 
+    public static function isGridFlowContainer(id:Int):Bool {
+        return _gridFlowGroups.exists(id);
+    }
+
+    public static function isGridFlowMember(id:Int):Bool {
+        return _memberToGridFlow.exists(id);
+    }
+
     /**
     * Resets the current context of dimensions, clearing the current dimension and any commands.
     **/
@@ -374,29 +382,65 @@ class Dimensions {
         }
         
         analyzeDependencies(_currentId, init);
+        advanceId();
+    }
+
+    // Helper function to generate ID for existing index
+    static function generateIdForIndex(dimIndex:DimIndex):Int {
+        // Check if we already have an ID for this index
+        for (existingId => existingIndex in _idToIndex) {
+            if (DimIndexUtils.equals(existingIndex, dimIndex)) {
+                return existingId;
+            }
+        }
+        
+        // Generate a new ID
+        var id = 1000 + DimIndexUtils.getDirectIndex(dimIndex);
+        while (_idCommand.contains(id) || _idToIndex.exists(id)) {
+            id++;
+        }
+        _idToIndex.set(id, dimIndex);
+        return id;
     }
 
     static function handleGridFlowInit(init:DimInitCommand, containerIndex:DimIndex) {
         switch (init) {
             case CreateGridEquals(container, columns, rows, indices): {
+                var containerId = getIdFromDimIndex(container);
+                
+                // Ensure we have a proper container ID
+                if (containerId == -1) {
+                    containerId = generateIdForIndex(container);
+                }
+                
                 createGridFlowGroup(
-                    getIdFromDimIndex(container),
+                    containerId,
                     GridEquals(columns, rows),
                     {columns: columns, rows: rows},
                     indices
                 );
             }
             case CreateGridFloats(container, columns, rows, indices): {
+                var containerId = getIdFromDimIndex(container);
+                if (containerId == -1) {
+                    containerId = generateIdForIndex(container);
+                }
+                
                 createGridFlowGroup(
-                    getIdFromDimIndex(container),
+                    containerId,
                     GridFloats(columns, rows),
                     {columns: columns, rows: rows},
                     indices
                 );
             }
             case CreateGrid(container, columns, rows, indices): {
+                var containerId = getIdFromDimIndex(container);
+                if (containerId == -1) {
+                    containerId = generateIdForIndex(container);
+                }
+                
                 createGridFlowGroup(
-                    getIdFromDimIndex(container),
+                    containerId,
                     GridCustom(columns, rows),
                     {columns: columns, rows: rows},
                     indices
@@ -425,6 +469,8 @@ class Dimensions {
             
             analyzeDependencies(_currentId, null, cmd);
         }
+
+        advanceId();
     }
 
     static function handleGridFlowCommand(cmd:DimCommand, containerIndex:DimIndex) {
@@ -1186,10 +1232,8 @@ class Dimensions {
         var cellHeight = container.height / rows;
         var results = [];
 
-        for (r in 0...rows)
-        {
-            for (c in 0...columns)
-            {
+        for (r in 0...rows) {
+            for (c in 0...columns) {
                 var cell = new Dim(c * cellWidth + container.x, r * cellHeight + container.y, cellWidth, cellHeight, _order);
                 cell.visible = _visibility;
                 results.push(cell);
@@ -1198,9 +1242,20 @@ class Dimensions {
 
         var resultIndices:Array<DimIndex> = [];
 
+        var containerId = getIdFromDimIndex(containerIndex);
         if (!_editMode) {
             resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
+            
+            // IMPORTANT: Record this as an init command for the CONTAINER, not individual items
+            if (containerId == -1) {
+                containerId = generateIdForIndex(containerIndex);
+            }
+            
+            // Store the grid command with the container ID
+            var oldCurrentId = _currentId;
+            _currentId = containerId;
             addCommandResultInit(containerIndex, CreateGridEquals(containerIndex, columns, rows, resultIndices));
+            _currentId = oldCurrentId;
         }
 
         var dimResults:Array<DimResult> = [];
@@ -1208,6 +1263,28 @@ class Dimensions {
             var index:DimIndex = null;
             if (i < resultIndices.length) {
                 index = resultIndices[i];
+                
+                // Create individual command groups for each grid item
+                if (!_editMode) {
+                    var itemId = generateIdForIndex(index);
+                    var itemGroup:EnhancedCommandGroup = {
+                        id: itemId,
+                        initCommand: null, // Grid items don't have individual init commands
+                        commands: [],
+                        dependencies: {
+                            id: itemId,
+                            dependsOn: [containerId], // Grid item depends on container
+                            dependents: [],
+                            originalCommands: [],
+                            resolvedCommands: []
+                        }
+                    };
+                    _commandGroups.set(itemId, itemGroup);
+                    _idToIndex.set(itemId, index);
+                    
+                    // Add dependency relationship
+                    addDependency(itemId, containerId);
+                }
             }
 
             dimResults.push({
