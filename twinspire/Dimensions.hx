@@ -138,48 +138,47 @@ typedef DimResult = {
     var ?dim:Dim;
 }
 
-typedef DependencyRecord = {
-    var id:Int;                           // The unique ID for this dimension
-    var dependsOn:Array<Int>;            // IDs this dimension depends on
-    var dependents:Array<Int>;           // IDs that depend on this dimension  
-    var originalCommands:Array<DimCommand>; // Commands as originally defined
-    var resolvedCommands:Array<DimCommand>; // Commands with dependencies resolved
+enum ComponentType {
+    CText(text:String);
+    CFlowItem(parentComponent:Int);
+    CFlowFixed(direction:Direction);
+    CFlowVariable(direction:Direction);
+    CGridCell(parentComponent:Int);
+    CGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>);
+    CGridEquals(columns:Array<Float>, rows:Array<Float>);
+    CGridFloats(columns:Array<Float>, rows:Array<Float>);
 }
 
-typedef CommandGroup = {
-    var id:Int;                          // Unique ID for this group
-    var initCommand:Null<DimInitCommand>; // Initial creation command
-    var commands:Array<DimCommand>;      // Transformation commands
-    var dependencies:DependencyRecord;   // Dependency information
+typedef Component = {
+    var ?name:String;
+    var ?id:Id;
+    var ?type:ComponentType;
+    var ?align:DimAlignment;
+    var ?offset:FastVector2;
+    var ?width:Float;
+    var ?height:Float;
+    var ?items:Array<Component>;
 }
 
-typedef GridFlowGroup = {
-    var containerId:Int;                    // The container this grid/flow belongs to
-    var type:GridFlowType;                  // Grid or Flow type
-    var parameters:GridFlowParameters;      // Specific parameters for recreation
-    var memberIds:Array<Int>;               // IDs of all dimensions in this grid/flow
-    var memberIndices:Array<DimIndex>;      // Current indices (may change)
+typedef RenderedComponent = {
+    var ?index:DimIndex;
+    var ?component:Component;
+    // assuming if the referenced component is flow or grid
+    var ?content:Array<RenderedComponent>;
 }
 
-enum GridFlowType {
-    GridEquals(columns:Int, rows:Int);
-    GridFloats(columns:Array<Float>, rows:Array<Float>);
-    GridCustom(columns:Array<DimCellSize>, rows:Array<DimCellSize>);
-    FlowFixed(itemSize:DimSize, direction:Direction);
-    FlowVariable(direction:Direction);
+enum ContentPosition {
+    PositionAt(index:Int);
+    Before;
+    After;
 }
 
-typedef GridFlowParameters = {
-    var ?columns:Dynamic;        // Int, Array<Float>, or Array<DimCellSize>
-    var ?rows:Dynamic;           // Int, Array<Float>, or Array<DimCellSize>
-    var ?itemSize:DimSize;       // For fixed flows
-    var ?direction:Direction;    // For flows
-}
-
-typedef EnhancedCommandGroup = {
-    > CommandGroup,
-    var ?gridFlowGroup:GridFlowGroup;    // Present if this is part of a grid/flow
-    var ?isGridFlowContainer:Bool;       // True if this dimension contains grid/flow items
+typedef PrerenderedComponent = {
+    var ?rendered:RenderedComponent;
+    var ?autoPosition:Bool;
+    var ?name:String;
+    var ?offset:FastVector2;
+    var ?groupIndex:DimIndex;
 }
 
 class Dimensions {
@@ -196,12 +195,108 @@ class Dimensions {
 
     private static var _editMode:Bool = false;
 
-    private static var _commandGroups:Map<Int, CommandGroup>;
-    private static var _dependencyGraph:Map<Int, DependencyRecord>;
-    private static var _idToIndex:Map<Int, DimIndex>;
 
-    private static var _gridFlowGroups:Map<Int, GridFlowGroup>; // Container ID -> GridFlowGroup
-    private static var _memberToGridFlow:Map<Int, Int>;         // Member ID -> Container ID
+    /**
+    NOTES FOR IMPLEMENTATION
+
+    The below structure goes in the following process:
+
+     1. Define dimensions and/or components
+       - Dimensions defined outside of components are considered screen dimensions
+       - Dimensions defined within components are defined, but not immediately rendered
+     2. Components are executed/injected, meaning they are calculated within either
+       screen bounds or another's components bounds.
+       - The result is a `PrerenderedComponent`. This gives users the ability to alter
+         queries from a `DimIndex`, for example, in `GraphicsContext`, or change the
+         `PrerenderedComponent` before it's processed into render state.
+       - The `PrerenderedComponent` references the actual `RenderedComponent` before it's
+         added to rendering, which allows users to alter contents before the reference is submitted.
+       - Dimensions are created for `PrerenderedComponent` in `GraphicsContext` using
+         `addLogic` and the resulting `DimIndex` is stored in the referenced `RenderedComponent`.
+     3. Submission of `PrerenderedComponent` to `RenderedComponent`. The rendered component
+        is stored into the stack and preserved, and the original reference in `PrerenderedComponent`
+        is replaced by the reference in the stack.
+        - As users can keep hold of the `PrerenderedComponent` reference, changes to this should immediately
+          reflect in the `RenderedComponent`. Therefore, dimensions should re-calculate according to the rules
+          of the submission.
+        - For users, they use the function `submitItem` to re-calculate dimensions, using existing stored `DimIndices`
+          and manipulating positions according to the rules of the underlying `Component`.
+    **/
+
+
+
+    private static var _components:Array<Component>;
+    private static var _rendered:Array<RenderedComponent>;
+    private static var _prerendered:Array<PrerenderedComponent>;
+
+    /**
+    * Create a new component and begin adding dimensions to it. Once the component
+    * has been defined, use `endComponent`. To use the component, call `executeComponent` or
+    * `injectComponent`.
+    *
+    * If this function is called within another component, the dimension calls
+    * will allocate to the respective child component.
+    *
+    * Optionally specify an `id`. If one is not supplied, one will be created automatically.
+    **/
+    public static function beginComponent(name:String, ?id:Id) {
+        if (id == null) {
+            id = Application.createId(true);
+        }
+
+
+    }
+
+    /**
+    * Completes the structure of a component and stores it. Child components are completed
+    * and stored appropriately in their parent.
+    **/
+    public static function endComponent() {
+
+    }
+
+    /**
+    * Calls the respective dimension API depending on configuration of the component,
+    * and positions to the screen. To add to an existing component, use `injectComponent` instead.
+    **/
+    public static function executeComponent(name:String, position:FastVector2):PrerenderedComponent {
+
+    }
+
+    /**
+    * Inject a component at the given position into an already rendered component.
+    **/
+    public static function injectComponent(name:String, component:String, position:ContentPosition):PrerenderedComponent {
+
+    }
+
+    /**
+    * Gets the complete collection of rendered components.
+    **/
+    public static function getRenderedComponents() {
+
+    }
+
+    /**
+    * Remove an item using a pre-rendered component.
+    **/
+    public static function removeItem(prerendered:PrerenderedComponent) {
+
+    }
+
+    /**
+    * If you make changes to a component, re-submit it to the rendered stack using this function.
+    **/
+    public static function submitItem(prerendered:PrerenderedComponent) {
+
+    }
+
+    /**
+    * Get the query data from `GraphicsContext` for the given prerendered component.
+    **/
+    public static function getQuery(prerendered:PrerenderedComponent) {
+
+    }
 
     /**
     * Used internally to store information about constructed dimensions before an `add` is called.
@@ -209,11 +304,6 @@ class Dimensions {
     public static function initContext() {
         resetContext();
         _lastDimensions = [];
-        _commandGroups = new Map();
-        _dependencyGraph = new Map();
-        _idToIndex = new Map();
-        _gridFlowGroups = new Map();
-        _memberToGridFlow = new Map();
     }
 
     /**
@@ -313,14 +403,6 @@ class Dimensions {
         return poppedId;
     }
 
-    public static function isGridFlowContainer(id:Int):Bool {
-        return _gridFlowGroups.exists(id);
-    }
-
-    public static function isGridFlowMember(id:Int):Bool {
-        return _memberToGridFlow.exists(id);
-    }
-
     /**
     * Resets the current context of dimensions, clearing the current dimension and any commands.
     **/
@@ -359,95 +441,7 @@ class Dimensions {
         
         _commandResults.push(result);
         
-        // Handle grid/flow creation commands
-        handleGridFlowInit(init, index);
-        
-        // Create standard command group
-        if (!_commandGroups.exists(_currentId)) {
-            var group:EnhancedCommandGroup = {
-                id: _currentId,
-                initCommand: init,
-                commands: [],
-                dependencies: {
-                    id: _currentId,
-                    dependsOn: [],
-                    dependents: [],
-                    originalCommands: [],
-                    resolvedCommands: []
-                }
-            };
-            
-            _commandGroups.set(_currentId, group);
-            _idToIndex.set(_currentId, index);
-        }
-        
-        analyzeDependencies(_currentId, init);
         advanceId();
-    }
-
-    // Helper function to generate ID for existing index
-    static function generateIdForIndex(dimIndex:DimIndex):Int {
-        // Check if we already have an ID for this index
-        for (existingId => existingIndex in _idToIndex) {
-            if (DimIndexUtils.equals(existingIndex, dimIndex)) {
-                return existingId;
-            }
-        }
-        
-        // Generate a new ID
-        var id = 1000 + DimIndexUtils.getDirectIndex(dimIndex);
-        while (_idCommand.contains(id) || _idToIndex.exists(id)) {
-            id++;
-        }
-        _idToIndex.set(id, dimIndex);
-        return id;
-    }
-
-    static function handleGridFlowInit(init:DimInitCommand, containerIndex:DimIndex) {
-        switch (init) {
-            case CreateGridEquals(container, columns, rows, indices): {
-                var containerId = getIdFromDimIndex(container);
-                
-                // Ensure we have a proper container ID
-                if (containerId == -1) {
-                    containerId = generateIdForIndex(container);
-                }
-                
-                createGridFlowGroup(
-                    containerId,
-                    GridEquals(columns, rows),
-                    {columns: columns, rows: rows},
-                    indices
-                );
-            }
-            case CreateGridFloats(container, columns, rows, indices): {
-                var containerId = getIdFromDimIndex(container);
-                if (containerId == -1) {
-                    containerId = generateIdForIndex(container);
-                }
-                
-                createGridFlowGroup(
-                    containerId,
-                    GridFloats(columns, rows),
-                    {columns: columns, rows: rows},
-                    indices
-                );
-            }
-            case CreateGrid(container, columns, rows, indices): {
-                var containerId = getIdFromDimIndex(container);
-                if (containerId == -1) {
-                    containerId = generateIdForIndex(container);
-                }
-                
-                createGridFlowGroup(
-                    containerId,
-                    GridCustom(columns, rows),
-                    {columns: columns, rows: rows},
-                    indices
-                );
-            }
-            default: // Not a grid/flow command
-        }
     }
 
     static function addCommandResult(index:DimIndex, cmd:DimCommand) {
@@ -458,474 +452,8 @@ class Dimensions {
             index: index,
             cmd: cmd
         });
-        
-        // Handle flow commands
-        handleGridFlowCommand(cmd, index);
-        
-        if (_commandGroups.exists(_currentId)) {
-            var group = _commandGroups.get(_currentId);
-            group.commands.push(cmd);
-            group.dependencies.originalCommands.push(cmd);
-            
-            analyzeDependencies(_currentId, null, cmd);
-        }
 
         advanceId();
-    }
-
-    static function handleGridFlowCommand(cmd:DimCommand, containerIndex:DimIndex) {
-        switch (cmd) {
-            case CreateFixedFlow(container, itemSize, dir, indices): {
-                createGridFlowGroup(
-                    getIdFromDimIndex(container),
-                    FlowFixed(itemSize, dir),
-                    {itemSize: itemSize, direction: dir},
-                    indices
-                );
-            }
-            case CreateVariableFlow(container, dir, indices): {
-                createGridFlowGroup(
-                    getIdFromDimIndex(container),
-                    FlowVariable(dir),
-                    {direction: dir},
-                    indices
-                );
-            }
-            default: // Not a flow command
-        }
-    }
-    
-    static function createGridFlowGroup(containerId:Int, type:GridFlowType, parameters:GridFlowParameters, indices:Array<DimIndex>) {
-        var memberIds:Array<Int> = [];
-        
-        // Generate IDs for all members if they don't exist
-        for (i in 0...indices.length) {
-            var memberId = _currentId + i + 1; // Generate sequential IDs
-            memberIds.push(memberId);
-            _memberToGridFlow.set(memberId, containerId);
-            _idToIndex.set(memberId, indices[i]);
-        }
-        
-        var gridFlowGroup:GridFlowGroup = {
-            containerId: containerId,
-            type: type,
-            parameters: parameters,
-            memberIds: memberIds,
-            memberIndices: indices.copy()
-        };
-        
-        _gridFlowGroups.set(containerId, gridFlowGroup);
-        
-        // Mark container as having grid/flow
-        if (_commandGroups.exists(containerId)) {
-            var containerGroup:EnhancedCommandGroup = cast _commandGroups.get(containerId);
-            containerGroup.isGridFlowContainer = true;
-            containerGroup.gridFlowGroup = gridFlowGroup;
-        }
-        
-        // Create dependency records for all members
-        for (memberId in memberIds) {
-            createGridFlowMemberDependencies(memberId, containerId, memberIds);
-        }
-    }
-    
-    static function createGridFlowMemberDependencies(memberId:Int, containerId:Int, allMemberIds:Array<Int>) {
-        // Each member depends on the container
-        addDependency(memberId, containerId);
-        
-        // For flows, each member (except first) also depends on layout order
-        var gridFlowGroup = _gridFlowGroups.get(containerId);
-        if (gridFlowGroup != null) {
-            switch (gridFlowGroup.type) {
-                case FlowFixed(_, _) | FlowVariable(_): {
-                    var memberIndex = allMemberIds.indexOf(memberId);
-                    if (memberIndex > 0) {
-                        // Flow items depend on previous item for positioning
-                        addDependency(memberId, allMemberIds[memberIndex - 1]);
-                    }
-                }
-                default: {
-                    // Grid items only depend on container
-                }
-            }
-        }
-    }
-
-    static function analyzeDependencies(currentId:Int, ?initCmd:DimInitCommand, ?cmd:DimCommand) {
-        var dependencies:Array<Int> = [];
-        
-        if (initCmd != null) {
-            dependencies = extractDependenciesFromInit(initCmd);
-        } else if (cmd != null) {
-            dependencies = extractDependenciesFromCommand(cmd);
-        }
-        
-        // Update dependency records
-        for (depId in dependencies) {
-            addDependency(currentId, depId);
-        }
-    }
-
-    static function extractDependenciesFromInit(cmd:DimInitCommand):Array<Int> {
-        return switch (cmd) {
-            case CreateFromOffset(from, offset): [getIdFromDimIndex(from)];
-            case DimOffsetX(a, offsetX): [getIdFromDimIndex(a)];
-            case DimOffsetY(a, offsetY): [getIdFromDimIndex(a)];
-            default: [];
-        };
-    }
-
-    static function extractDependenciesFromCommand(cmd:DimCommand):Array<Int> {
-        return switch (cmd) {
-            case DimAlign(to, halign, valign): [getIdFromDimIndex(to)];
-            case DimAlignOffset(to, halign, valign, hoffset, voffset): [getIdFromDimIndex(to)];
-            case DimVAlign(to, valign): [getIdFromDimIndex(to)];
-            case DimHAlign(to, halign): [getIdFromDimIndex(to)];
-            case DimVAlignOffset(to, valign, offset): [getIdFromDimIndex(to)];
-            case DimHAlignOffset(to, halign, offset): [getIdFromDimIndex(to)];
-            case CreateFixedFlow(container, itemSize, dir, indices): [getIdFromDimIndex(container)];
-            case CreateVariableFlow(container, dir, indices): [getIdFromDimIndex(container)];
-            default: [];
-        };
-    }
-
-    static function getIdFromDimIndex(dimIndex:DimIndex):Int {
-        // Look up the ID from the index
-        for (id => idx in _idToIndex) {
-            if (DimIndexUtils.equals(idx, dimIndex)) {
-                return id;
-            }
-        }
-        return -1; // No dependency found
-    }
-
-    static function addDependency(dependentId:Int, dependsOnId:Int) {
-        if (dependsOnId == -1) return; // No valid dependency
-        
-        // Update dependent record
-        if (!_dependencyGraph.exists(dependentId)) {
-            _dependencyGraph.set(dependentId, {
-                id: dependentId,
-                dependsOn: [],
-                dependents: [],
-                originalCommands: [],
-                resolvedCommands: []
-            });
-        }
-        
-        var dependentRecord = _dependencyGraph.get(dependentId);
-        if (!dependentRecord.dependsOn.contains(dependsOnId)) {
-            dependentRecord.dependsOn.push(dependsOnId);
-        }
-        
-        // Update dependency provider record
-        if (!_dependencyGraph.exists(dependsOnId)) {
-            _dependencyGraph.set(dependsOnId, {
-                id: dependsOnId,
-                dependsOn: [],
-                dependents: [],
-                originalCommands: [],
-                resolvedCommands: []
-            });
-        }
-        
-        var providerRecord = _dependencyGraph.get(dependsOnId);
-        if (!providerRecord.dependents.contains(dependentId)) {
-            providerRecord.dependents.push(dependentId);
-        }
-    }
-
-    public static function removeDimensionGroup(id:Int) {
-        if (!_commandGroups.exists(id)) {
-            return;
-        }
-        
-        var gtx = Application.instance.graphicsCtx;
-        
-        // Check if this is part of a grid/flow
-        if (_memberToGridFlow.exists(id)) {
-            removeGridFlowMember(id); // This calls removeIndex internally
-            return;
-        }
-        
-        // Check if this is a container with grid/flow
-        if (_gridFlowGroups.exists(id)) {
-            removeGridFlowContainer(id); // This calls removeIndex internally
-            return;
-        }
-        
-        // Standard removal for individual dimensions
-        var removedGroup = _commandGroups.get(id);
-        var dependencyRecord = _dependencyGraph.get(id);
-        
-        // Update dependent dimensions first
-        for (dependentId in dependencyRecord.dependents) {
-            resolveDependencyAfterRemoval(dependentId, id, removedGroup);
-            gtx.recalculateIndividualDimensionDirect(dependentId);
-        }
-        
-        // Clean up tracking
-        _commandGroups.remove(id);
-        _dependencyGraph.remove(id);
-        
-        var dimIndex = _idToIndex.get(id);
-        if (dimIndex != null) {
-            gtx.removeIndex(dimIndex);
-        }
-        
-        _idToIndex.remove(id);
-    }
-
-    static function removeGridFlowMember(memberId:Int) {
-        var containerId = _memberToGridFlow.get(memberId);
-        var gridFlowGroup = _gridFlowGroups.get(containerId);
-        
-        if (gridFlowGroup == null) return;
-        
-        // Remove from member arrays
-        gridFlowGroup.memberIds.remove(memberId);
-        var memberIndex = gridFlowGroup.memberIds.indexOf(memberId);
-        if (memberIndex >= 0) {
-            gridFlowGroup.memberIndices.splice(memberIndex, 1);
-        }
-        
-        // Update dependencies for flow items
-        switch (gridFlowGroup.type) {
-            case FlowFixed(_, _) | FlowVariable(_): {
-                var removedIndex = gridFlowGroup.memberIds.indexOf(memberId);
-                if (removedIndex > 0 && removedIndex < gridFlowGroup.memberIds.length - 1) {
-                    var prevId = gridFlowGroup.memberIds[removedIndex - 1];
-                    var nextId = gridFlowGroup.memberIds[removedIndex + 1];
-                    addDependency(nextId, prevId);
-                }
-            }
-            default: // Grid items don't need chain repair
-        }
-        
-        // Clean up tracking
-        _memberToGridFlow.remove(memberId);
-        _commandGroups.remove(memberId);
-        _dependencyGraph.remove(memberId);
-        _idToIndex.remove(memberId);
-        
-        var gtx = Application.instance.graphicsCtx;
-        var dimIndex = _idToIndex.get(memberId);
-        if (dimIndex != null) {
-            gtx.removeIndex(dimIndex);
-        }
-        
-        // Recalculate the grid/flow
-        gtx.recalculateGridFlowGroupDirect(containerId);
-    }
-
-    static function removeGridFlowContainer(containerId:Int) {
-        var gridFlowGroup = _gridFlowGroups.get(containerId);
-        if (gridFlowGroup == null) return;
-        
-        var gtx = Application.instance.graphicsCtx;
-        
-        for (memberId in gridFlowGroup.memberIds.copy()) {
-            _memberToGridFlow.remove(memberId);
-            _commandGroups.remove(memberId);
-            _dependencyGraph.remove(memberId);
-            
-            var dimIndex = _idToIndex.get(memberId);
-            if (dimIndex != null) {
-                gtx.removeIndex(dimIndex);
-            }
-            
-            _idToIndex.remove(memberId);
-        }
-        
-        // Remove the container group
-        _gridFlowGroups.remove(containerId);
-        _commandGroups.remove(containerId);
-        _dependencyGraph.remove(containerId);
-        
-        var containerIndex = _idToIndex.get(containerId);
-        if (containerIndex != null) {
-            gtx.removeIndex(containerIndex);
-        }
-        
-        _idToIndex.remove(containerId);
-    }
-
-    static function resolveDependencyAfterRemoval(dependentId:Int, removedId:Int, removedGroup:CommandGroup) {
-        var dependentGroup = _commandGroups.get(dependentId);
-        var dependentRecord = _dependencyGraph.get(dependentId);
-        
-        // Find what the removed dimension was depending on
-        var removedDependencies = _dependencyGraph.get(removedId).dependsOn;
-        
-        // Update commands that referenced the removed dimension
-        var updatedCommands:Array<DimCommand> = [];
-        
-        for (cmd in dependentGroup.commands) {
-            var updatedCmd = redirectCommand(cmd, removedId, removedDependencies, removedGroup);
-            updatedCommands.push(updatedCmd);
-        }
-        
-        // Update the group's commands
-        dependentGroup.commands = updatedCommands;
-        dependentGroup.dependencies.resolvedCommands = updatedCommands;
-        
-        // Update dependency relationships
-        dependentRecord.dependsOn.remove(removedId);
-        for (newDepId in removedDependencies) {
-            if (newDepId != dependentId) { // Avoid self-dependency
-                addDependency(dependentId, newDepId);
-            }
-        }
-    }
-
-    static function redirectCommand(cmd:DimCommand, removedId:Int, newDependencies:Array<Int>, removedGroup:CommandGroup):DimCommand {
-        return switch (cmd) {
-            case DimAlign(to, halign, valign): {
-                if (getIdFromDimIndex(to) == removedId) {
-                    // Redirect to what the removed dimension was aligned to
-                    var newTarget = findBestAlignmentTarget(newDependencies, removedGroup.commands);
-                    DimAlign(getIndexFromId(newTarget), halign, valign);
-                } else {
-                    cmd;
-                }
-            }
-            case DimVAlign(to, valign): {
-                if (getIdFromDimIndex(to) == removedId) {
-                    var newTarget = findBestAlignmentTarget(newDependencies, removedGroup.commands);
-                    DimVAlign(getIndexFromId(newTarget), valign);
-                } else {
-                    cmd;
-                }
-            }
-            case DimHAlign(to, halign): {
-                if (getIdFromDimIndex(to) == removedId) {
-                    var newTarget = findBestAlignmentTarget(newDependencies, removedGroup.commands);
-                    DimHAlign(getIndexFromId(newTarget), halign);
-                } else {
-                    cmd;
-                }
-            }
-            // Add similar cases for other alignment commands
-            default: cmd;
-        };
-    }
-
-    static function findBestAlignmentTarget(dependencies:Array<Int>, removedCommands:Array<DimCommand>):Int {
-        // Strategy: Find the most "primary" dependency
-        // Priority: containers > positioned elements > other elements
-        
-        for (depId in dependencies) {
-            if (_commandGroups.exists(depId)) {
-                var group = _commandGroups.get(depId);
-                // Prefer containers or screen-aligned elements
-                if (isContainerOrScreenAligned(group)) {
-                    return depId;
-                }
-            }
-        }
-        
-        // Fallback to first available dependency
-        return dependencies.length > 0 ? dependencies[0] : -1;
-    }
-
-    static function isContainerOrScreenAligned(group:CommandGroup):Bool {
-        // Check if this is likely a container or screen-aligned element
-        if (group.initCommand != null) {
-            return switch (group.initCommand) {
-                case CentreScreenY(_, _, _): true;
-                case CentreScreenX(_, _, _): true;
-                case CentreScreenFromSize(_, _): true;
-                case CreateDimAlignScreen(_, _, _, _, _): true;
-                default: false;
-            };
-        }
-        
-        // Check for screen alignment commands
-        for (cmd in group.commands) {
-            switch (cmd) {
-                case ScreenAlignX(_, _): return true;
-                case ScreenAlignY(_, _): return true;
-                default: continue;
-            }
-        }
-        
-        return false;
-    }
-
-    public static function getIndexFromId(id:Int):DimIndex {
-        return _idToIndex.exists(id) ? _idToIndex.get(id) : Direct(-1);
-    }
-
-    /**
-    * Get IDs in topological order (dependencies first)
-    * @param targetIds Optional array of specific IDs to order. If null, orders all IDs.
-    */
-    public static function getTopologicalOrder(?targetIds:Array<Int>):Array<Int> {
-        if (targetIds == null) {
-            targetIds = [for (id in _commandGroups.keys()) id];
-        }
-        
-        var visited:Map<Int, Bool> = new Map();
-        var result:Array<Int> = [];
-        
-        function visit(id:Int) {
-            if (visited.get(id) || !targetIds.contains(id)) return;
-            visited.set(id, true);
-            
-            if (_dependencyGraph.exists(id)) {
-                var record = _dependencyGraph.get(id);
-                for (depId in record.dependsOn) {
-                    if (targetIds.contains(depId)) { // Only visit dependencies in our target set
-                        visit(depId);
-                    }
-                }
-            }
-            
-            result.push(id);
-        }
-        
-        for (id in targetIds) {
-            visit(id);
-        }
-        
-        return result;
-    }
-
-    public static function getCommandGroup(id:Int):Null<CommandGroup> {
-        return _commandGroups.get(id);
-    }
-
-    public static function getGridFlowGroup(containerId:Int):Null<GridFlowGroup> {
-        return _gridFlowGroups.get(containerId);
-    }
-
-    public static function getGridFlowContainerIds():Array<Int> {
-        var ids:Array<Int> = [];
-        for (id in _gridFlowGroups.keys()) {
-            ids.push(id);
-        }
-        return ids;
-    }
-
-    public static function getContainerIds():Array<Int> {
-        var ids:Array<Int> = [];
-        for (group in _commandGroups) {
-            var enhancedGroup:EnhancedCommandGroup = cast group;
-            if (enhancedGroup.isGridFlowContainer == true) {
-                ids.push(group.id);
-            }
-        }
-        return ids;
-    }
-
-    public static function getNonGridFlowIds():Array<Int> {
-        var ids:Array<Int> = [];
-        for (id in _commandGroups.keys()) {
-            if (!_gridFlowGroups.exists(id) && !_memberToGridFlow.exists(id)) {
-                ids.push(id);
-            }
-        }
-        return ids;
     }
 
     static function addDimToGraphicsContext(dim:Dim, addLogic:ContainerAddLogic, ?parent:DimIndex) {
@@ -1242,20 +770,9 @@ class Dimensions {
 
         var resultIndices:Array<DimIndex> = [];
 
-        var containerId = getIdFromDimIndex(containerIndex);
         if (!_editMode) {
             resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
-            
-            // IMPORTANT: Record this as an init command for the CONTAINER, not individual items
-            if (containerId == -1) {
-                containerId = generateIdForIndex(containerIndex);
-            }
-            
-            // Store the grid command with the container ID
-            var oldCurrentId = _currentId;
-            _currentId = containerId;
             addCommandResultInit(containerIndex, CreateGridEquals(containerIndex, columns, rows, resultIndices));
-            _currentId = oldCurrentId;
         }
 
         var dimResults:Array<DimResult> = [];
@@ -1263,28 +780,6 @@ class Dimensions {
             var index:DimIndex = null;
             if (i < resultIndices.length) {
                 index = resultIndices[i];
-                
-                // Create individual command groups for each grid item
-                if (!_editMode) {
-                    var itemId = generateIdForIndex(index);
-                    var itemGroup:EnhancedCommandGroup = {
-                        id: itemId,
-                        initCommand: null, // Grid items don't have individual init commands
-                        commands: [],
-                        dependencies: {
-                            id: itemId,
-                            dependsOn: [containerId], // Grid item depends on container
-                            dependents: [],
-                            originalCommands: [],
-                            resolvedCommands: []
-                        }
-                    };
-                    _commandGroups.set(itemId, itemGroup);
-                    _idToIndex.set(itemId, index);
-                    
-                    // Add dependency relationship
-                    addDependency(itemId, containerId);
-                }
             }
 
             dimResults.push({
