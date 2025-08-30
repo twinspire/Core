@@ -3,7 +3,6 @@ package twinspire;
 import twinspire.DimSize;
 import kha.math.FastVector2;
 import twinspire.events.DimBindingOptions;
-import twinspire.Dimensions.DimInitCommand;
 import twinspire.Id;
 import twinspire.geom.Dim;
 import twinspire.DimIndex;
@@ -18,7 +17,6 @@ typedef DimObjectResult = {
     var ?requestedContainer:Bool;
     var ?parentIndex:Int;
     var ?resultIndex:DimIndex;
-    var ?originalCommand:DimInitCommand;
     var ?textDim:Dim;
     var ?bindings:DimBindingOptions;
     var ?path:String;

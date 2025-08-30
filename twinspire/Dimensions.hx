@@ -54,21 +54,6 @@ enum abstract Direction(Int) to Int {
     var Right;
 }
 
-enum abstract DimBehaviourFlags(Int) from Int to Int {
-    /**
-     * A dimension behaviour which specifies no events are to be handled by the simulation engine.
-     */
-    var DIM_NO_EVENTS           =   0;
-    /**
-     * A dimension behaviour specifying mouse movements in and out of the dimension affects the render results.
-     */
-    var DIM_MOUSE_EVENTS        =   0x01;
-    /**
-     * A dimension behaviour specifying that the mouse wheel affects the position of dimensions contained in this dimension.
-     */
-    var DIM_SCROLL_EVENTS       =   0x02;
-}
-
 enum abstract ContainerMethods(Int) from Int to Int {
     var FLOW_FIXED      =   0;
     var FLOW_VARIABLE   =   1;
@@ -79,51 +64,6 @@ enum DimAlignment {
     DimVAlign(valign:VerticalAlign);
     DimHAlign(halign:HorizontalAlign);
     DimAlign(valign:VerticalAlign, halign:HorizontalAlign);
-}
-
-enum DimInitCommand {
-    FromDim(dim:Dim);
-    CentreScreenY(width:Float, height:Float, offsetY:Float);
-    CentreScreenX(width:Float, height:Float, offsetX:Float);
-    CentreScreenFromSize(width:Float, height:Float);
-    CreateDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offset:FastVector2);
-    CreateFromOffset(from:DimIndex, offset:FastVector2);
-    CreateGridEquals(container:DimIndex, columns:Int, rows:Int, indices:Array<DimIndex>);
-    CreateGridFloats(container:DimIndex, columns:Array<Float>, rows:Array<Float>, indices:Array<DimIndex>);
-    CreateGrid(container:DimIndex, columns:Array<DimCellSize>, rows:Array<DimCellSize>, indices:Array<DimIndex>);
-    MeasureText(font:Font, fontSize:Int, text:String, ?id:Id);
-    DimOffsetX(a:DimIndex, offsetX:Float);
-    DimOffsetY(a:DimIndex, offsetY:Float);
-}
-
-enum DimCommand {
-    CreateFixedFlow(container:DimIndex, itemSize:DimSize, dir:Direction, indices:Array<DimIndex>);
-    CreateVariableFlow(container:DimIndex, dir:Direction, indices:Array<DimIndex>);
-    ScreenAlignX(halign:HorizontalAlign, offset:FastVector2);
-    ScreenAlignY(valign:VerticalAlign, offset:FastVector2);
-    DimAlign(to:DimIndex, halign:HorizontalAlign, valign:VerticalAlign);
-    DimAlignOffset(to:DimIndex, halign:HorizontalAlign, valign:VerticalAlign, hoffset:Float, voffset:Float);
-    DimVAlign(to:DimIndex, valign:VerticalAlign);
-    DimHAlign(to:DimIndex, halign:HorizontalAlign);
-    DimVAlignOffset(to:DimIndex, valign:VerticalAlign, offset:Float);
-    DimHAlignOffset(to:DimIndex, halign:HorizontalAlign, offset:Float);
-    DimScale(scaleX:Float, scaleY:Float);
-    DimScaleX(scaleX:Float);
-    DimScaleY(scaleY:Float);
-    DimShrink(amount:Float);
-    DimShrinkW(amount:Float);
-    DimShrinkH(amount:Float);
-    DimGrow(amount:Float);
-    DimGrowW(amount:Float);
-    DimGrowH(amount:Float);
-}
-
-typedef CommandResult = {
-    var ?index:DimIndex;
-    var ?init:DimInitCommand;
-    var ?cmd:DimCommand;
-    var ?matchScreenWidth:Bool;
-    var ?matchScreenHeight:Bool;
 }
 
 enum ContainerAddLogic {
@@ -138,323 +78,11 @@ typedef DimResult = {
     var ?dim:Dim;
 }
 
-enum ComponentType {
-    CText(text:String);
-    CFlowItem(parentComponent:Int);
-    CFlowFixed(direction:Direction);
-    CFlowVariable(direction:Direction);
-    CGridCell(parentComponent:Int);
-    CGrid(columns:Array<DimCellSize>, rows:Array<DimCellSize>);
-    CGridEquals(columns:Array<Float>, rows:Array<Float>);
-    CGridFloats(columns:Array<Float>, rows:Array<Float>);
-}
-
-typedef Component = {
-    var ?name:String;
-    var ?id:Id;
-    var ?type:ComponentType;
-    var ?align:DimAlignment;
-    var ?offset:FastVector2;
-    var ?width:Float;
-    var ?height:Float;
-    var ?items:Array<Component>;
-}
-
-typedef RenderedComponent = {
-    var ?index:DimIndex;
-    var ?component:Component;
-    // assuming if the referenced component is flow or grid
-    var ?content:Array<RenderedComponent>;
-}
-
-enum ContentPosition {
-    PositionAt(index:Int);
-    Before;
-    After;
-}
-
-typedef PrerenderedComponent = {
-    var ?rendered:RenderedComponent;
-    var ?autoPosition:Bool;
-    var ?name:String;
-    var ?offset:FastVector2;
-    var ?groupIndex:DimIndex;
-}
-
 class Dimensions {
 
-    private static var _order:Int;
-    private static var _visibility:Bool;
-    private static var _lastDimensions:Array<DimIndex>;
-
-    private static var _commandResults:Array<CommandResult>;
-    private static var _currentDimCommands:Array<DimCommand>;
-    private static var _idCommand:Array<Int>;
-    private static var _currentId:Int;
-    private static var _idStack:Array<Int>;
-
-    private static var _editMode:Bool = false;
-
-
-    /**
-    NOTES FOR IMPLEMENTATION
-
-    The below structure goes in the following process:
-
-     1. Define dimensions and/or components
-       - Dimensions defined outside of components are considered screen dimensions
-       - Dimensions defined within components are defined, but not immediately rendered
-     2. Components are executed/injected, meaning they are calculated within either
-       screen bounds or another's components bounds.
-       - The result is a `PrerenderedComponent`. This gives users the ability to alter
-         queries from a `DimIndex`, for example, in `GraphicsContext`, or change the
-         `PrerenderedComponent` before it's processed into render state.
-       - The `PrerenderedComponent` references the actual `RenderedComponent` before it's
-         added to rendering, which allows users to alter contents before the reference is submitted.
-       - Dimensions are created for `PrerenderedComponent` in `GraphicsContext` using
-         `addLogic` and the resulting `DimIndex` is stored in the referenced `RenderedComponent`.
-     3. Submission of `PrerenderedComponent` to `RenderedComponent`. The rendered component
-        is stored into the stack and preserved, and the original reference in `PrerenderedComponent`
-        is replaced by the reference in the stack.
-        - As users can keep hold of the `PrerenderedComponent` reference, changes to this should immediately
-          reflect in the `RenderedComponent`. Therefore, dimensions should re-calculate according to the rules
-          of the submission.
-        - For users, they use the function `submitItem` to re-calculate dimensions, using existing stored `DimIndices`
-          and manipulating positions according to the rules of the underlying `Component`.
-    **/
-
-
-
-    private static var _components:Array<Component>;
-    private static var _rendered:Array<RenderedComponent>;
-    private static var _prerendered:Array<PrerenderedComponent>;
-
-    /**
-    * Create a new component and begin adding dimensions to it. Once the component
-    * has been defined, use `endComponent`. To use the component, call `executeComponent` or
-    * `injectComponent`.
-    *
-    * If this function is called within another component, the dimension calls
-    * will allocate to the respective child component.
-    *
-    * Optionally specify an `id`. If one is not supplied, one will be created automatically.
-    **/
-    public static function beginComponent(name:String, ?id:Id) {
-        if (id == null) {
-            id = Application.createId(true);
-        }
-
-
-    }
-
-    /**
-    * Completes the structure of a component and stores it. Child components are completed
-    * and stored appropriately in their parent.
-    **/
-    public static function endComponent() {
-
-    }
-
-    /**
-    * Calls the respective dimension API depending on configuration of the component,
-    * and positions to the screen. To add to an existing component, use `injectComponent` instead.
-    **/
-    public static function executeComponent(name:String, position:FastVector2):PrerenderedComponent {
-
-    }
-
-    /**
-    * Inject a component at the given position into an already rendered component.
-    **/
-    public static function injectComponent(name:String, component:String, position:ContentPosition):PrerenderedComponent {
-
-    }
-
-    /**
-    * Gets the complete collection of rendered components.
-    **/
-    public static function getRenderedComponents() {
-
-    }
-
-    /**
-    * Remove an item using a pre-rendered component.
-    **/
-    public static function removeItem(prerendered:PrerenderedComponent) {
-
-    }
-
-    /**
-    * If you make changes to a component, re-submit it to the rendered stack using this function.
-    **/
-    public static function submitItem(prerendered:PrerenderedComponent) {
-
-    }
-
-    /**
-    * Get the query data from `GraphicsContext` for the given prerendered component.
-    **/
-    public static function getQuery(prerendered:PrerenderedComponent) {
-
-    }
-
-    /**
-    * Used internally to store information about constructed dimensions before an `add` is called.
-    **/
-    public static function initContext() {
-        resetContext();
-        _lastDimensions = [];
-    }
-
-    /**
-    * Push an ID to the current stack. Use either a `String` or `Int`, but not both.
-    **/
-    public static function pushId(?ident:String, ?value:Int) {
-        if (_idStack == null) {
-            _idStack = [];
-        }
-
-        var newId:Int;
-        
-        if (value != null) {
-            // For integer values, combine with current stack depth for uniqueness
-            newId = hashCombine(_currentId, value);
-        }
-        else if (ident != null) {
-            // Use the string-to-seed function for consistent hashing
-            var stringHash = stringToSeed(ident);
-            newId = hashCombine(_currentId, stringHash);
-        }
-        else {
-            // Auto-increment if no identifier provided
-            newId = hashCombine(_currentId, _idStack.length + 1);
-        }
-        
-        // Ensure uniqueness by checking against existing commands
-        while (_idCommand.contains(newId)) {
-            newId = hashCombine(newId, 1);
-        }
-        
-        _idStack.push(_currentId); // Push the previous ID
-        _currentId = newId;        // Set new current ID
-    }
-
-    /**
-    * Hash combine function for creating composite hash values.
-    * This ensures good distribution.
-    */
-    static function hashCombine(seed:Int, value:Int):Int {
-        // Based on boost::hash_combine algorithm
-        var result = seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
-        return result & 0x7FFFFFFF; // Keep positive
-}
-
-    /**
-    * Generate a seed integer from a string using DJB2 hash.
-    */
-    static function stringToSeed(input:String):Int {
-        if (input == null || input.length == 0) {
-            return 0;
-        }
-        
-        var hash = 5381;
-        
-        for (i in 0...input.length) {
-            var char = input.charCodeAt(i);
-            hash = ((hash << 5) + hash) + char; // hash * 33 + char
-            hash = hash & 0x7FFFFFFF; // Keep positive
-        }
-        
-        return hash;
-    }
-
-    static function advanceId() {
-        // Return because we have an ID pushed manually by the user
-        if (_idStack.length > 0) {
-            return;
-        }
-        
-        // Generate next sequential ID
-        var nextId = hashCombine(_currentId, 1);
-        
-        // Ensure uniqueness
-        while (_idCommand.contains(nextId)) {
-            nextId = hashCombine(nextId, 1);
-        }
-        
-        _currentId = nextId;
-    }
-
-    static function addCommandId() {
-        advanceId();
-        _idCommand.push(_currentId);
-    }
-
-    /**
-    * Remove the last identifier pushed to the stack.
-    **/
-    public static function popId():Int {
-        if (_idStack.length == 0) {
-            return -1;
-        }
-        
-        var poppedId = _currentId;
-        _currentId = _idStack.pop(); // Restore previous ID
-        return poppedId;
-    }
-
-    /**
-    * Resets the current context of dimensions, clearing the current dimension and any commands.
-    **/
-    public static function resetContext() {
-        _idStack = [];
-        _idCommand = [];
-        _commandResults = [];
-        _order = 0;
-        _visibility = true;
-        _currentId = 0;
-    }
-
-    public static function getCommandResultList() {
-        return _commandResults;
-    }
-
-    public static function addDimIndex(dim:DimIndex) {
-        if (_lastDimensions == null)
-            _lastDimensions = [];
-        _lastDimensions.push(dim);
-    }
-
-    static function addCommandResultInit(index:DimIndex, init:DimInitCommand) {
-        var result:CommandResult = {};
-        
-        var gtx = Application.instance.graphicsCtx;
-        var dim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(index));
-        result.matchScreenWidth = dim.width == Application.getScreenDim().width;
-        result.matchScreenHeight = dim.height == Application.getScreenDim().height;
-        result.index = index;
-        result.init = init;
-        
-        if (_commandResults == null) {
-            _commandResults = [];
-        }
-        
-        _commandResults.push(result);
-        
-        advanceId();
-    }
-
-    static function addCommandResult(index:DimIndex, cmd:DimCommand) {
-        if (_commandResults == null) {
-            _commandResults = [];
-        }
-        _commandResults.push({
-            index: index,
-            cmd: cmd
-        });
-
-        advanceId();
-    }
+    private static var _order:Int = 0;
+    private static var _visibility:Bool = true;
+    private static var _editMode:Bool;
 
     static function addDimToGraphicsContext(dim:Dim, addLogic:ContainerAddLogic, ?parent:DimIndex) {
         var gtx = Application.instance.graphicsCtx;
@@ -529,7 +157,6 @@ class Dimensions {
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic);
-            addCommandResultInit(resultIndex, FromDim(dim));
         }
 
         return {
@@ -552,7 +179,6 @@ class Dimensions {
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic);
-            addCommandResultInit(resultIndex, CentreScreenFromSize(width, height));
         }
 
         return {
@@ -575,7 +201,6 @@ class Dimensions {
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic);
-            addCommandResultInit(resultIndex, CentreScreenY(width, height, offsetY));
         }
 
         return {
@@ -598,7 +223,6 @@ class Dimensions {
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic);
-            addCommandResultInit(resultIndex, CentreScreenX(width, height, offsetX));
         }
 
         return {
@@ -655,7 +279,6 @@ class Dimensions {
 
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic);
-            addCommandResultInit(resultIndex, CreateDimAlignScreen(width, height, valign, halign, new FastVector2(offsetX, offsetY)));
         }
 
         return {
@@ -680,7 +303,6 @@ class Dimensions {
 
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic);
-            addCommandResultInit(resultIndex, CreateFromOffset(fromIndex, offset));
         }
 
         return {
@@ -711,10 +333,6 @@ class Dimensions {
         {
             a.x = System.windowWidth() - a.width - offset.x;
         }
-
-        if (!_editMode) {
-            addCommandResult(aIndex, ScreenAlignX(halign, offset));
-        }
     }
 
     /**
@@ -738,10 +356,6 @@ class Dimensions {
         else if (valign == VALIGN_BOTTOM)
         {
             a.y = System.windowHeight() - a.height + offset.y;
-        }
-
-        if (!_editMode) {
-            addCommandResult(aIndex, ScreenAlignY(valign, offset));
         }
     }
 
@@ -772,7 +386,6 @@ class Dimensions {
 
         if (!_editMode) {
             resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
-            addCommandResultInit(containerIndex, CreateGridEquals(containerIndex, columns, rows, resultIndices));
         }
 
         var dimResults:Array<DimResult> = [];
@@ -823,7 +436,6 @@ class Dimensions {
 
         if (!_editMode) {
             resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
-            addCommandResultInit(containerIndex, CreateGridFloats(containerIndex, columns, rows, resultIndices));
         }
 
         var dimResults:Array<DimResult> = [];
@@ -940,7 +552,6 @@ class Dimensions {
 
         if (!_editMode) {
             resultIndices = getDimensionIndicesFromGroup(results, addLogic ?? Empty(), containerIndex);
-            addCommandResultInit(containerIndex, CreateGrid(containerIndex, columns, rows, resultIndices));
         }
 
         var dimResults:Array<DimResult> = [];
@@ -1091,13 +702,6 @@ class Dimensions {
 
         if (!_editMode) {
             resultIndices = getDimensionIndicesFromGroup(flowResults, flowAddLogic, flowContainerIndex);
-
-            if (containerMethod == FLOW_FIXED) {
-                addCommandResult(flowContainerIndex, CreateFixedFlow(flowContainerIndex, containerCellSize, cast containerDirection, resultIndices));
-            }
-            else if (containerMethod == FLOW_VARIABLE) {
-                addCommandResult(flowContainerIndex, CreateVariableFlow(flowContainerIndex, cast containerDirection, resultIndices));
-            }
         }
 
         var dimResults:Array<DimResult> = [];
@@ -1141,7 +745,6 @@ class Dimensions {
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic ?? Empty());
-            addCommandResultInit(aIndex, DimOffsetX(aIndex, offsetX));
         }
         
         return {
@@ -1173,7 +776,6 @@ class Dimensions {
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic ?? Empty());
-            addCommandResultInit(resultIndex, DimOffsetY(aIndex, offsetY));
         }
 
         return {
@@ -1192,10 +794,6 @@ class Dimensions {
     public static function dimAlign(aIndex:DimIndex, bIndex:DimIndex, valign:Int, halign:Int) {
         dimVAlign(aIndex, bIndex, valign, true);
         dimHAlign(aIndex, bIndex, halign, true);
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimAlign(bIndex, halign, valign));
-        }
     }
 
     /**
@@ -1220,10 +818,6 @@ class Dimensions {
         else if (valign == VALIGN_CENTRE)
         {
             b.y = a.y + ((a.height - b.height) / 2);
-        }
-
-        if (!noCommandCreation && !_editMode) {
-            addCommandResult(aIndex, DimVAlign(bIndex, valign));
         }
     }
 
@@ -1250,19 +844,11 @@ class Dimensions {
         {
             b.x = a.x + ((a.width - b.width) / 2);
         }
-
-        if (!noCommandCreation && !_editMode) {
-            addCommandResult(aIndex, DimHAlign(bIndex, halign));
-        }
     }
 
     public static function dimAlignOffset(a:DimIndex, b:DimIndex, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0) {
         dimVAlignOffset(a, b, valign, voffset, true);
         dimHAlignOffset(a, b, halign, hoffset, true);
-
-        if (!_editMode) {
-            addCommandResult(a, DimAlignOffset(b, halign, valign, hoffset, voffset));
-        }
     }
 
     public static function dimVAlignOffset(aIndex:DimIndex, bIndex:DimIndex, valign:Int, offset:Float = 0.0, noCommandCreation:Bool = false) {
@@ -1282,10 +868,6 @@ class Dimensions {
         {
             b.y = a.y - ((b.height - a.height) / 2);
         }
-
-        if (!noCommandCreation && !_editMode) {
-            addCommandResult(aIndex, DimVAlignOffset(bIndex, valign, offset));
-        }
     }
 
     public static function dimHAlignOffset(aIndex:DimIndex, bIndex:DimIndex, halign:Int, offset:Float = 0.0, noCommandCreation:Bool = false) {
@@ -1304,10 +886,6 @@ class Dimensions {
         else if (halign == HALIGN_MIDDLE)
         {
             b.x = a.x - ((b.width - a.width) / 2);
-        }
-
-        if (!noCommandCreation && !_editMode) {
-            addCommandResult(aIndex, DimHAlignOffset(bIndex, halign, offset));
         }
     }
 
@@ -1329,10 +907,6 @@ class Dimensions {
         a.y = ratioY;
         a.width = ratioWidth;
         a.height = ratioHeight;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimScale(scaleX, scaleY));
-        }
     }
 
     /**
@@ -1348,10 +922,6 @@ class Dimensions {
         var ratioX = a.x + ((a.width - ratioWidth) / 2);
         a.x = ratioX;
         a.width = ratioWidth;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimScaleX(scaleX));
-        }
     }
 
     /**
@@ -1367,10 +937,6 @@ class Dimensions {
         var ratioY = a.y + ((a.height - ratioHeight) / 2);
         a.y = ratioY;
         a.height = ratioHeight;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimScaleY(scaleY));
-        }
     }
 
     /**
@@ -1382,10 +948,6 @@ class Dimensions {
 
         a.width = a.width - amount;
         a.height = a.height - amount;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimShrink(amount));
-        }
     }
 
     /**
@@ -1396,10 +958,6 @@ class Dimensions {
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
 
         a.width = a.width - amount;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimShrinkW(amount));
-        }
     }
 
     /**
@@ -1410,10 +968,6 @@ class Dimensions {
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
 
         a.height = a.height - amount;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimShrinkH(amount));
-        }
     }
 
     /**
@@ -1425,10 +979,6 @@ class Dimensions {
 
         a.width = a.width + amount;
         a.height = a.height + amount;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimGrow(amount));
-        }
     }
 
     /**
@@ -1439,10 +989,6 @@ class Dimensions {
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
 
         a.width = a.width + amount;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimGrowW(amount));
-        }
     }
 
     /**
@@ -1453,10 +999,6 @@ class Dimensions {
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
 
         a.height = a.height + amount;
-
-        if (!_editMode) {
-            addCommandResult(aIndex, DimGrowH(amount));
-        }
     }
 
     /**
@@ -1472,7 +1014,6 @@ class Dimensions {
         var resultIndex:DimIndex = null;
         if (!_editMode) {
             resultIndex = addDimToGraphicsContext(result, addLogic ?? Empty());
-            addCommandResultInit(resultIndex, MeasureText(font, fontSize, text));
         }
 
 		return {

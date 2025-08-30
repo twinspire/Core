@@ -52,6 +52,8 @@ typedef VectorContext = {
     var space:VectorSpace;
 }
 
+typedef DimensionCallback = (DimIndex) -> Void;
+
 @:allow(Application)
 @:allow(UpdateContext)
 class GraphicsContext {
@@ -88,6 +90,9 @@ class GraphicsContext {
     private var _dimRecords:Array<DimensionRecord>;
 
     private var _animations:Map<DimIndex, AnimationState>;
+
+    private var _dimensionCallbacks:Map<Int, DimensionCallback>;
+    private var _callbackOrder:Array<Int>;
 
     /**
     * A collection of dimensions within this context. Do not write directly.
@@ -138,8 +143,6 @@ class GraphicsContext {
     private var _g2:Graphics;
 
     public function new() {
-        Dimensions.initContext();
-
         _dimTemp = [];
         _dimTempLinkTo = [];
         _dimForceChangeIndices = [];
@@ -161,6 +164,8 @@ class GraphicsContext {
         _currentGroup = -1;
         _currentGroupRenderType = null;
         _animations = [];
+        _dimensionCallbacks = [];
+        _callbackOrder = [];
 
         containers = [];
         dimensions = [];
@@ -221,6 +226,107 @@ class GraphicsContext {
             }
             case Group(item): {
                 return _groups[item].map((grp) -> activities[grp]);
+            }
+        }
+    }
+
+    /**
+    * Register a callback for recalculating a dimension on resize.
+    * Callbacks are executed in the order they were registered.
+    */
+    public function useDimension(index:DimIndex, callback:DimensionCallback):Void {
+        var directIndex = switch (index) {
+            case Direct(i, _): i;
+            case Group(i, _): i; // For groups, use the group index
+        };
+        
+        _dimensionCallbacks.set(directIndex, callback);
+        
+        // Maintain order for dependency management
+        if (!_callbackOrder.contains(directIndex)) {
+            _callbackOrder.push(directIndex);
+        }
+    }
+
+    /**
+    * Remove a dimension callback.
+    */
+    public function removeDimensionCallback(index:DimIndex):Void {
+        var directIndex = switch (index) {
+            case Direct(i, _): i;
+            case Group(i, _): i;
+        };
+        
+        _dimensionCallbacks.remove(directIndex);
+        _callbackOrder.remove(directIndex);
+    }
+
+    /**
+    * Recalculate all dimensions using user-defined callbacks.
+    */
+    public function recalculateDimensions():Void {
+        Dimensions.beginEdit();
+        
+        // Execute callbacks in registration order
+        for (index in _callbackOrder) {
+            var callback = _dimensionCallbacks.get(index);
+            if (callback != null) {
+                var dimIndex = Direct(index);
+                try {
+                    callback(dimIndex);
+                } catch (e:Dynamic) {
+                    trace('Error in dimension callback for index $index: $e');
+                }
+            }
+        }
+        
+        Dimensions.endEdit();
+    }
+    
+    /**
+    * Clear all dimension callbacks. Useful for scene changes.
+    */
+    public function clearDimensionCallbacks():Void {
+        _dimensionCallbacks.clear();
+        _callbackOrder = [];
+    }
+
+    /**
+    * Specify a new manually adjusted dimension for the given index.
+    **/
+    public function overrideDimension(index:DimIndex, dim:Dim) {
+        switch (index) {
+            case Direct(i): {
+                if (i < _dimRecords.length) {
+                    _dimRecords[i].dim.width = dim.width;
+                    _dimRecords[i].dim.height = dim.height;
+                    _dimRecords[i].dim.x = dim.x;
+                    _dimRecords[i].dim.y = dim.y;
+                }
+                else {
+                    _dimRecordsTemp[i].dim.width = dim.width;
+                    _dimRecordsTemp[i].dim.height = dim.height;
+                    _dimRecordsTemp[i].dim.x = dim.x;
+                    _dimRecordsTemp[i].dim.y = dim.y;
+                }
+            }
+            case Group(g): {
+                if (g < _groups.length) {
+                    for (item in _groups[g]) {
+                        if (item < _dimRecords.length) {
+                            _dimRecords[item].dim.width = dim.width;
+                            _dimRecords[item].dim.height = dim.height;
+                            _dimRecords[item].dim.x = dim.x;
+                            _dimRecords[item].dim.y = dim.y;
+                        }
+                        else {
+                            _dimRecordsTemp[item].dim.width = dim.width;
+                            _dimRecordsTemp[item].dim.height = dim.height;
+                            _dimRecordsTemp[item].dim.x = dim.x;
+                            _dimRecordsTemp[item].dim.y = dim.y;
+                        }
+                    }
+                }
             }
         }
     }
@@ -1297,8 +1403,6 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
-        Dimensions.addDimIndex(result);
-        Dimensions.resetContext();
         return result;
     }
 
@@ -1366,8 +1470,6 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
-        Dimensions.addDimIndex(result);
-        Dimensions.resetContext();
         return result;
     }
 
@@ -1431,8 +1533,6 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
-        Dimensions.addDimIndex(result);
-        Dimensions.resetContext();
         return result;
     }
 
