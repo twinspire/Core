@@ -292,6 +292,302 @@ class GraphicsContext {
     }
 
     /**
+    * Advance the order of a dimension or group of dimensions by a specified amount.
+    *
+    * @param index The `DimIndex` to advance.
+    * @param amount The amount to advance the order by.
+    **/
+    public function advanceOrderOf(index:DimIndex, amount:Int) {
+        switch (index) {
+            case Direct(i): {
+                if (i < _dimRecords.length) {
+                    _dimRecords[i].dim.order += amount;
+                }
+                else {
+                    _dimRecordsTemp[i].dim.order += amount;
+                }
+            }
+            case Group(g): {
+                if (g < _groups.length) {
+                    for (item in _groups[g]) {
+                        if (item < _dimRecords.length) {
+                            _dimRecords[item].dim.order += amount;
+                        }
+                        else {
+                            _dimRecordsTemp[item].dim.order += amount;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+    * Advance the order of a collection of dimensions or groups by a specified amount.
+    *
+    * @param indices An array of `DimIndex` to advance.
+    * @param amount The amount to advance the order by.
+    **/
+    public function advanceOrderOfCollection(indices:Array<DimIndex>, amount:Int) {
+        for (index in indices) {
+            advanceOrderOf(index, amount);
+        }
+    }
+
+    /**
+    * Make a dimension or group of dimensions invisible.
+    *
+    * @param index The `DimIndex` to make invisible.
+    **/
+    public function makeInvisible(index:DimIndex) {
+        switch (index) {
+            case Direct(i): {
+                if (i < _dimRecords.length) {
+                    _dimRecords[i].dim.visible = false;
+                }
+                else {
+                    _dimRecordsTemp[i].dim.visible = false;
+                }
+            }
+            case Group(g): {
+                if (g < _groups.length) {
+                    for (item in _groups[g]) {
+                        if (item < _dimRecords.length) {
+                            _dimRecords[item].dim.visible = false;
+                        }
+                        else {
+                            _dimRecordsTemp[item].dim.visible = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+    * Make a dimension or group of dimensions visible.
+    *
+    * @param index The `DimIndex` to make visible.
+    **/
+    public function makeVisible(index:DimIndex) {
+        switch (index) {
+            case Direct(i): {
+                if (i < _dimRecords.length) {
+                    _dimRecords[i].dim.visible = true;
+                }
+                else {
+                    _dimRecordsTemp[i].dim.visible = true;
+                }
+            }
+            case Group(g): {
+                if (g < _groups.length) {
+                    for (item in _groups[g]) {
+                        if (item < _dimRecords.length) {
+                            _dimRecords[item].dim.visible = true;
+                        }
+                        else {
+                            _dimRecordsTemp[item].dim.visible = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+    * Make a collection of dimensions or groups invisible.
+    *
+    * @param indices An array of `DimIndex` to make invisible.
+    **/
+    public function makeInvisibleCollection(indices:Array<DimIndex>) {
+        for (index in indices) {
+            makeInvisible(index);
+        }
+    }
+
+    /**
+    * Make a collection of dimensions or groups visible.
+    *
+    * @param indices An array of `DimIndex` to make visible.
+    **/
+    public function makeVisibleCollection(indices:Array<DimIndex>) {
+        for (index in indices) {
+            makeVisible(index);
+        }
+    }
+
+    /**
+    * Move a dimension or group of dimensions towards a target position at a specified speed.
+    *
+    * @param index The `DimIndex` to move.
+    * @param target The target position to move towards.
+    * @param speed The speed at which to move towards the target position, typically a value between 0 and 1.
+    **/
+    public function moveDimIndexTowards(index:DimIndex, target:FastVector2, speed:Float) {
+        switch (index) {
+            case Direct(i): {
+                if (i < _dimRecords.length) {
+                    var dim = _dimRecords[i].dim;
+                    dim.x += (target.x - dim.x) * speed;
+                    dim.y += (target.y - dim.y) * speed;
+                }
+                else {
+                    var dim = _dimRecordsTemp[i].dim;
+                    dim.x += (target.x - dim.x) * speed;
+                    dim.y += (target.y - dim.y) * speed;
+                }
+            }
+            case Group(g): {
+                if (g < _groups.length) {
+                    for (item in _groups[g]) {
+                        if (item < _dimRecords.length) {
+                            var dim = _dimRecords[item].dim;
+                            dim.x += (target.x - dim.x) * speed;
+                            dim.y += (target.y - dim.y) * speed;
+                        }
+                        else {
+                            var dim = _dimRecordsTemp[item].dim;
+                            dim.x += (target.x - dim.x) * speed;
+                            dim.y += (target.y - dim.y) * speed;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+    * Move a collection of dimensions or groups towards a target position at a specified speed.
+    *
+    * @param indices An array of `DimIndex` to move.
+    * @param target The target position to move towards.
+    * @param speed The speed at which to move towards the target position, typically a value between 0 and 1.
+    **/
+    public function moveDimIndexTowardsCollection(indices:Array<DimIndex>, target:FastVector2, speed:Float) {
+        for (index in indices) {
+            moveDimIndexTowards(index, target, speed);
+        }
+    }
+
+    /**
+    * Move a dimension or group of dimensions towards a target position at a specified speed and radius.
+    *
+    * @param index The `DimIndex` to move.
+    * @param target The target position to move towards.
+    * @param speed The speed at which to move towards the target position, typically a value between 0 and 1.
+    * @param radius The radius to apply to the movement, affecting how far the dimension moves towards the target.
+    **/
+    public function moveDimIndexTowardsArch(index:DimIndex, target:FastVector2, speed:Float, radius:Float) {
+        switch (index) {
+            case Direct(i): {
+                if (i < _dimRecords.length) {
+                    var dim = _dimRecords[i].dim;
+                    var angle = Math.atan2(target.y - dim.y, target.x - dim.x);
+                    dim.x += Math.cos(angle) * speed * radius;
+                    dim.y += Math.sin(angle) * speed * radius;
+                }
+                else {
+                    var dim = _dimRecordsTemp[i].dim;
+                    var angle = Math.atan2(target.y - dim.y, target.x - dim.x);
+                    dim.x += Math.cos(angle) * speed * radius;
+                    dim.y += Math.sin(angle) * speed * radius;
+                }
+            }
+            case Group(g): {
+                if (g < _groups.length) {
+                    for (item in _groups[g]) {
+                        if (item < _dimRecords.length) {
+                            var dim = _dimRecords[item].dim;
+                            var angle = Math.atan2(target.y - dim.y, target.x - dim.x);
+                            dim.x += Math.cos(angle) * speed * radius;
+                            dim.y += Math.sin(angle) * speed * radius;
+                        }
+                        else {
+                            var dim = _dimRecordsTemp[item].dim;
+                            var angle = Math.atan2(target.y - dim.y, target.x - dim.x);
+                            dim.x += Math.cos(angle) * speed * radius;
+                            dim.y += Math.sin(angle) * speed * radius;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+    * Move a collection of dimensions or groups towards a target position at a specified speed and radius.
+    *
+    * @param indices An array of `DimIndex` to move.
+    * @param target The target position to move towards.
+    * @param speed The speed at which to move towards the target position, typically a value between 0 and 1.
+    * @param radius The radius to apply to the movement, affecting how far the dimensions move towards the target.
+    **/
+    public function moveDimIndexTowardsArchCollection(indices:Array<DimIndex>, target:FastVector2, speed:Float, radius:Float) {
+        for (index in indices) {
+            moveDimIndexTowardsArch(index, target, speed, radius);
+        }
+    }
+
+    /**
+    * Move a dimension or group of dimensions towards a target position using a bezier curve with a control point.
+    *
+    * @param index The `DimIndex` to move.
+    * @param target The target position to move towards.
+    * @param speed The speed at which to move towards the target position, typically a value between 0 and 1.
+    * @param controlPoint The control point for the bezier curve, affecting the curvature of the movement.
+    **/
+    public function moveDimIndexTowardsBezier(index:DimIndex, target:FastVector2, speed:Float, controlPoint:FastVector2) {
+        switch (index) {
+            case Direct(i): {
+                if (i < _dimRecords.length) {
+                    var dim = _dimRecords[i].dim;
+                    var t = speed; // Assuming speed is a value between 0 and 1
+                    dim.x = (1 - t) * (1 - t) * dim.x + 2 * (1 - t) * t * controlPoint.x + t * t * target.x;
+                    dim.y = (1 - t) * (1 - t) * dim.y + 2 * (1 - t) * t * controlPoint.y + t * t * target.y;
+                }
+                else {
+                    var dim = _dimRecordsTemp[i].dim;
+                    var t = speed; // Assuming speed is a value between 0 and 1
+                    dim.x = (1 - t) * (1 - t) * dim.x + 2 * (1 - t) * t * controlPoint.x + t * t * target.x;
+                    dim.y = (1 - t) * (1 - t) * dim.y + 2 * (1 - t) * t * controlPoint.y + t * t * target.y;
+                }
+            }
+            case Group(g): {
+                if (g < _groups.length) {
+                    for (item in _groups[g]) {
+                        if (item < _dimRecords.length) {
+                            var dim = _dimRecords[item].dim;
+                            var t = speed; // Assuming speed is a value between 0 and 1
+                            dim.x = (1 - t) * (1 - t) * dim.x + 2 * (1 - t) * t * controlPoint.x + t * t * target.x;
+                            dim.y = (1 - t) * (1 - t) * dim.y + 2 * (1 - t) * t * controlPoint.y + t * t * target.y;
+                        }
+                        else {
+                            var dim = _dimRecordsTemp[item].dim;
+                            var t = speed; // Assuming speed is a value between 0 and 1
+                            dim.x = (1 - t) * (1 - t) * dim.x + 2 * (1 - t) * t * controlPoint.x + t * t * target.x;
+                            dim.y = (1 - t) * (1 - t) * dim.y + 2 * (1 - t) * t * controlPoint.y + t * t * target.y;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+    * Move a collection of dimensions or groups towards a target position using a bezier curve with a control point.
+    *
+    * @param indices An array of `DimIndex` to move.
+    * @param target The target position to move towards.
+    * @param speed The speed at which to move towards the target position, typically a value between 0 and 1.
+    * @param controlPoint The control point for the bezier curve, affecting the curvature of the movement.
+    **/
+    public function moveDimIndexTowardsBezierCollection(indices:Array<DimIndex>, target:FastVector2, speed:Float, controlPoint:FastVector2) {
+        for (index in indices) {
+            moveDimIndexTowardsBezier(index, target, speed, controlPoint);
+        }
+    }
+
+    /**
     * Specify a new manually adjusted dimension for the given index.
     **/
     public function overrideDimension(index:DimIndex, dim:Dim) {
