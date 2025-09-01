@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import twinspire.DimIndex.DimIndexUtils;
 import twinspire.events.EventArgs;
 import twinspire.events.GameEventProcessingType;
 import twinspire.events.GameEventProcessor;
@@ -330,7 +331,25 @@ class UpdateContext {
             return;
         }
 
-        handleMouseEvents();
+        var containers = _gctx.getActiveContainers();
+        var possibleActiveContainers = new Array<Int>();
+        var lastContainerIndex = -1;
+        for (i in 0...containers.length) {
+            var context = containers[i];
+            var containerIndex = _tempUI.indexOf(DimIndexUtils.getDirectIndex(context.index));
+            if (containerIndex > lastContainerIndex && containerIndex > -1) {
+                possibleActiveContainers.push(i);
+            }
+        }
+
+        var containerActiveIndex = -1;
+        if (possibleActiveContainers.length > 0) {
+            containerActiveIndex = possibleActiveContainers[possibleActiveContainers.length - 1];
+        }
+
+        if (!handleContainerScrolling(containerActiveIndex)) {
+            handleMouseEvents();   
+        }
     }
 
     private function determineInitialMouseEvents() {
@@ -402,6 +421,51 @@ class UpdateContext {
         return acceptNewEvents;
     }
 
+    private function handleContainerScrolling(index:Int) {
+        if (index == -1) {
+            return false;
+        }
+
+        var mousePos = GlobalEvents.getMousePosition();
+        var isScrolling = false;
+        
+        @:privateAccess(GraphicsContext) {
+            var i = _gctx.findContainerForDimension(index);
+            if (i < 0 || i >= _gctx._activeContainers.length) {
+                return false;
+            }
+
+            var context = _gctx._activeContainers[i];
+            var space = context.space;
+            if (!space.scrollable) return false;
+            
+            // Handle mouse wheel scrolling
+            var scrollDelta = GlobalEvents.getMouseDelta();
+            if (scrollDelta != 0) {
+                var scrollAmount = scrollDelta * 20; // Adjust scroll sensitivity
+                if (_keysDown.contains(KeyCode.Shift)) {
+                    space.scrollBy(scrollAmount, 0);
+                } else {
+                    space.scrollBy(0, scrollAmount);
+                }
+                isScrolling = true;
+            }
+            
+            // Handle click-and-drag scrolling
+            if (GlobalEvents.isMouseButtonDown(space.scrollButtons)) {
+                var mouseDelta = new FastVector2(
+                    mousePos.x - _lastMousePosition.x,
+                    mousePos.y - _lastMousePosition.y
+                );
+                // For drag scrolling, use immediate scrolling to feel responsive
+                space.scrollByImmediate(-mouseDelta.x, -mouseDelta.y);
+                isScrolling = true;
+            }
+        }
+
+        return isScrolling;
+    }
+
     private function handleMouseEvents() {
         var isMouseOver = -1;
         var mouseScrollDelta = 0;
@@ -417,18 +481,7 @@ class UpdateContext {
 
             isMouseOver = index;
 
-            var containers = _gctx.containers.whereIndices((c) -> c.enableScrollWithClick != BUTTON_NONE);
             
-            for (c in containers) {
-                var container = _gctx.containers[c];
-                var containerDim = _gctx.dimensions[container.dimIndex];
-                
-                if (GlobalEvents.isMouseOverDim(containerDim) && 
-                    GlobalEvents.isMouseButtonDown(container.enableScrollWithClick)) {
-                    _drag.scrollIndex = container.dimIndex;
-                    break; // Only one container can be scrolled at a time
-                }
-            }
 
             if (GlobalEvents.isAnyMouseButtonReleased()) {
                 if (query.acceptsTextInput) {

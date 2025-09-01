@@ -307,7 +307,7 @@ class InputRenderer {
     }
 
     private function updateLineInfo(inputState:TextInputState) {
-        var destination = gtx.getClientDimensionsAtIndex(inputState.index.dimIndex)[0];
+        var destination = gtx.getClientDimensionsAtIndex(inputState.index.index)[0];
 
         switch (inputState.method) {
             case ImMultiLine(breaks): {

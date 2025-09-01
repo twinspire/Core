@@ -29,12 +29,6 @@ import kha.Color;
 import kha.Font;
 import kha.Video;
 
-typedef ContainerResult = {
-    var dimIndex:DimIndex;
-    var containerIndex:Int;
-    var ?reference:Int;
-}
-
 typedef TextInputResult = {
     > ContainerResult,
     var textInputIndex:Int;
@@ -42,17 +36,20 @@ typedef TextInputResult = {
 
 typedef DimensionRecord = {
     var dim:Dim;
-    var vectorContext:VectorContext;
-}
-
-typedef VectorContext = {
-    var active:Bool;
-    var zoom:Float;
-    var translation:FastVector2;
-    var space:VectorSpace;
 }
 
 typedef DimensionCallback = (DimIndex) -> Void;
+
+typedef ContainerResult = {
+    var index:DimIndex;
+    var ?space:VectorSpace;
+    var containerIndex:Int;
+}
+
+typedef ContainerContext = {
+    var container:ContainerResult;
+    var childrenThisFrame:Array<DimIndex>;
+}
 
 @:allow(Application)
 @:allow(UpdateContext)
@@ -70,6 +67,10 @@ class GraphicsContext {
 
     private var _containerOffsetsChanged:Bool;
     private var _containerLastOffsets:Array<FastVector2>;
+
+    private var _vectorSpaces:Array<VectorSpace>;
+    private var _activeContainers:Array<ContainerResult>;
+    private var _containerStack:Array<ContainerResult>; // For nested containers
 
     private var _buffers:Array<Image>;
     private var _bufferDimensionIndices:Array<Array<Int>>;
@@ -157,6 +158,9 @@ class GraphicsContext {
         _currentMenu = -1;
         _containerOffsetsChanged = false;
         _containerLastOffsets = [];
+        _vectorSpaces = [];
+        _activeContainers = [];
+        _containerStack = [];
         _buffers = [];
         _bufferDimensionIndices = [];
         _currentBuffer = -1;
@@ -1228,13 +1232,12 @@ class GraphicsContext {
     **/
     private function calculateClientDimension(record:DimensionRecord):Dim {
         var dim = record.dim;
-        var context = record.vectorContext;
         
-        if (context.active && context.space != null) {
+        if (vectorSpace != null) {
             // Apply vector transformation
-            var transformedPos = context.space.transformPoint(dim.x, dim.y);
-            var transformedWidth = context.space.transformDistance(dim.width);
-            var transformedHeight = context.space.transformDistance(dim.height);
+            var transformedPos = vectorSpace.transformPoint(dim.x, dim.y);
+            var transformedWidth = vectorSpace.transformDistance(dim.width);
+            var transformedHeight = vectorSpace.transformDistance(dim.height);
             
             var result = new Dim(transformedPos.x, transformedPos.y, transformedWidth, transformedHeight, dim.order);
             result.visible = dim.visible;
@@ -1351,7 +1354,7 @@ class GraphicsContext {
         for (i in 0...textInputs.length) {
             var input = textInputs[i];
             for (r in toRemove) {
-                if (compareIndex(input.index.dimIndex, Direct(r))) {
+                if (compareIndex(input.index.index, Direct(r))) {
                     inputsRemove.push(i);
                 }
             }
@@ -1365,24 +1368,24 @@ class GraphicsContext {
             inputIndex -= 1;
         }
 
-        var containersToRemove = containers.whereIndices((c) -> toRemove.contains(c.dimIndex));
+        // var containersToRemove = containers.whereIndices((c) -> toRemove.contains(c.dimIndex));
 
-        for (i in 0...containers.length) {
-            var container = containers[i];
+        // for (i in 0...containers.length) {
+        //     var container = containers[i];
 
-            var found = container.childIndices.whereIndices((di) -> toRemove.contains(DimIndexUtils.getDirectIndex(di)));
-            for (j in found.length...0) {
-                container.childIndices.splice(found[j], 1);
-            }
-        }
+        //     var found = container.childIndices.whereIndices((di) -> toRemove.contains(DimIndexUtils.getDirectIndex(di)));
+        //     for (j in found.length...0) {
+        //         container.childIndices.splice(found[j], 1);
+        //     }
+        // }
 
-        var containerIndex = containersToRemove.length - 1;
-        while (containerIndex > -1) {
-            var index = containersToRemove[containerIndex];
-            containers.splice(index, 1);
+        // var containerIndex = containersToRemove.length - 1;
+        // while (containerIndex > -1) {
+        //     var index = containersToRemove[containerIndex];
+        //     containers.splice(index, 1);
 
-            containerIndex -= 1;
-        }
+        //     containerIndex -= 1;
+        // }
 
         for (g in _groups) {
             var gi = g.whereIndices((item) -> toRemove.contains(item));
@@ -1591,6 +1594,83 @@ class GraphicsContext {
     }
 
     /**
+    * Create a container with the given bounds and render type. This function is used to create
+    * a container that can hold dimensions and render them as a group.
+    *
+    * @param bounds The dimensions of the container.
+    * @param renderType An optional render type ID to specify how the container should be rendered.
+    **/
+    public function createContainer(bounds:Dim, renderType:Id = null):ContainerResult {
+        // Create the container dimension (setup phase)
+        var containerIndex = addUI(bounds, renderType ?? Id.None);
+        
+        // Create associated VectorSpace
+        var vectorSpace = new VectorSpace(bounds);
+        
+        var result:ContainerResult = {
+            index: containerIndex,
+            space: vectorSpace,
+            containerIndex: _vectorSpaces.length
+        };
+        
+        _vectorSpaces.push(vectorSpace);
+        
+        return result;
+    }
+
+    /**
+    * Begin a new container with the given `ContainerResult`. This function is used to start rendering
+    * dimensions within a container. The container must be created with `createContainer` first.
+    **/
+    public function beginContainer(container:ContainerResult) {
+        if (_containerStack.findIndex((c) -> c.index == container.index) == -1) {
+            _containerStack.push(container);
+        }
+        else {
+            throw "Container with the same index already exists in the stack.";
+        }
+        
+        // Begin vector space transformation
+        beginVectorSpace(container.space);
+        
+        // Set up clipping
+        scissor(container.index);
+    }
+
+    /**
+    * End the current container and finalize its rendering. This function is used to stop rendering
+    * dimensions within a container.
+    **/
+    public function endContainer() {
+        if (_containerStack.length == 0) return;
+        
+        var container = _containerStack.pop();
+        
+        // Clean up rendering state
+        disableScissor();
+        endVectorSpace();
+        
+        // Store for cleanup in end()
+        var foundContainerIndex = _activeContainers.findIndex((c) -> c.index == container.index);
+        if (foundContainerIndex == -1) {
+            _activeContainers.push(container);
+        }
+        else {
+            _activeContainers[foundContainerIndex] = container;
+        }
+
+        updateContainerContentBounds(container);
+    }
+
+    /**
+    * Get children that should be rendered in current container
+    */
+    public function getCurrentContainerChildren():Array<DimIndex> {
+        return _containerStack.length > 0 ? 
+            _containerStack[_containerStack.length - 1].space.children : [];
+    }
+
+    /**
     * Add an empty dimension to the context. This function is used to reserve a dimension index
     * for later use, such as when you want to add a dimension later in the frame.
     *
@@ -1606,18 +1686,9 @@ class GraphicsContext {
             throw "Cannot add to context once the current frame has ended.";
         }
 
-        // Create vector context snapshot
-        var vectorContext:VectorContext = {
-            active: _vectorActive,
-            zoom: _vectorZoom,
-            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
-            space: vectorSpace
-        };
-
         // Store as a unified record in temporary storage
         var record:DimensionRecord = {
-            dim: dim.clone(),
-            vectorContext: vectorContext
+            dim: dim.clone()
         };
         
         _dimRecordsTemp.push(record);
@@ -1655,19 +1726,10 @@ class GraphicsContext {
         if (_ended) {
             throw "Cannot add to context once the current frame has ended.";
         }
-        
-        // Create vector context snapshot
-        var vectorContext:VectorContext = {
-            active: _vectorActive,
-            zoom: _vectorZoom,
-            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
-            space: vectorSpace
-        };
 
         // Store as a unified record in temporary storage
         var record:DimensionRecord = {
-            dim: dim.clone(),
-            vectorContext: vectorContext
+            dim: dim.clone()
         };
         
         _dimRecordsTemp.push(record);
@@ -1720,18 +1782,9 @@ class GraphicsContext {
             throw "Cannot add to context once the current frame has ended.";
         }
 
-        // Create vector context snapshot
-        var vectorContext:VectorContext = {
-            active: _vectorActive,
-            zoom: _vectorZoom,
-            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
-            space: vectorSpace
-        };
-
         // Store as a unified record in temporary storage
         var record:DimensionRecord = {
             dim: dim.clone(),
-            vectorContext: vectorContext
         };
         
         _dimRecordsTemp.push(record);
@@ -1787,18 +1840,9 @@ class GraphicsContext {
             throw "Cannot add to context once the current frame has ended.";
         }
 
-        // Create vector context snapshot
-        var vectorContext:VectorContext = {
-            active: _vectorActive,
-            zoom: _vectorZoom,
-            translation: _vectorTranslation != null ? new FastVector2(_vectorTranslation.x, _vectorTranslation.y) : new FastVector2(0, 0),
-            space: vectorSpace
-        };
-
         // Store as a unified record in temporary storage
         var record:DimensionRecord = {
             dim: dim.clone(),
-            vectorContext: vectorContext
         };
         
         _dimRecordsTemp.push(record);
@@ -1843,6 +1887,7 @@ class GraphicsContext {
     *
     * @return An index value of the position of this container as it would be in permanent storage.
     **/
+    @:deprecated("Use `createContainer` instead.")
     public function addContainer(dim:Dim, renderType:Id, linkTo:Int = -1):ContainerResult {
         var container = new Container();
         var resultIndex = addUI(dim, renderType, linkTo);
@@ -1862,7 +1907,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(container.dimIndex);
 
         return {
-            dimIndex: resultIndex,
+            index: resultIndex,
             containerIndex: result
         };
     }
@@ -1880,6 +1925,7 @@ class GraphicsContext {
     *
     * @return Returns three indices to represent the dim, container and input text states stored in this context.
     **/
+    @:deprecated("API to be replaced with a more robust text input system in the future.")
     public function addTextInput(dim:Dim, method:TextInputMethod, linkTo:Int = -1):TextInputResult {
         var container = new Container();
         var resultIndex = addUI(dim, InputRenderer.RenderId, linkTo);
@@ -1900,7 +1946,7 @@ class GraphicsContext {
 
         var inputResult:TextInputResult = {
             containerIndex: result,
-            dimIndex: resultIndex,
+            index: resultIndex,
             textInputIndex: textInputs.length
         };
 
@@ -1922,6 +1968,7 @@ class GraphicsContext {
     * @param scroll The scroll position to set this container to.
     * @param infinite (Optional) A value to specify if the container should scroll infinitely.
     **/
+    @:deprecated("Favour `createContainer` and related vector space functions instead.")
     public function setContainerScroll(containerIndex:Int, scroll:FastVector2, ?infinite:Bool = false) {
         var container = containers[containerIndex];
         container.infiniteScroll = infinite;
@@ -1932,11 +1979,21 @@ class GraphicsContext {
         }
     }
 
+    private function updateVectorSpaces() {
+        for (vectorSpace in _vectorSpaces) {
+            if (vectorSpace.scrollable) {
+                vectorSpace.updateScrolling();
+            }
+        }
+    }
+
     /**
     * Begin the `GraphicsContext`.
     **/
     public function begin() {
         _ended = false;
+
+        updateVectorSpaces();
     }
 
     /**
@@ -1955,9 +2012,9 @@ class GraphicsContext {
                 dimensionLinks = _dimTempLinkTo.copy();
             }
 
-            if (_containerTemp.length > 0) {
-                containers = _containerTemp.copy();
-            }
+            // if (_containerTemp.length > 0) {
+            //     containers = _containerTemp.copy();
+            // }
         }
         else {
             for (i in 0..._dimRecordsTemp.length) {
@@ -1977,17 +2034,15 @@ class GraphicsContext {
                 }
             }
 
-            for (i in 0..._containerTemp.length) {
-                containers.push(_containerTemp[i]);
-            }
+            // for (i in 0..._containerTemp.length) {
+            //     containers.push(_containerTemp[i]);
+            // }
         }
 
         _dimRecordsTemp = [];
         _dimTemp = [];
         _dimTempLinkTo = [];
         _containerTemp = [];
-
-        updateContainerContentBounds();
 
         for (i in 0...activities.length) {
             activities[i] = [];
@@ -2000,39 +2055,21 @@ class GraphicsContext {
     /**
     * Update container content bounds based on their children's actual positions.
     **/
-    private function updateContainerContentBounds() {
-        for (i in 0...containers.length) {
-            var container = containers[i];
-            var maxWidth = 0.0;
-            var maxHeight = 0.0;
-            var containerDim = _dimRecords[container.dimIndex].dim;
-            var gap = containerDim.width * 0.3;
-
-            for (child in container.childIndices) {
-                switch (child) {
-                    case Direct(childItem): {
-                        // Get the final transformed dimensions
-                        var clientDims = getClientDimensionsAtIndex(Direct(childItem));
-                        var dim = clientDims[0];
-                        if (dim != null) {
-                            maxWidth = Math.max(dim.x + dim.width + gap, maxWidth);
-                            maxHeight = Math.max(dim.y + dim.height + gap, maxHeight);
-                        }
-                    }
-                    case Group(childGroup): {
-                        var clientDims = getClientDimensionsAtIndex(Group(childGroup));
-                        for (dim in clientDims) {
-                            if (dim != null) {
-                                maxWidth = Math.max(dim.x + dim.width + gap, maxWidth);
-                                maxHeight = Math.max(dim.y + dim.height + gap, maxHeight);
-                            }
-                        }
-                    }
+    private function updateContainerContentBounds(context:ContainerResult) {
+        var maxWidth = 0.0;
+        var maxHeight = 0.0;
+        
+        for (childIndex in context.space.children) {
+            var dims = getClientDimensionsAtIndex(childIndex);
+            for (dim in dims) {
+                if (dim != null) {
+                    maxWidth = Math.max(dim.x + dim.width, maxWidth);
+                    maxHeight = Math.max(dim.y + dim.height, maxHeight);
                 }
             }
-
-            container.content = new FastVector2(maxWidth, maxHeight);
         }
+        
+        context.space.updateContentBounds(new Dim(0, 0, maxWidth, maxHeight));
     }
 
     /**
@@ -2044,51 +2081,55 @@ class GraphicsContext {
             return dim;
         }
         
-        var container = containers[containerIndex];
+        var container = _vectorSpaces[containerIndex];
         var result = dim.clone();
         
-        // Apply scrolling offset first (in the appropriate measurement units)
-        var offsetX = container.offset.x;
-        var offsetY = container.offset.y;
-        
-        // Convert offset based on measurement type if needed
-        if (container.measurement == UNIT_PIXELS_BUFFER && container.bufferIndex > -1) {
-            // Handle buffer pixel measurements
-            var buffer = _buffers[container.bufferIndex];
-            // Apply any buffer-specific offset calculations here
-        }
+        // Apply scrolling offset first
+        var offsetX = container.translation.x;
+        var offsetY = container.translation.y;
         
         result.x += offsetX;
         result.y += offsetY;
+
+        var transformedPos = container.transformPoint(result.x, result.y);
+        var transformedSize = container.transformPoint(result.width, result.height);
         
-        // Then apply vector space transformation if enabled
-        if (container.useVectorSpace && container.vectorSpace != null) {
-            var transformedPos = container.vectorSpace.transformPoint(result.x, result.y);
-            var transformedSize = container.vectorSpace.transformPoint(result.width, result.height);
-            
-            result.x = transformedPos.x;
-            result.y = transformedPos.y;
-            result.width = transformedSize.x;
-            result.height = transformedSize.y;
-        }
+        result.x = transformedPos.x;
+        result.y = transformedPos.y;
+        result.width = transformedSize.x;
+        result.height = transformedSize.y;
         
         return result;
     }
 
+    public function getActiveContainers():Array<ContainerResult> {
+        return _activeContainers;
+    }
+
     private function findContainerForDimension(dimIndex:Int):Int {
-        for (i in 0...containers.length) {
-            var container = containers[i];
-            for (childIndex in container.childIndices) {
-                switch (childIndex) {
-                    case Direct(index): {
-                        if (index == dimIndex) return i;
-                    }
-                    case Group(groupIndex): {
-                        if (_groups[groupIndex].contains(dimIndex)) return i;
-                    }
-                }
+        for (i in 0..._activeContainers.length) {
+            if (_activeContainers[i].containerIndex == dimIndex) {
+                return i;
+            }
+
+            if (_activeContainers[i].space.hasChild(Direct(dimIndex))) {
+                return i;
             }
         }
+
+        // for (i in 0...containers.length) {
+        //     var container = containers[i];
+        //     for (childIndex in container.childIndices) {
+        //         switch (childIndex) {
+        //             case Direct(index): {
+        //                 if (index == dimIndex) return i;
+        //             }
+        //             case Group(groupIndex): {
+        //                 if (_groups[groupIndex].contains(dimIndex)) return i;
+        //             }
+        //         }
+        //     }
+        // }
         return -1;
     }
 
@@ -2107,6 +2148,12 @@ class GraphicsContext {
 
     public function drawParticles() {
         var engine = Engine.instance;
+        if (vectorSpace != null) {
+            for (emitter in engine.emitters) {
+                emitter.position = vectorSpace.transformPoint(emitter.position.x, emitter.position.y);
+            }
+        }
+
         engine.update(UpdateContext.deltaTime);
         engine.render(this);
     }
@@ -2259,25 +2306,19 @@ class GraphicsContext {
 
 
     private var vectorSpace:VectorSpace;
-    private var _vectorZoom:Float = 1.0;
-    private var _vectorTranslation:FastVector2;
-    private var _vectorActive:Bool = false;
 
     /**
     * Begin vector space rendering. All subsequent dimension operations will be transformed.
     **/
-    public function beginVectorSpace(space:VectorSpace, zoom:Float = 1.0, ?translation:FastVector2 = null) {
+    public function beginVectorSpace(space:VectorSpace) {
         vectorSpace = space;
-        _vectorZoom = zoom;
-        _vectorTranslation = translation ?? new FastVector2(0, 0);
-        _vectorActive = true;
     }
 
     /**
     * End vector space rendering.
     **/
     public function endVectorSpace() {
-        _vectorActive = false;
+        vectorSpace = null;
     }
 
     /**
@@ -2285,22 +2326,22 @@ class GraphicsContext {
     * Use this for input handling when you need vector space coordinates.
     **/
     public function transformScreenToVector(screenPos:FastVector2):FastVector2 {
-        if (!_vectorActive || vectorSpace == null) {
+        if (vectorSpace == null) {
             return screenPos;
         }
         
         // Inverse transformation
-        var translatedX = screenPos.x - _vectorTranslation.x;
-        var translatedY = screenPos.y - _vectorTranslation.y;
+        var translatedX = screenPos.x - vectorSpace.translation.x;
+        var translatedY = screenPos.y - vectorSpace.translation.y;
         
-        return new FastVector2(translatedX / _vectorZoom, translatedY / _vectorZoom);
+        return new FastVector2(translatedX / vectorSpace.zoom, translatedY / vectorSpace.zoom);
     }
 
     /**
     * Transform vector space coordinates to screen coordinates.
     **/
     public function transformVectorToScreen(vectorPos:FastVector2):FastVector2 {
-        if (!_vectorActive || vectorSpace == null) {
+        if (vectorSpace == null) {
             return vectorPos;
         }
         
@@ -2388,7 +2429,7 @@ class GraphicsContext {
 
         pushAnimationState(index);
 
-        if (vectorSpace != null && _vectorActive) {
+        if (vectorSpace != null) {
             getGraphics().drawScaledImageDim(img, dims[0]);
         }
         else {
@@ -2578,7 +2619,7 @@ class GraphicsContext {
 
         pushAnimationState(index);
 
-        if (vectorSpace != null && _vectorActive) {
+        if (vectorSpace != null && vectorSpace?.zoom > 2) {
             var cx = dims[0].x + (dims[0].width / 2);
             var cy = dims[0].y + (dims[0].height / 2);
             var radius = dims[0].width / 2;
@@ -2600,7 +2641,7 @@ class GraphicsContext {
 
         pushAnimationState(index);
 
-        if (vectorSpace != null && _vectorActive) {
+        if (vectorSpace != null && vectorSpace?.zoom > 2) {
             var cx = dims[0].x + (dims[0].width / 2);
             var cy = dims[0].y + (dims[0].height / 2);
             var radius = dims[0].width / 2;
@@ -2821,7 +2862,7 @@ class GraphicsContext {
     * Apply vector transformation to a dimension.
     **/
     private function applyVectorTransform(dim:Dim):Dim {
-        if (!_vectorActive || vectorSpace == null) {
+        if (vectorSpace == null) {
             return dim;
         }
         
