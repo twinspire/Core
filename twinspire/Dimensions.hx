@@ -3,7 +3,6 @@ package twinspire;
 import twinspire.DimIndex;
 import haxe.ds.ArraySort;
 
-import kha.AssetError;
 import twinspire.DimIndex.DimIndexUtils;
 import haxe.io.Path;
 import twinspire.events.EventArgs;
@@ -122,30 +121,59 @@ class Dimensions {
         return resultIndices;
     }
 
+    /**
+    * Begins editing dimensions. This avoids creating a `DimIndex` and invoking the underlying `GraphicsContext`
+    * `add` functions. Called by `useDimension` if using this for managing dimensions.
+    *
+    * All functions that return a `DimResult` will only return a `Dim` and no `index` value.
+    **/
     public static function beginEdit() {
         _editMode = true;
     }
 
+    /**
+    * Ends editing.
+    **/
     public static function endEdit() {
         _editMode = false;
     }
 
+    /**
+    * Advances the `order` of a `Dim` when creating dimensions.
+    **/
     public static function advanceOrder() {
         _order += 1;
     }
 
+    /**
+    * Reduces the `order` of a `Dim` when creating dimensions.
+    **/
     public static function reduceOrder() {
         _order -= 1;
     }
 
+    /**
+    * Mark a dimension beginning invisible when creating dimensions.
+    **/
     public static function beginInvisible() {
         _visibility = false;
     }
 
+    /**
+    * Mark a dimension as visible when creating dimensions.
+    **/
     public static function endInvisible() {
         _visibility = true;
     }
 
+    /**
+    * Create a dimension from a manually created `Dim`.
+    *
+    * @param dim The dimensions to create from.
+    * @param addLogic The type of dimension to add to `GraphicsContext`.
+    *
+    * @return Returns a `DimResult` with a `dim`, and `index` value if available.
+    **/
     public static function createFromDim(dim:Dim, addLogic:ContainerAddLogic):DimResult {
         var result = dim.clone();
         result.order = _order;
@@ -166,6 +194,9 @@ class Dimensions {
 	 * Create a dimension block from the given width and height, centering in the middle of the screen.
 	 * @param width The width of the object to centre.
 	 * @param height The height of the object to centre.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
 	 */
 	public static function centreScreenFromSize(width:Float, height:Float, addLogic:ContainerAddLogic):DimResult {
         var x = (System.windowWidth() - width) / 2;
@@ -189,6 +220,9 @@ class Dimensions {
      * @param width The width of the object.
      * @param height The height of the object.
      * @param offsetY The offset from the top of the screen.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
     public static function centreScreenY(width:Float, height:Float, offsetY:Float, addLogic:ContainerAddLogic):DimResult {
         var x = (System.windowWidth() - width) / 2;
@@ -211,6 +245,9 @@ class Dimensions {
      * @param width The width of the object.
      * @param height The height of the object.
      * @param offsetX The offset from the left of the screen.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
     public static function centreScreenX(width:Float, height:Float, offsetX:Float, addLogic:ContainerAddLogic):DimResult {
         var y = (System.windowHeight() - height) / 2;
@@ -236,6 +273,9 @@ class Dimensions {
      * @param halign The horizontal alignment to use.
      * @param offsetX The offset from the left of the screen.
      * @param offsetY The offset from the top of the screen.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
     public static function createDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offsetX:Float, offsetY:Float, addLogic:ContainerAddLogic):DimResult {
         var x = 0.0;
@@ -289,6 +329,9 @@ class Dimensions {
     *
     * @param from The dim to reference.
     * @param offset The offset value from the given dimension.
+    * @param addLogic The type of dimension to add to `GraphicsContext`.
+    *
+    * @return Returns a `DimResult` with a `dim`, and `index` value if available.
     **/
     public static function createFromOffset(fromIndex:DimIndex, offset:FastVector2, addLogic:ContainerAddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
@@ -310,7 +353,7 @@ class Dimensions {
 
     /**
      * Align the given dimension along the x-axis of the current game client.
-     * @param a The dimension.
+     * @param aIndex The dimension reference.
      * @param halign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
@@ -334,7 +377,7 @@ class Dimensions {
 
     /**
      * Align the given dimension along the y-axis of the current game client.
-     * @param a The dimension.
+     * @param aIndex The dimension reference.
      * @param valign The alignment to give to the dimension.
      * @param offset A `FastVector2` offset from the anchor point of the alignment.
      */
@@ -359,9 +402,12 @@ class Dimensions {
     /**
      * Create a series of dimensions representing a grid, with each column and row of 
      * equal width and height proportionate to the number of given columns and rows to the container.
-     * @param container The container dimension to create the grid from.
+     * @param containerIndex The container dimension reference to create the grid from.
      * @param columns The number of equally sized columns.
      * @param rows The number of equally sized rows.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns an array of `DimResult` with a `dim`, and `index` value if available.
      */
     public static function dimGridEquals(containerIndex:DimIndex, columns:Int, rows:Int, ?addLogic:ContainerAddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
@@ -406,6 +452,9 @@ class Dimensions {
      * @param container The container dimension to create the grid from.
      * @param columns An array representing the ratios for the columns in the grid.
      * @param rows An array representing the ratios for the rows in the grid.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns an array of `DimResult` with a `dim`, and `index` value if available.
      */
     public static function dimGridFloats(containerIndex:DimIndex, columns:Array<Float>, rows:Array<Float>, ?addLogic:ContainerAddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
@@ -459,6 +508,9 @@ class Dimensions {
      * @param container The container dimension to create the grid from.
      * @param columns An array of column sizes.
      * @param rows An array of row sizes.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns an array of `DimResult` with a `dim`, and `index` value if available.
      */
     public static function dimGrid(containerIndex:DimIndex, columns:Array<DimCellSize>, rows:Array<DimCellSize>, ?addLogic:ContainerAddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
@@ -567,6 +619,9 @@ class Dimensions {
         return dimResults;
     }
 
+    /**
+    * Create multiple `DimCellSize` with the given `count` as convenience.
+    **/
     public static function dimMultiCellSize(cellSize:DimCellSize, count:Int):Array<DimCellSize> {
         var results = [];
         for (i in 0...count)
@@ -575,7 +630,7 @@ class Dimensions {
     }
 
     static var containerColumnOrRow:Dim;
-    static var containerDirection:Int;
+    static var containerDirection:Direction;
     static var containerCellSize:Dim;
     static var containerCell:Int;
     static var containerMethod:Int;
@@ -586,13 +641,19 @@ class Dimensions {
     static var flowAddLogic:ContainerAddLogic;
 
     /**
-     * Create a dimension column, within which each time the function `getNewDim` is called,
-     * a row is created within this column below the last row created.
-     * @param container The container to use for creating new rows.
+     * Create a flow container, within which each time the function `getNewDim` is called,
+     * a new dimension is created based on the given `size` and `direction`.
+     *
+     * This function flows continuously in one direction.
+     *
+     * Call `endFlow` to obtain an array of all dimensions created in this flow.
+     *
+     * @param container The container reference to use.
      * @param size The dim of each cell.
-     * @param direction 1 for up, 2 for down, 3 for left, 4 for right
+     * @param direction Specify the direction flow should go in.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
      */
-    public static function dimFixedFlow(containerIndex:DimIndex, size:Dim, direction:Int, ?addLogic:ContainerAddLogic) {
+    public static function dimFixedFlow(containerIndex:DimIndex, size:Dim, direction:Direction, ?addLogic:ContainerAddLogic) {
         var gtx = Application.instance.graphicsCtx;
         var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
 
@@ -615,9 +676,17 @@ class Dimensions {
     }
 
     /**
+     * Create a flow container within which each time the function `getNewDim` is called,
+     * a new dimension is created based on the given `direction`. The size of each item
+     * must be specified using `dimVariableSetNextDim` prior to calling subsequent `getNewDim`.
+     *
+     * This function flows continuously in one direction.
+     *
+     * Call `endFlow` to obtain an array of all dimensions created in this flow.
      * 
-     * @param container The container to use for creating new rows.
-     * @param direction 1 for up, 2 for down, 3 for left, 4 for right
+     * @param container The container reference to use.
+     * @param direction The specified direction dimensions should flow in.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
      */
     public static function dimVariableFlow(containerIndex:DimIndex, direction:Int, ?addLogic:ContainerAddLogic) {
         var gtx = Application.instance.graphicsCtx;
@@ -641,12 +710,18 @@ class Dimensions {
         flowResults = [];
     }
 
+    /**
+    * When using variable flow, specify the last `dim`.
+    **/
     public static function dimVariableSetNextDim(dim:Dim) {
         if (containerMethod == FLOW_VARIABLE) {
             containerCellSize = dim.clone();
         }
     }
 
+    /**
+    * Get a new dimension from flow functionality.
+    **/
     public static function getNewDim(padding:Float = 0):Dim {
         if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize != null) {
             var x = containerColumnOrRow.getX();
@@ -692,7 +767,7 @@ class Dimensions {
     /**
     * Ends the current flow of dimensions, returning an array of dimension indices that were created during the flow.
     * This function should be called after all dimensions have been created using `getNewDim`.
-    * @return An array of `DimIndex` representing the dimensions created during the flow.
+    * @return An array of `DimResult` representing the dimensions created during the flow.
     **/
     public static function endFlow():Array<DimResult> {
         var resultIndices:Array<DimIndex> = [];
@@ -725,6 +800,9 @@ class Dimensions {
      * If `offsetX` is equal to `0`, the new dimension will be to the right with no margin.
      * @param a The current dimension to use.
      * @param offsetX The value to offset the new dimension.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */ 
     public static function dimOffsetX(aIndex:DimIndex, offsetX:Float, ?addLogic:ContainerAddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
@@ -756,6 +834,9 @@ class Dimensions {
      * If `offsetY` is equal to `0`, the new dimension will be below with no margin.
      * @param a The current dimension to use.
      * @param offsetY The value to offset the new dimension.
+     * @param addLogic The type of dimension to add to `GraphicsContext`.
+     *
+     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
     public static function dimOffsetY(aIndex:DimIndex, offsetY:Float, ?addLogic:ContainerAddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
@@ -782,9 +863,9 @@ class Dimensions {
     }
 
     /**
-     * Aligns dimension `b` to `a`, with the given alignment options. If both alignment values are set to CENTRE/MIDDLE, `b` will effectively be centred to `a`.
-     * @param a The first dimension.
-     * @param b The second dimension.
+     * Aligns dimension `bIndex` to `aIndex`, with the given alignment options. If both alignment values are set to CENTRE/MIDDLE, `b` will effectively be centred to `a`.
+     * @param aIndex The first dimension reference.
+     * @param bIndex The second dimension reference.
      * @param valign The vertical alignment `b` should be to `a`.
      * @param halign The horizontal alignment `b` should be to `a`.
      */
@@ -794,12 +875,12 @@ class Dimensions {
     }
 
     /**
-     * Aligns dimension `b` to `a` on the Y-axis using the given vertical alignment.
-     * @param a The first dimension.
-     * @param b The second dimension.
+     * Aligns dimension `bIndex` to `aIndex` on the Y-axis using the given vertical alignment.
+     * @param aIndex The first dimension reference.
+     * @param bIndex The second dimension reference.
      * @param valign The vertical alignment `b` should be to `a`.
      */
-    public static function dimVAlign(aIndex:DimIndex, bIndex:DimIndex, valign:Int, noCommandCreation:Bool = false) {
+    public static function dimVAlign(aIndex:DimIndex, bIndex:DimIndex, valign:Int) {
         var gtx = Application.instance.graphicsCtx;
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
         var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
@@ -819,12 +900,12 @@ class Dimensions {
     }
 
     /**
-     * Aligns dimension `b` to `a` on the X-axis using the given horizontal alignment.
-     * @param a The first dimension.
-     * @param b The second dimension.
+     * Aligns dimension `bIndex` to `aIndex` on the X-axis using the given horizontal alignment.
+     * @param aIndex The first dimension reference.
+     * @param bIndex The second dimension reference.
      * @param valign The horizontal alignment `b` should be to `a`.
      */
-    public static function dimHAlign(aIndex:DimIndex, bIndex:DimIndex, halign:Int, noCommandCreation:Bool = false) {
+    public static function dimHAlign(aIndex:DimIndex, bIndex:DimIndex, halign:Int) {
         var gtx = Application.instance.graphicsCtx;
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
         var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
@@ -843,12 +924,32 @@ class Dimensions {
         }
     }
 
+    /**
+    * Align dimension `b` to `a` using the given alignment and offset values. This will align from the outer edge of `a`, rather than
+    * align to the inside of `a`.
+    *
+    * @param a The first dimension reference.
+    * @param b The second dimension reference.
+    * @param halign The horizontal alignment.
+    * @param valign The vertical alignment.
+    * @param hoffset The horizontal offset.
+    * @param voffset The vertical offset.
+    **/
     public static function dimAlignOffset(a:DimIndex, b:DimIndex, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0) {
         dimVAlignOffset(a, b, valign, voffset, true);
         dimHAlignOffset(a, b, halign, hoffset, true);
     }
 
-    public static function dimVAlignOffset(aIndex:DimIndex, bIndex:DimIndex, valign:Int, offset:Float = 0.0, noCommandCreation:Bool = false) {
+    /**
+    * Align dimension `b` to `a` using the given alignment and offset values. This will align from the outer edge of `a`, rather than
+    * align to the inside of `a`.
+    *
+    * @param aIndex The first dimension reference.
+    * @param bIndex The second dimension reference.
+    * @param valign The vertical alignment.
+    * @param offset The vertical offset.
+    **/
+    public static function dimVAlignOffset(aIndex:DimIndex, bIndex:DimIndex, valign:Int, offset:Float = 0.0) {
         var gtx = Application.instance.graphicsCtx;
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
         var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
@@ -867,7 +968,16 @@ class Dimensions {
         }
     }
 
-    public static function dimHAlignOffset(aIndex:DimIndex, bIndex:DimIndex, halign:Int, offset:Float = 0.0, noCommandCreation:Bool = false) {
+    /**
+    * Align dimension `b` to `a` using the given alignment and offset values. This will align from the outer edge of `a`, rather than
+    * align to the inside of `a`.
+    *
+    * @param a The first dimension reference.
+    * @param b The second dimension reference.
+    * @param halign The horizontal alignment.
+    * @param offset The horizontal offset.
+    **/
+    public static function dimHAlignOffset(aIndex:DimIndex, bIndex:DimIndex, halign:Int, offset:Float = 0.0) {
         var gtx = Application.instance.graphicsCtx;
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
         var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
@@ -999,11 +1109,13 @@ class Dimensions {
     }
 
     /**
-     * Measure the width and height of the given text with font and fontSize parameters provided by
-     * the given `g2` instance.
+     * Measure the width and height of the given text with font and fontSize.
+     *
      * @param font The instance of a font to measure against.
      * @param fontSize The size of the font.
      * @param text The text to measure.
+     * 
+     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
     public static function getTextDim(font:Font, fontSize:Int, text:String, ?addLogic:ContainerAddLogic):DimResult {
         var result = new Dim(0, 0, font.width(fontSize, text), font.height(fontSize), _order);
