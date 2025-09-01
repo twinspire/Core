@@ -1,5 +1,6 @@
 package twinspire.render.particles;
 
+import kha.System;
 import twinspire.extensions.Graphics2;
 
 import kha.Image;
@@ -176,6 +177,13 @@ class Emitter {
             if (i >= _particles.length) break;
             
             var particle = _particles[i];
+            var posX = position.x + particle.x;
+            var posY = position.y + particle.y;
+
+            if ((posX < 0 || posX > System.windowWidth()) && (posY < 0 || posY >= System.windowHeight())) {
+                continue;
+            }
+
             var particleColor = _colors[i];
             var particleSize = _sizes[i];
             
@@ -185,26 +193,26 @@ class Emitter {
             // Render based on particle shape
             switch (shape) {
                 case Circle: {
-                    Graphics2.fillCircle(g2, particle.x, particle.y, particleSize / 2);
+                    Graphics2.fillCircle(g2, posX, posY, particleSize / 2);
                 }
                 case Square: {
-                    g2.fillRect(particle.x - particleSize / 2, particle.y - particleSize / 2, particleSize, particleSize);
+                    g2.fillRect(posX - particleSize / 2, posY - particleSize / 2, particleSize, particleSize);
                 }
                 case Triangle: {
                     var halfSize = particleSize / 2;
-                    var x1 = particle.x;
-                    var y1 = particle.y - halfSize;
-                    var x2 = particle.x - halfSize;
-                    var y2 = particle.y + halfSize;
-                    var x3 = particle.x + halfSize;
-                    var y3 = particle.y + halfSize;
+                    var x1 = posX;
+                    var y1 = posY - halfSize;
+                    var x2 = posX - halfSize;
+                    var y2 = posY + halfSize;
+                    var x3 = posX + halfSize;
+                    var y3 = posY + halfSize;
                     g2.fillTriangle(x1, y1, x2, y2, x3, y3);
                 }
                 case Image(img): {
                     if (img != null) {
                         g2.drawScaledImage(img, 
-                            particle.x - particleSize / 2, 
-                            particle.y - particleSize / 2, 
+                            posX - particleSize / 2, 
+                            posY - particleSize / 2, 
                             particleSize, particleSize);
                     }
                 }
@@ -366,8 +374,8 @@ class Emitter {
 
         // Set particle position
         _particles[_activeParticles].setFrom(new FastVector2(
-            position.x + oppositeVelocity.x * randomSpread,
-            position.y + oppositeVelocity.y * randomSpread
+            oppositeVelocity.x * randomSpread,
+            oppositeVelocity.y * randomSpread
         ));
 
         if (variableSpeed) {
@@ -429,7 +437,7 @@ class Emitter {
         }
         
         // Set starting position with spread
-        var startPos = new FastVector2(position.x, position.y);
+        var startPos = new FastVector2();
         if (spread > 0.0) {
             var spreadAngle = Math.random() * Math.PI * 2;
             var spreadDistance = Math.random() * spread;
