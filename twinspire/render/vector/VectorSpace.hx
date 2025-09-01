@@ -5,6 +5,13 @@ import twinspire.geom.Dim;
 import twinspire.DimIndex;
 import kha.math.FastVector2;
 
+enum VectorSpaceAlignment {
+    TopLeft;    // Default - align to top-left
+    Center;     // Center both horizontally and vertically
+    TopCenter;  // Center horizontally, align to top
+    CenterLeft; // Center vertically, align to left
+}
+
 class VectorSpace {
     
     private var _bounds:Dim;
@@ -24,6 +31,8 @@ class VectorSpace {
     private var _scrollSpeed:Float = 8.0; // Higher = faster scrolling
     private var _scrollThreshold:Float = 0.5; // When to stop smooth scrolling
     private var _isSmoothing:Bool = false;
+
+    private var _alignment:VectorSpaceAlignment = TopLeft;
 
     public var children(get, never):Array<DimIndex>;
     function get_children():Array<DimIndex> {
@@ -85,6 +94,16 @@ class VectorSpace {
     
     public function isActive():Bool {
         return _isActive;
+    }
+
+    public function setAlignment(alignment:VectorSpaceAlignment):VectorSpace {
+        _alignment = alignment;
+        clampScrolling(); // Reapply clamping with new alignment
+        return this;
+    }
+    
+    public function getAlignment():VectorSpaceAlignment {
+        return _alignment;
     }
     
     public function transformPoint(x:Float, y:Float):FastVector2 {
@@ -294,37 +313,106 @@ class VectorSpace {
         }
         return this;
     }
+
+    public function getVisibleArea():Dim {
+        return new Dim(
+            -_translation.x,
+            -_translation.y,
+            _bounds.width,
+            _bounds.height
+        );
+    }
     
     // Clamp current translation
     private function clampScrolling() {
         if (_infiniteScroll) return;
     
-        // Calculate maximum scroll distances
-        // maxX/maxY represent how far we can scroll in each direction
-        var maxX = Math.max(0, _contentBounds.width - _bounds.width);
-        var maxY = Math.max(0, _contentBounds.height - _bounds.height);
+        // Content bounds can now have negative x,y positions
+        var contentLeft = _contentBounds.x;
+        var contentTop = _contentBounds.y;
+        var contentRight = _contentBounds.x + _contentBounds.width;
+        var contentBottom = _contentBounds.y + _contentBounds.height;
         
-        // Clamp translation values:
-        // - Minimum translation is -maxX/-maxY (scrolled to bottom-right)
-        // - Maximum translation is 0/0 (scrolled to top-left)
-        _translation.x = Math.max(-maxX, Math.min(0, _translation.x));
-        _translation.y = Math.max(-maxY, Math.min(0, _translation.y));
+        // Calculate how much we can scroll in each direction
+        var maxScrollLeft = Math.max(0, -contentLeft); // How far we can scroll to show negative content
+        var maxScrollRight = Math.max(0, contentRight - _bounds.width);
+        var maxScrollUp = Math.max(0, -contentTop);
+        var maxScrollDown = Math.max(0, contentBottom - _bounds.height);
+        
+        // Calculate alignment offsets for when content is smaller than container
+        var alignmentOffsetX = 0.0;
+        var alignmentOffsetY = 0.0;
+        
+        var totalContentWidth = contentRight - contentLeft;
+        var totalContentHeight = contentBottom - contentTop;
+        
+        if (totalContentWidth < _bounds.width) {
+            switch (_alignment) {
+                case Center | TopCenter:
+                    alignmentOffsetX = (_bounds.width - totalContentWidth) / 2 - contentLeft;
+                case TopLeft | CenterLeft:
+                    alignmentOffsetX = -contentLeft; // Align content's left edge to container's left
+            }
+        }
+        
+        if (totalContentHeight < _bounds.height) {
+            switch (_alignment) {
+                case Center | CenterLeft:
+                    alignmentOffsetY = (_bounds.height - totalContentHeight) / 2 - contentTop;
+                case TopLeft | TopCenter:
+                    alignmentOffsetY = -contentTop; // Align content's top edge to container's top
+            }
+        }
+        
+        // Determine clamping bounds
+        var minTranslationX:Float, maxTranslationX:Float;
+        var minTranslationY:Float, maxTranslationY:Float;
+        
+        if (totalContentWidth <= _bounds.width) {
+            // Content fits horizontally - fix to alignment position
+            minTranslationX = maxTranslationX = alignmentOffsetX;
+        } else {
+            // Content larger than container - allow scrolling
+            // Can scroll left to show negative content, right to show positive content
+            minTranslationX = -maxScrollRight;
+            maxTranslationX = maxScrollLeft;
+        }
+        
+        if (totalContentHeight <= _bounds.height) {
+            // Content fits vertically - fix to alignment position
+            minTranslationY = maxTranslationY = alignmentOffsetY;
+        } else {
+            // Content larger than container - allow scrolling
+            minTranslationY = -maxScrollDown;
+            maxTranslationY = maxScrollUp;
+        }
+        
+        // Apply clamping
+        _translation.x = Math.max(minTranslationX, Math.min(maxTranslationX, _translation.x));
+        _translation.y = Math.max(minTranslationY, Math.min(maxTranslationY, _translation.y));
         
         // Also clamp target if we're smoothing
         if (_smoothScrolling) {
-            _targetTranslation.x = Math.max(-maxX, Math.min(0, _targetTranslation.x));
-            _targetTranslation.y = Math.max(-maxY, Math.min(0, _targetTranslation.y));
+            _targetTranslation.x = Math.max(minTranslationX, Math.min(maxTranslationX, _targetTranslation.x));
+            _targetTranslation.y = Math.max(minTranslationY, Math.min(maxTranslationY, _targetTranslation.y));
         }
     }
     
     // Clamp target translation
     private function clampTargetScrolling() {
-        if (_infiniteScroll) return;
+        clampScrolling();
+    }
+
+    public function doesContentFit():Bool {
+        return _contentBounds.width <= _bounds.width && _contentBounds.height <= _bounds.height;
+    }
     
-        var maxX = Math.max(0, _contentBounds.width - _bounds.width);
-        var maxY = Math.max(0, _contentBounds.height - _bounds.height);
-        
-        _targetTranslation.x = Math.max(-maxX, Math.min(0, _targetTranslation.x));
-        _targetTranslation.y = Math.max(-maxY, Math.min(0, _targetTranslation.y));
+    // Helper methods to check individual axes
+    public function doesContentFitHorizontally():Bool {
+        return _contentBounds.width <= _bounds.width;
+    }
+    
+    public function doesContentFitVertically():Bool {
+        return _contentBounds.height <= _bounds.height;
     }
 }

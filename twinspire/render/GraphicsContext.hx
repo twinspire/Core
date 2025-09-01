@@ -2056,20 +2056,38 @@ class GraphicsContext {
     * Update container content bounds based on their children's actual positions.
     **/
     private function updateContainerContentBounds(context:ContainerResult) {
-        var maxWidth = 0.0;
-        var maxHeight = 0.0;
+        if (context.space.children.length == 0) {
+            context.space.updateContentBounds(new Dim(0, 0, 0, 0));
+            return;
+        }
         
+        var minX = Math.POSITIVE_INFINITY;
+        var minY = Math.POSITIVE_INFINITY;
+        var maxX = Math.NEGATIVE_INFINITY;
+        var maxY = Math.NEGATIVE_INFINITY;
+        
+        // Find the actual bounds of all content
         for (childIndex in context.space.children) {
             var dims = getClientDimensionsAtIndex(childIndex);
             for (dim in dims) {
                 if (dim != null) {
-                    maxWidth = Math.max(dim.x + dim.width, maxWidth);
-                    maxHeight = Math.max(dim.y + dim.height, maxHeight);
+                    minX = Math.min(minX, dim.x);
+                    minY = Math.min(minY, dim.y);
+                    maxX = Math.max(maxX, dim.x + dim.width);
+                    maxY = Math.max(maxY, dim.y + dim.height);
                 }
             }
         }
         
-        context.space.updateContentBounds(new Dim(0, 0, maxWidth, maxHeight));
+        // Handle case where no valid dimensions were found
+        if (minX == Math.POSITIVE_INFINITY) {
+            context.space.updateContentBounds(new Dim(0, 0, 0, 0));
+            return;
+        }
+        
+        // Create content bounds that include negative positions
+        var contentBounds = new Dim(minX, minY, maxX - minX, maxY - minY);
+        context.space.updateContentBounds(contentBounds);
     }
 
     /**
