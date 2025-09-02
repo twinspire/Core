@@ -13,6 +13,7 @@ typedef Dependent = {
 
 class Template {
     
+    private var dimensionRefs:Map<String, DimIndex> = new Map();
     private var dependencies:Array<Dependent>;
 
     /**
@@ -28,6 +29,40 @@ class Template {
         indices = [];
         callbacks = [];
         dependencies = [];
+    }
+
+    /**
+    * Adds or updates a dimension from a given name using the given callback and scope. Unlike `addAndInvoke`,
+    * this function manages creating or updating dimensions for specific items within the template.
+    *
+    * Moreover, use this function for better organisation and managing your use of `useDimension` in `GraphicsContext`.
+    *
+    * @param name The name to map the callback `dimProvider` to.
+    * @param dimProvider The callback used to create and update dimensions. The string is the `name` given, and an optional `DimIndex`. Return the
+    * new `Dim` from this callback.
+    * @param scope The `AddLogic` used to determine what type of dimension should be created in `GraphicsContext`.
+    * @param dependsOn An optional string value specifying which `name` this dimension should depend on.
+    **/
+    public function addOrUpdateDim(name:String, dimProvider:(String, ?DimIndex) -> Dim, ?scope:AddLogic, ?dependsOn:String):DimIndex {
+        var existingIndex = dimensionRefs.get(name);
+        var newDim = dimProvider(name, existingIndex);
+        
+        var gctx = Application.instance.graphicsCtx;
+        
+        var resultIndex = gctx.setOrReinitDim(existingIndex, newDim, scope);
+        
+        // Store/update reference
+        dimensionRefs.set(name, resultIndex);
+        
+        // Handle dependencies only on creation
+        if (existingIndex == null && dependsOn != null) {
+            var dependsOnIndex = dimensionRefs.get(dependsOn);
+            if (dependsOnIndex != null) {
+                gctx.setupDirectLink(resultIndex, dependsOnIndex);
+            }
+        }
+        
+        return resultIndex;
     }
 
     /**
@@ -147,6 +182,25 @@ class Template {
         dependencies = dependencies.where(d -> d.current != found);
         
         return affectedIndices;
+    }
+
+    /**
+    * Get a dimension reference by name.
+    **/
+    public function getDim(name:String):DimIndex {
+        return dimensionRefs.get(name);
+    }
+    
+    /**
+    * Update all dimensions in this template (useful for responsive layouts).
+    **/
+    public function updateAll(dimProvider:(String, DimIndex) -> Dim) {
+        var gctx = Application.instance.graphicsCtx;
+        
+        for (name => index in dimensionRefs) {
+            var newDim = dimProvider(name, index);
+            gctx.setOrReinitDim(index, newDim);
+        }
     }
 
     /**

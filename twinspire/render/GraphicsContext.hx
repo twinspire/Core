@@ -1671,6 +1671,139 @@ class GraphicsContext {
     }
 
     /**
+    * Sets a new dimension or reinitializes an existing one.
+    * This unified function handles both creation and updates seamlessly.
+    *
+    * @param index Optional existing DimIndex to update. If null, creates new dimension.
+    * @param dim The dimension to set or create.
+    * @param scope How to handle the dimension (UI, Static, Sprite, or Empty).
+    * @return The DimIndex (either the original or newly created one).
+    **/
+    public function setOrReinitDim(?index:DimIndex, dim:Dim, ?scope:AddLogic):DimIndex {
+        if (scope != null && index == null) {
+            switch (scope) {
+                case Ui(renderType, linkTo): {
+                    return addUI(dim, renderType, linkTo != null ? DimIndexUtils.getDirectIndex(linkTo) : -1);
+                }
+                case Static(renderType, linkTo): {
+                    return addStatic(dim, renderType, linkTo != null ? DimIndexUtils.getDirectIndex(linkTo) : -1);
+                }
+                case Sprite(renderType, linkTo): {
+                    return addSprite(dim, renderType, linkTo != null ? DimIndexUtils.getDirectIndex(linkTo) : -1);
+                }
+                case Empty(linked): {
+                    return addEmpty(dim, linkTo != null ? DimIndexUtils.getDirectIndex(linkTo) : -1);
+                }
+            }
+        }
+        else if (index != null && isDimIndexValid(index)) {
+            var adjustedDim = adjustDimForVectorSpace(index, dim);
+            overrideDimension(index, adjustedDim);
+            return index;
+        }
+    }
+
+    /**
+    * Adjusts dimension coordinates if the DimIndex belongs to a VectorSpace.
+    **/
+    private function adjustDimForVectorSpace(index:DimIndex, worldDim:Dim):Dim {
+        // Find which VectorSpace (if any) contains this dimension
+        var vectorSpace = findVectorSpaceForDimension(index);
+        
+        if (vectorSpace != null) {
+            // Convert world coordinates to vector space coordinates
+            var adjustedDim = convertWorldToVectorSpace(worldDim, vectorSpace);
+            return adjustedDim;
+        }
+        
+        // No vector space - return original dimension
+        return worldDim;
+    }
+
+    /**
+    * Finds the VectorSpace that contains the given dimension.
+    **/
+    private function findVectorSpaceForDimension(index:DimIndex):Null<VectorSpace> {
+        if (_vectorActive && vectorSpace != null) {
+            for (childIndex in vectorSpace.children) {
+                if (DimIndexUtils.equals(childIndex, index)) {
+                    return vectorSpace;
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+    * Converts world coordinates to vector space relative coordinates.
+    **/
+    private function convertWorldToVectorSpace(worldDim:Dim, vectorSpace:VectorSpace):Dim {
+        var translation = vectorSpace.translation;
+        var zoom = vectorSpace.zoom;
+        
+        // Reverse the vector space transformation
+        var vectorSpaceX = (worldDim.x / zoom) - translation.x;
+        var vectorSpaceY = (worldDim.y / zoom) - translation.y;
+        var vectorSpaceWidth = worldDim.width / zoom;
+        var vectorSpaceHeight = worldDim.height / zoom;
+        
+        return new Dim(vectorSpaceX, vectorSpaceY, vectorSpaceWidth, vectorSpaceHeight, worldDim.order);
+    }
+
+    /**
+    * Check if a dimension belongs to any VectorSpace.
+    **/
+    public function isInVectorSpace(index:DimIndex):Bool {
+        return findVectorSpaceForDimension(index) != null;
+    }
+
+    /**
+    * Get the VectorSpace that contains a dimension.
+    **/
+    public function getVectorSpaceForDimension(index:DimIndex):Null<VectorSpace> {
+        return findVectorSpaceForDimension(index);
+    }
+
+    /**
+    * Get all dimensions that belong to a specific VectorSpace.
+    **/
+    public function getDimensionsInVectorSpace(vectorSpace:VectorSpace):Array<DimIndex> {
+        return vectorSpace.children.copy();
+    }
+
+    /**
+    * Add a dimension to a VectorSpace.
+    **/
+    public function addDimensionToVectorSpace(index:DimIndex, vectorSpace:VectorSpace) {
+        if (!vectorSpace.hasChild(index)) {
+            vectorSpace.addChild(index);
+        }
+    }
+
+    /**
+    * Remove a dimension from its VectorSpace.
+    **/
+    public function removeDimensionFromVectorSpace(index:DimIndex) {
+        var vectorSpace = findVectorSpaceForDimension(index);
+        if (vectorSpace != null) {
+            vectorSpace.removeChild(index);
+        }
+    }
+
+    public function setupContainerVectorSpace(containerIndex:Int, vectorSpace:VectorSpace) {
+        if (containerIndex >= 0 && containerIndex < containers.length) {
+            var container = containers[containerIndex];
+            container.setupVectorSpace(vectorSpace);
+            
+            // Register all existing child indices with the vector space
+            for (childIndex in container.childIndices) {
+                addDimensionToVectorSpace(childIndex, vectorSpace);
+            }
+        }
+    }
+
+    /**
     * Add an empty dimension to the context. This function is used to reserve a dimension index
     * for later use, such as when you want to add a dimension later in the frame.
     *
@@ -1703,7 +1836,7 @@ class GraphicsContext {
 
         queries[index] = null;
         activities[index] = null;
-        _activeDimensions[index] = true;
+        _activeDimensions[index] = false;
         
         return DimIndex.Direct(index);
     }

@@ -62,13 +62,6 @@ enum DimAlignment {
     DimAlign(valign:VerticalAlign, halign:HorizontalAlign);
 }
 
-enum ContainerAddLogic {
-    Empty(?linked:DimIndex);
-    Ui(?id:Id, ?linked:DimIndex);
-    Static(?id:Id, ?linked:DimIndex);
-    Sprite(?id:Id, ?linked:DimIndex);
-}
-
 typedef DimResult = {
     var ?index:DimIndex;
     var ?dim:Dim;
@@ -80,7 +73,7 @@ class Dimensions {
     private static var _visibility:Bool = true;
     private static var _editMode:Bool;
 
-    static function addDimToGraphicsContext(dim:Dim, addLogic:ContainerAddLogic, ?parent:DimIndex) {
+    static function addDimToGraphicsContext(dim:Dim, addLogic:AddLogic, ?parent:DimIndex) {
         var gtx = Application.instance.graphicsCtx;
         var result:DimIndex = null;
         switch (addLogic) {
@@ -100,7 +93,7 @@ class Dimensions {
         return result;
     }
 
-    static function getDimensionIndicesFromGroup(group:Array<Dim>, addLogic:ContainerAddLogic, parent:DimIndex):Array<DimIndex> {
+    static function getDimensionIndicesFromGroup(group:Array<Dim>, addLogic:AddLogic, parent:DimIndex):Array<DimIndex> {
         var gtx = Application.instance.graphicsCtx;
         var resultIndices = new Array<DimIndex>();
 
@@ -174,7 +167,7 @@ class Dimensions {
     *
     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
     **/
-    public static function createFromDim(dim:Dim, addLogic:ContainerAddLogic):DimResult {
+    public static function createFromDim(dim:Dim, addLogic:AddLogic):DimResult {
         var result = dim.clone();
         result.order = _order;
         result.visible = _visibility;
@@ -198,7 +191,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
 	 */
-	public static function centreScreenFromSize(width:Float, height:Float, addLogic:ContainerAddLogic):DimResult {
+	public static function centreScreenFromSize(width:Float, height:Float, addLogic:AddLogic):DimResult {
         var x = (System.windowWidth() - width) / 2;
         var y = (System.windowHeight() - height) / 2;
         var result = new Dim(x, y, width, height, _order);
@@ -224,7 +217,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function centreScreenY(width:Float, height:Float, offsetY:Float, addLogic:ContainerAddLogic):DimResult {
+    public static function centreScreenY(width:Float, height:Float, offsetY:Float, addLogic:AddLogic):DimResult {
         var x = (System.windowWidth() - width) / 2;
         var result = new Dim(x, offsetY, width, height, _order);
         result.visible = _visibility;
@@ -249,7 +242,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function centreScreenX(width:Float, height:Float, offsetX:Float, addLogic:ContainerAddLogic):DimResult {
+    public static function centreScreenX(width:Float, height:Float, offsetX:Float, addLogic:AddLogic):DimResult {
         var y = (System.windowHeight() - height) / 2;
         var result = new Dim(offsetX, y, width, height, _order);
         result.visible = _visibility;
@@ -277,7 +270,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function createDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offsetX:Float, offsetY:Float, addLogic:ContainerAddLogic):DimResult {
+    public static function createDimAlignScreen(width:Float, height:Float, valign:VerticalAlign, halign:HorizontalAlign, offsetX:Float, offsetY:Float, addLogic:AddLogic):DimResult {
         var x = 0.0;
         var y = 0.0;
         if (valign == VALIGN_TOP)
@@ -333,7 +326,7 @@ class Dimensions {
     *
     * @return Returns a `DimResult` with a `dim`, and `index` value if available.
     **/
-    public static function createFromOffset(fromIndex:DimIndex, offset:FastVector2, addLogic:ContainerAddLogic):DimResult {
+    public static function createFromOffset(fromIndex:DimIndex, offset:FastVector2, addLogic:AddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
         var from = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(fromIndex));
 
@@ -409,7 +402,7 @@ class Dimensions {
      *
      * @return Returns an array of `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function dimGridEquals(containerIndex:DimIndex, columns:Int, rows:Int, ?addLogic:ContainerAddLogic):Array<DimResult> {
+    public static function dimGridEquals(containerIndex:DimIndex, columns:Int, rows:Int, ?addLogic:AddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
         var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
 
@@ -456,7 +449,7 @@ class Dimensions {
      *
      * @return Returns an array of `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function dimGridFloats(containerIndex:DimIndex, columns:Array<Float>, rows:Array<Float>, ?addLogic:ContainerAddLogic):Array<DimResult> {
+    public static function dimGridFloats(containerIndex:DimIndex, columns:Array<Float>, rows:Array<Float>, ?addLogic:AddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
         var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
 
@@ -512,7 +505,7 @@ class Dimensions {
      *
      * @return Returns an array of `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function dimGrid(containerIndex:DimIndex, columns:Array<DimCellSize>, rows:Array<DimCellSize>, ?addLogic:ContainerAddLogic):Array<DimResult> {
+    public static function dimGrid(containerIndex:DimIndex, columns:Array<DimCellSize>, rows:Array<DimCellSize>, ?addLogic:AddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
         var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
 
@@ -638,7 +631,7 @@ class Dimensions {
 
     static var flowContainerIndex:DimIndex;
     static var flowResults:Array<Dim>;
-    static var flowAddLogic:ContainerAddLogic;
+    static var flowAddLogic:AddLogic;
 
     /**
      * Create a flow container, within which each time the function `getNewDim` is called,
@@ -653,7 +646,7 @@ class Dimensions {
      * @param direction Specify the direction flow should go in.
      * @param addLogic The type of dimension to add to `GraphicsContext`.
      */
-    public static function dimFixedFlow(containerIndex:DimIndex, size:Dim, direction:Direction, ?addLogic:ContainerAddLogic) {
+    public static function dimFixedFlow(containerIndex:DimIndex, size:Dim, direction:Direction, ?addLogic:AddLogic) {
         var gtx = Application.instance.graphicsCtx;
         var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
 
@@ -688,7 +681,7 @@ class Dimensions {
      * @param direction The specified direction dimensions should flow in.
      * @param addLogic The type of dimension to add to `GraphicsContext`.
      */
-    public static function dimVariableFlow(containerIndex:DimIndex, direction:Int, ?addLogic:ContainerAddLogic) {
+    public static function dimVariableFlow(containerIndex:DimIndex, direction:Int, ?addLogic:AddLogic) {
         var gtx = Application.instance.graphicsCtx;
         var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
 
@@ -804,7 +797,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */ 
-    public static function dimOffsetX(aIndex:DimIndex, offsetX:Float, ?addLogic:ContainerAddLogic):DimResult {
+    public static function dimOffsetX(aIndex:DimIndex, offsetX:Float, ?addLogic:AddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
 
@@ -838,7 +831,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function dimOffsetY(aIndex:DimIndex, offsetY:Float, ?addLogic:ContainerAddLogic):DimResult {
+    public static function dimOffsetY(aIndex:DimIndex, offsetY:Float, ?addLogic:AddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
         var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
 
@@ -1117,7 +1110,7 @@ class Dimensions {
      * 
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function getTextDim(font:Font, fontSize:Int, text:String, ?addLogic:ContainerAddLogic):DimResult {
+    public static function getTextDim(font:Font, fontSize:Int, text:String, ?addLogic:AddLogic):DimResult {
         var result = new Dim(0, 0, font.width(fontSize, text), font.height(fontSize), _order);
         result.visible = _visibility;
         var resultIndex:DimIndex = null;
