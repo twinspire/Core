@@ -681,7 +681,7 @@ class Dimensions {
      * @param direction The specified direction dimensions should flow in.
      * @param addLogic The type of dimension to add to `GraphicsContext`.
      */
-    public static function dimVariableFlow(containerIndex:DimIndex, direction:Int, ?addLogic:AddLogic) {
+    public static function dimVariableFlow(containerIndex:DimIndex, direction:Direction, ?addLogic:AddLogic) {
         var gtx = Application.instance.graphicsCtx;
         var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
 
@@ -716,7 +716,7 @@ class Dimensions {
     * Get a new dimension from flow functionality.
     **/
     public static function getNewDim(padding:Float = 0):Dim {
-        if (containerColumnOrRow != null && containerDirection > 0 && containerCellSize != null) {
+        if (containerColumnOrRow != null && containerCellSize != null) {
             var x = containerColumnOrRow.getX();
             var y = containerColumnOrRow.getY();
             var width = containerColumnOrRow.getWidth();
@@ -863,8 +863,8 @@ class Dimensions {
      * @param halign The horizontal alignment `b` should be to `a`.
      */
     public static function dimAlign(aIndex:DimIndex, bIndex:DimIndex, valign:Int, halign:Int) {
-        dimVAlign(aIndex, bIndex, valign, true);
-        dimHAlign(aIndex, bIndex, halign, true);
+        dimVAlign(aIndex, bIndex, valign);
+        dimHAlign(aIndex, bIndex, halign);
     }
 
     /**
@@ -929,8 +929,8 @@ class Dimensions {
     * @param voffset The vertical offset.
     **/
     public static function dimAlignOffset(a:DimIndex, b:DimIndex, halign:Int, valign:Int, hoffset:Float = 0.0, voffset:Float = 0.0) {
-        dimVAlignOffset(a, b, valign, voffset, true);
-        dimHAlignOffset(a, b, halign, hoffset, true);
+        dimVAlignOffset(a, b, valign, voffset);
+        dimHAlignOffset(a, b, halign, hoffset);
     }
 
     /**

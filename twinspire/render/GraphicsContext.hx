@@ -1691,7 +1691,7 @@ class GraphicsContext {
                 case Sprite(renderType, linkTo): {
                     return addSprite(dim, renderType, linkTo != null ? DimIndexUtils.getDirectIndex(linkTo) : -1);
                 }
-                case Empty(linked): {
+                case Empty(linkTo): {
                     return addEmpty(dim, linkTo != null ? DimIndexUtils.getDirectIndex(linkTo) : -1);
                 }
             }
@@ -1700,6 +1700,9 @@ class GraphicsContext {
             var adjustedDim = adjustDimForVectorSpace(index, dim);
             overrideDimension(index, adjustedDim);
             return index;
+        }
+        else {
+            return null;
         }
     }
 
@@ -1724,7 +1727,7 @@ class GraphicsContext {
     * Finds the VectorSpace that contains the given dimension.
     **/
     private function findVectorSpaceForDimension(index:DimIndex):Null<VectorSpace> {
-        if (_vectorActive && vectorSpace != null) {
+        if (vectorSpace != null) {
             for (childIndex in vectorSpace.children) {
                 if (DimIndexUtils.equals(childIndex, index)) {
                     return vectorSpace;
