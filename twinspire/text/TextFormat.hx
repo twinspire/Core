@@ -13,6 +13,8 @@ class TextFormat
 	public var fontSize:Int;
 	public var underline:Bool;
 	public var superscript:Bool;
+	public var subscript:Bool;
+	public var fraction:Int;
 
 	public function new()
 	{
