@@ -44,13 +44,13 @@ class RopedString {
     }
 
     public function toString():String {
-        var result = new StringBuf();
+        var result = "";
         for (node in nodes) {
             for (leaf in node.leaves) {
-                result.add(leaf.toString());
+                result += leaf.toString();
             }
         }
-        return result.toString();
+        return result;
     }
     
     public function getLines(limit:Int = 100, startPos:Int = 0):Array<{data:Array<Int>, nextNodeStart:Int}> {
@@ -66,7 +66,15 @@ class RopedString {
     }
     
     public function find(chars:Array<Int>):Int {
-      
+        if (chars.length == 0) return -1;
+        
+        var needle = "";
+        for (charCode in chars) {
+            needle += String.fromCharCode(charCode);
+        }
+        
+        var haystack = toString();
+        return haystack.indexOf(needle);
     }
     
     public function findNextToken(type:Int):String {
@@ -196,11 +204,11 @@ class RopedString {
     }
 
     public function substring(start:Int, end:Int):String {
-        var chars:String = "";
+        var result = "";
         for (i in start...end) {
-            chars += String.fromCharCode(charAt(i));
+            result += String.fromCharCode(charAt(i));
         }
-        return chars;
+        return result;
     }
 
     public function getStringData():Dynamic {
@@ -222,9 +230,15 @@ class RopedString {
 
     public function search(data:Array<Int>):Array<{start:Int, end:Int}> {
         var results:Array<{start:Int, end:Int}> = [];
-        var searchPos = find(data);
-        if (searchPos != -1) {
-            results.push({start: searchPos, end: searchPos + data.length});
+        var needle = "";
+        for (charCode in data) {
+            needle += String.fromCharCode(charCode);
+        }
+        
+        var haystack = toString();
+        var foundIndex = haystack.indexOf(needle);
+        if (foundIndex != -1) {
+            results.push({start: foundIndex, end: foundIndex + data.length});
         }
         return results;
     }
@@ -339,7 +353,7 @@ class RopedString {
             newNode.leaves.push(leaf);
         }
         
-        // Update navigation pointers - much simpler now!
+        // Update navigation pointers
         newNode.lastNodeIndex = nodeIndex;
         newNode.nextNodeIndex = originalNode.nextNodeIndex;
         originalNode.nextNodeIndex = nodeIndex + 1;

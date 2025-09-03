@@ -29,7 +29,10 @@ class Leaf {
     
     public function toString():String {
         if (stringDirty || cachedString == null) {
-            cachedString = String.fromCharCodes(data);
+            cachedString = "";
+            for (charCode in data) {
+                cachedString += String.fromCharCode(charCode);
+            }
             stringDirty = false;
         }
         return cachedString;
