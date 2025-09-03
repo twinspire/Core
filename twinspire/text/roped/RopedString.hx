@@ -237,8 +237,9 @@ class RopedString {
         
         var haystack = toString();
         var foundIndex = haystack.indexOf(needle);
-        if (foundIndex != -1) {
+        while (foundIndex > -1) {
             results.push({start: foundIndex, end: foundIndex + data.length});
+            foundIndex = haystack.indexOf(needle, foundIndex + 1);
         }
         return results;
     }
