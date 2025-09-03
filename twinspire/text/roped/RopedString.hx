@@ -17,7 +17,7 @@ class RopedString {
     
     /**
      * A callback function that is called each time a value is appended to this string.
-     * The resulting string is passed vianthe first parameter, allowing you to check the value.
+     * The resulting string is passed via the first parameter, allowing you to check the value.
      * Return `true` in `tokenize` to reset the string and a numeric value `type` to specify a user-defined token, stored internally.
      */
     public var tokenCallback:(String) -> { tokenize: Bool, type: Int };
