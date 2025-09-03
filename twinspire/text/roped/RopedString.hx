@@ -15,6 +15,10 @@ class RopedString {
      * Return `true` in `tokenize` to reset the string and a numeric value `type` to specify a user-defined token, stored internally.
      */
     public var tokenCallback:(String) -> { tokenize: Bool, type: Int };
+
+    public function getTokens() {
+        return tokens;
+    }
     
     public function new() {
         nodes = [];
@@ -271,8 +275,8 @@ class RopedString {
                 
                 if (start < leafEnd && end > leafStart) {
                     // This leaf is affected by the deletion
-                    var deleteStart = Math.max(0, start - leafStart);
-                    var deleteEnd = Math.min(leafLength, end - leafStart);
+                    var deleteStart = cast (Math.max(0, start - leafStart), Int);
+                    var deleteEnd = cast (Math.min(leafLength, end - leafStart), Int);
                     var leafDeleteLength = deleteEnd - deleteStart;
                     
                     if (deleteStart == 0 && deleteEnd == leafLength) {
@@ -428,7 +432,6 @@ class RopedString {
             var node = new Node();
             var leaf = new Leaf(chars);
             node.leaves.push(leaf);
-            node.updateTotalLength();
             nodes.push(node);
             updateTokens(pos, chars.length);
             return;
@@ -461,7 +464,6 @@ class RopedString {
             }
         }
         
-        node.updateTotalLength();
         updateTokens(pos, chars.length);
     }
 
@@ -472,7 +474,7 @@ class RopedString {
         
         // Subtract lengths from previous nodes
         for (i in 0...nodeIndex) {
-            localPos -= nodes[i].totalLength;
+            localPos -= nodes[i].getTotalLength();
         }
         
         // Subtract lengths from previous leaves in current node
