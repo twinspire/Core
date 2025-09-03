@@ -1,8 +1,14 @@
+//
+// Developed with assistance from Claude AI - 2025-09-03
+//
+
 package twinspire.text.roped;
 
 class RopedString {
   
     private var tokens:Array<Token>;
+    private var untokenizedBuffer:String; 
+    private var bufferStartPos:Int;
   
     /**
      * A collection of nodes representing chunks of text.
@@ -23,28 +29,46 @@ class RopedString {
     public function new() {
         nodes = [];
         tokens = [];
+        untokenizedBuffer = "";
+        bufferStartPos = 0;
     }
 
-    private function updateTokens(insertPos:Int, deltaLength:Int):Void {
-        if (tokenCallback != null) {
-            var currentText = toString();
-            var tokenResult = tokenCallback(currentText);
-            if (tokenResult.tokenize) {
-                // Create token for the text that was just inserted
-                var token = new Token(tokenResult.type, insertPos, insertPos + deltaLength);
-                tokens.push(token);
-            }
-        }
-        
-        // Update existing token positions
+    private function updateTokensWithText(insertPos:Int, deltaLength:Int, insertedText:String):Void {
+        // First, update existing token positions for any insertions before them
         for (token in tokens) {
-            if (token.start > insertPos) {
+            if (token.start >= insertPos) {
                 token.start += deltaLength;
             }
-            if (token.end > insertPos) {
+            if (token.end >= insertPos) {
                 token.end += deltaLength;
             }
         }
+        
+        // If this is the first text being added, set buffer start position
+        if (untokenizedBuffer.length == 0) {
+            bufferStartPos = insertPos;
+        }
+        
+        // Add the newly inserted text to the buffer
+        untokenizedBuffer += insertedText;
+        
+        // Check if we should tokenize
+        if (tokenCallback != null) {
+            var tokenResult = tokenCallback(untokenizedBuffer);
+            if (tokenResult.tokenize) {
+                // Create token for the entire buffer
+                var token = new Token(tokenResult.type, bufferStartPos, bufferStartPos + untokenizedBuffer.length);
+                tokens.push(token);
+                
+                // Reset buffer and advance position
+                bufferStartPos += untokenizedBuffer.length;
+                untokenizedBuffer = "";
+            }
+        }
+    }
+
+    private function updateTokens(insertPos:Int, deltaLength:Int):Void {
+        updateTokensWithText(insertPos, deltaLength, "");
     }
 
     public function toString():String {
@@ -430,17 +454,24 @@ class RopedString {
     public function insertChars(chars:Array<Int>, pos:Int):Void {
         if (chars.length == 0) return;
         
+        // Convert chars to string for tokenization
+        var insertedText = "";
+        for (charCode in chars) {
+            insertedText += String.fromCharCode(charCode);
+        }
+        
         if (nodes.length == 0) {
             // Create first node and leaf
             var node = new Node();
             var leaf = new Leaf(chars);
             node.leaves.push(leaf);
             nodes.push(node);
-            updateTokens(pos, chars.length);
+            updateTokensWithText(pos, chars.length, insertedText);
             return;
         }
         
         var result = findNodeLeafFromPosition(pos);
+        
         if (result.node == -1) {
             // Position is at or beyond end, append to last node
             var lastNode = nodes[nodes.length - 1];
@@ -452,7 +483,7 @@ class RopedString {
                 lastNode.leaves.push(newLeaf);
             }
             
-            updateTokens(pos, chars.length);
+            updateTokensWithText(pos, chars.length, insertedText);
             return;
         }
         
@@ -468,11 +499,12 @@ class RopedString {
             // Replace current leaf with left part
             node.leaves[result.leaf] = splitResult.left;
             
-            // Insert chars into right part
-            splitResult.right.insert(0, chars);
+            // Create a new leaf with just the inserted chars
+            var insertedLeaf = new Leaf(chars);
             
-            // Insert right part after current position
-            node.leaves.insert(result.leaf + 1, splitResult.right);
+            // Insert the new leaf and then the right part
+            node.leaves.insert(result.leaf + 1, insertedLeaf);
+            node.leaves.insert(result.leaf + 2, splitResult.right);
             
             // Check if node is too large and needs splitting
             if (node.leaves.length > MAX_NODE_SIZE) {
@@ -480,7 +512,7 @@ class RopedString {
             }
         }
         
-        updateTokens(pos, chars.length);
+        updateTokensWithText(pos, chars.length, insertedText);
     }
 
     private static var MAX_NODE_SIZE:Int = 8; // Adjust as needed
@@ -513,6 +545,7 @@ class RopedString {
                 var leaf = node.leaves[leafIndex];
                 var leafLength = leaf.length();
                 
+                // Fix: Should check if position falls within this leaf
                 if (pos >= currentPos && pos <= currentPos + leafLength) {
                     return {node: nodeIndex, leaf: leafIndex};
                 }
@@ -521,7 +554,7 @@ class RopedString {
             }
         }
         
-        // Return last valid position if pos is beyond string length
+        // If position is at the very end, return the last leaf
         if (nodes.length > 0) {
             var lastNode = nodes[nodes.length - 1];
             if (lastNode.leaves.length > 0) {
@@ -572,10 +605,18 @@ class RopedString {
     }
     
     private function removeEmptyNode(nodeIndex:Int):Void {
+        if (nodeIndex < 0 || nodeIndex >= nodes.length) return;
+        
         var node = nodes[nodeIndex];
         
-        // Update navigation pointers
-        if (node.lastNodeIndex != -1) {
+        // If this is the only node, just remove it and clear navigation
+        if (nodes.length == 1) {
+            nodes.splice(nodeIndex, 1);
+            return;
+        }
+        
+        // Update navigation pointers with bounds checking
+        if (node.lastNodeIndex != -1 && node.lastNodeIndex < nodes.length) {
             nodes[node.lastNodeIndex].nextNodeIndex = node.nextNodeIndex;
         }
         if (node.nextNodeIndex != -1 && node.nextNodeIndex < nodes.length) {
@@ -588,7 +629,7 @@ class RopedString {
         // Update all subsequent node indices
         for (i in nodeIndex...nodes.length) {
             var currentNode = nodes[i];
-            if (currentNode.lastNodeIndex > nodeIndex) {
+            if (currentNode.lastNodeIndex >= nodeIndex) {
                 currentNode.lastNodeIndex--;
             }
             if (currentNode.nextNodeIndex > nodeIndex && currentNode.nextNodeIndex != -1) {
@@ -598,6 +639,31 @@ class RopedString {
     }
 
     private function updateTokensAfterDeletion(deletePos:Int, deltaLength:Int):Void {
+        // Update buffer if deletion affects it
+        if (deletePos < bufferStartPos + untokenizedBuffer.length) {
+            if (deletePos >= bufferStartPos) {
+                // Deletion is within buffer
+                var bufferDeleteStart = deletePos - bufferStartPos;
+                var bufferDeleteEnd = cast (Math.min(untokenizedBuffer.length, bufferDeleteStart + deltaLength), Int);
+                
+                untokenizedBuffer = untokenizedBuffer.substring(0, bufferDeleteStart) + 
+                                untokenizedBuffer.substring(bufferDeleteEnd);
+            } else {
+                // Deletion starts before buffer
+                var remainingDelete = deltaLength - (bufferStartPos - deletePos);
+                if (remainingDelete > 0) {
+                    untokenizedBuffer = untokenizedBuffer.substring(cast (Math.min(remainingDelete, untokenizedBuffer.length), Int));
+                }
+                bufferStartPos = deletePos;
+            }
+        }
+        
+        // Update buffer position if deletion happened before buffer
+        if (deletePos < bufferStartPos) {
+            bufferStartPos -= cast (Math.min(deltaLength, bufferStartPos - deletePos), Int);
+        }
+        
+        // Handle existing tokens (same as before)
         var tokensToRemove:Array<Int> = [];
         
         for (i in 0...tokens.length) {
