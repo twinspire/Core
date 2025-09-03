@@ -53,21 +53,140 @@ class RopedString {
         return result;
     }
     
-    public function getLines(limit:Int = 100, startPos:Int = 0):Array<{data:Array<Int>, nextNodeStart:Int}> {
-      
+    public function getLines(limit:Int = 100, startLine:Int = 0):Array<{data:Array<Int>, nextNodeStart:Int}> {
+        var lines:Array<{data:Array<Int>, nextNodeStart:Int}> = [];
+        var currentLine:Array<Int> = [];
+        var linesFound = 0;
+        var currentLineIndex = 0;
+        var nodeStartForFirstLine = 0;
+        var foundStartLine = false;
+        
+        for (nodeIndex in 0...nodes.length) {
+            if (linesFound >= limit) break;
+            
+            var node = nodes[nodeIndex];
+            for (leaf in node.leaves) {
+                var data = leaf.getData();
+                for (charCode in data) {
+                    if (charCode == 10) { // Line feed
+                        if (currentLineIndex >= startLine && !foundStartLine) {
+                            // Mark the node where our first requested line starts
+                            nodeStartForFirstLine = nodeIndex;
+                            foundStartLine = true;
+                        }
+                        
+                        if (currentLineIndex >= startLine) {
+                            lines.push({
+                                data: currentLine.copy(),
+                                nextNodeStart: nodeStartForFirstLine
+                            });
+                            linesFound++;
+                            if (linesFound >= limit) break;
+                        }
+                        
+                        currentLine = [];
+                        currentLineIndex++;
+                    } else if (charCode != 13) { // Skip carriage return
+                        if (currentLineIndex >= startLine) {
+                            currentLine.push(charCode);
+                        }
+                    }
+                }
+                if (linesFound >= limit) break;
+            }
+            if (linesFound >= limit) break;
+        }
+        
+        // Add final line if it has content and we're within our range
+        if (currentLine.length > 0 && currentLineIndex >= startLine && linesFound < limit) {
+            if (!foundStartLine) {
+                nodeStartForFirstLine = nodes.length > 0 ? nodes.length - 1 : 0;
+            }
+            lines.push({
+                data: currentLine,
+                nextNodeStart: nodeStartForFirstLine
+            });
+        }
+        
+        return lines;
     }
     
     public function getLine(line:Int):Array<Int> {
-      
+        var currentLineIndex = 0;
+        var currentLine:Array<Int> = [];
+        
+        for (node in nodes) {
+            for (leaf in node.leaves) {
+                var data = leaf.getData();
+                for (charCode in data) {
+                    if (charCode == 10) { // Line feed
+                        if (currentLineIndex == line) {
+                            return currentLine;
+                        }
+                        currentLine = [];
+                        currentLineIndex++;
+                    } else if (charCode != 13) { // Skip carriage return
+                        currentLine.push(charCode);
+                    }
+                }
+            }
+        }
+        
+        // Return the line if we're at the target line index
+        if (currentLineIndex == line) {
+            return currentLine;
+        }
+        
+        return [];
     }
     
     public function findInLine(line:Int, chars:Array<Int>):Int {
-      
+        var lineData = getLine(line);
+        if (lineData.length == 0 || chars.length == 0) return -1;
+        
+        // Convert search chars to string for comparison
+        var needle = "";
+        for (charCode in chars) {
+            needle += String.fromCharCode(charCode);
+        }
+        
+        // Convert line data to string
+        var lineText = "";
+        for (charCode in lineData) {
+            lineText += String.fromCharCode(charCode);
+        }
+        
+        // Find position within the line
+        var foundIndex = lineText.indexOf(needle);
+        if (foundIndex == -1) return -1;
+        
+        // Convert line-relative position to global position
+        var globalPos = 0;
+        var currentLineIndex = 0;
+        
+        for (node in nodes) {
+            for (leaf in node.leaves) {
+                var data = leaf.getData();
+                for (charCode in data) {
+                    if (charCode == 10) { // Line feed
+                        if (currentLineIndex == line) {
+                            return globalPos - lineData.length + foundIndex;
+                        }
+                        currentLineIndex++;
+                    } else if (charCode != 13) { // Skip carriage return
+                        // Count position
+                    }
+                    globalPos++;
+                }
+            }
+        }
+        
+        return -1;
     }
     
     public function find(chars:Array<Int>):Int {
         if (chars.length == 0) return -1;
-        
+    
         var needle = "";
         for (charCode in chars) {
             needle += String.fromCharCode(charCode);
@@ -87,7 +206,10 @@ class RopedString {
     }
     
     public function findInTokenRange(startType:Int, endType:Int, chars:Array<Int>):Int {
-        var needle = String.fromCharCodes(chars);
+        var needle = "";
+        for (charCode in chars) {
+            needle += String.fromCharCode(charCode);
+        }
         var fullText = toString();
         
         for (token in tokens) {
@@ -127,11 +249,63 @@ class RopedString {
     }
     
     public function removeAt(pos:Int) {
-      
+        removeRange(pos, pos + 1);
     }
     
     public function removeRange(start:Int, end:Int) {
-      
+        if (start >= end || start < 0) return;
+        
+        var deleteLength = end - start;
+        var currentPos = 0;
+        var nodesToRemove:Array<Int> = [];
+        
+        for (nodeIndex in 0...nodes.length) {
+            var node = nodes[nodeIndex];
+            var leavesToRemove:Array<Int> = [];
+            
+            for (leafIndex in 0...node.leaves.length) {
+                var leaf = node.leaves[leafIndex];
+                var leafLength = leaf.length();
+                var leafStart = currentPos;
+                var leafEnd = currentPos + leafLength;
+                
+                if (start < leafEnd && end > leafStart) {
+                    // This leaf is affected by the deletion
+                    var deleteStart = Math.max(0, start - leafStart);
+                    var deleteEnd = Math.min(leafLength, end - leafStart);
+                    var leafDeleteLength = deleteEnd - deleteStart;
+                    
+                    if (deleteStart == 0 && deleteEnd == leafLength) {
+                        // Remove entire leaf
+                        leavesToRemove.push(leafIndex);
+                    } else {
+                        // Partial deletion within leaf
+                        leaf.delete(deleteStart, leafDeleteLength);
+                    }
+                }
+                
+                currentPos += leafLength;
+            }
+            
+            // Remove marked leaves (in reverse order to maintain indices)
+            leavesToRemove.reverse();
+            for (leafIndex in leavesToRemove) {
+                node.leaves.splice(leafIndex, 1);
+            }
+            
+            // Mark empty nodes for removal
+            if (node.leaves.length == 0) {
+                nodesToRemove.push(nodeIndex);
+            }
+        }
+        
+        // Remove empty nodes (in reverse order)
+        nodesToRemove.reverse();
+        for (nodeIndex in nodesToRemove) {
+            removeEmptyNode(nodeIndex);
+        }
+        
+        updateTokensAfterDeletion(start, deleteLength);
     }
     
     public function removeToken(type:Int, ?upto:Int):Void {
@@ -379,5 +553,62 @@ class RopedString {
         }
     }
     
+    private function removeEmptyNode(nodeIndex:Int):Void {
+        var node = nodes[nodeIndex];
+        
+        // Update navigation pointers
+        if (node.lastNodeIndex != -1) {
+            nodes[node.lastNodeIndex].nextNodeIndex = node.nextNodeIndex;
+        }
+        if (node.nextNodeIndex != -1 && node.nextNodeIndex < nodes.length) {
+            nodes[node.nextNodeIndex].lastNodeIndex = node.lastNodeIndex;
+        }
+        
+        // Remove the node
+        nodes.splice(nodeIndex, 1);
+        
+        // Update all subsequent node indices
+        for (i in nodeIndex...nodes.length) {
+            var currentNode = nodes[i];
+            if (currentNode.lastNodeIndex > nodeIndex) {
+                currentNode.lastNodeIndex--;
+            }
+            if (currentNode.nextNodeIndex > nodeIndex && currentNode.nextNodeIndex != -1) {
+                currentNode.nextNodeIndex--;
+            }
+        }
+    }
+
+    private function updateTokensAfterDeletion(deletePos:Int, deltaLength:Int):Void {
+        var tokensToRemove:Array<Int> = [];
+        
+        for (i in 0...tokens.length) {
+            var token = tokens[i];
+            
+            if (token.end <= deletePos) {
+                // Token is completely before deletion, no change needed
+                continue;
+            } else if (token.start >= deletePos + deltaLength) {
+                // Token is completely after deletion, shift it back
+                token.start -= deltaLength;
+                token.end -= deltaLength;
+            } else {
+                // Token overlaps with deletion
+                if (token.start < deletePos && token.end > deletePos + deltaLength) {
+                    // Token spans across deletion, shrink it
+                    token.end -= deltaLength;
+                } else {
+                    // Token is partially or completely within deletion, remove it
+                    tokensToRemove.push(i);
+                }
+            }
+        }
+        
+        // Remove marked tokens (in reverse order)
+        tokensToRemove.reverse();
+        for (tokenIndex in tokensToRemove) {
+            tokens.splice(tokenIndex, 1);
+        }
+    }
   
 }
