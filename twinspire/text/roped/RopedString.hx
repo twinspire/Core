@@ -30,7 +30,7 @@ class RopedString {
             var currentText = toString();
             var tokenResult = tokenCallback(currentText);
             if (tokenResult.tokenize) {
-                // Reset and create new token
+                // Create token for the text that was just inserted
                 var token = new Token(tokenResult.type, insertPos, insertPos + deltaLength);
                 tokens.push(token);
             }
@@ -38,10 +38,10 @@ class RopedString {
         
         // Update existing token positions
         for (token in tokens) {
-            if (token.start >= insertPos) {
+            if (token.start > insertPos) {
                 token.start += deltaLength;
             }
-            if (token.end >= insertPos) {
+            if (token.end > insertPos) {
                 token.end += deltaLength;
             }
         }
@@ -364,19 +364,13 @@ class RopedString {
 
     public function charAt(index:Int):Int {
         var result = findNodeLeafFromPosition(index);
+        if (result.node == -1 || result.leaf == -1) {
+            return 0; // Return null character for invalid positions
+        }
+        
         var node = nodes[result.node];
         var leaf = node.leaves[result.leaf];
-        var localPos = index;
-        
-        // Calculate local position within the leaf
-        for (i in 0...result.node) {
-            for (leafItem in nodes[i].leaves) {
-                localPos -= leafItem.length();
-            }
-        }
-        for (i in 0...result.leaf) {
-            localPos -= node.leaves[i].length();
-        }
+        var localPos = calculateLocalPosition(index, result.node, result.leaf);
         
         return leaf.charAt(localPos);
     }
@@ -408,17 +402,24 @@ class RopedString {
 
     public function search(data:Array<Int>):Array<{start:Int, end:Int}> {
         var results:Array<{start:Int, end:Int}> = [];
+        if (data.length == 0) return results;
+        
         var needle = "";
         for (charCode in data) {
             needle += String.fromCharCode(charCode);
         }
         
         var haystack = toString();
-        var foundIndex = haystack.indexOf(needle);
-        while (foundIndex > -1) {
+        var searchPos = 0;
+        
+        while (true) {
+            var foundIndex = haystack.indexOf(needle, searchPos);
+            if (foundIndex == -1) break;
+            
             results.push({start: foundIndex, end: foundIndex + data.length});
-            foundIndex = haystack.indexOf(needle, foundIndex + 1);
+            searchPos = foundIndex + 1; // Continue search from next position
         }
+        
         return results;
     }
 
@@ -427,6 +428,8 @@ class RopedString {
     }
 
     public function insertChars(chars:Array<Int>, pos:Int):Void {
+        if (chars.length == 0) return;
+        
         if (nodes.length == 0) {
             // Create first node and leaf
             var node = new Node();
@@ -438,10 +441,23 @@ class RopedString {
         }
         
         var result = findNodeLeafFromPosition(pos);
+        if (result.node == -1) {
+            // Position is at or beyond end, append to last node
+            var lastNode = nodes[nodes.length - 1];
+            var lastLeaf = lastNode.leaves[lastNode.leaves.length - 1];
+            
+            if (lastLeaf.insert(lastLeaf.length(), chars) == null) {
+                // Need to create new leaf
+                var newLeaf = new Leaf(chars);
+                lastNode.leaves.push(newLeaf);
+            }
+            
+            updateTokens(pos, chars.length);
+            return;
+        }
+        
         var node = nodes[result.node];
         var leaf = node.leaves[result.leaf];
-        
-        // Calculate local position within the leaf
         var localPos = calculateLocalPosition(pos, result.node, result.leaf);
         
         var insertResult = leaf.insert(localPos, chars);
