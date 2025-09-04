@@ -14,6 +14,7 @@ import twinspire.render.RenderQuery;
 import twinspire.render.QueryType;
 import twinspire.render.MouseScrollValue;
 import twinspire.render.ActivityType;
+import twinspire.text.TextRenderer;
 import twinspire.geom.Dim;
 import twinspire.Application;
 import twinspire.GlobalEvents;
@@ -214,9 +215,43 @@ class UpdateContext {
     }
 
     /**
+    * New main processing method with proper event ordering.
+    **/
+    private function processInputEvents() {
+        // Phase 1: Update global state and animations
+        _updateGlobalInputState();
+        _processAnimations();
+        
+        // Phase 2: Build interaction candidates
+        _buildInteractionCandidates();
+        
+        // Phase 3: Handle high-priority interactions
+        if (_processDragOperations()) return;  // If dragging, skip most other processing
+        if (_processModalInteractions()) return;  // If modal active, skip lower priority
+        
+        // Phase 4: Handle container scrolling (before focus changes)
+        _processContainerScrolling();
+        
+        // Phase 5: Process focus management
+        _processFocusChanges();
+        
+        // Phase 6: Process input for focused elements
+        _processFocusedElementInput();
+        
+        // Phase 7: Process general UI interactions
+        _processGeneralUIInteractions();
+        
+        // Phase 8: Update final state
+        _updateFinalState();
+    }
+
+    /**
     * Begin update context and start performing event simulations.
     **/
     public function begin() {
+        processInputEvents();
+        return;
+
         // simulate animations first, then check user input
         var finished = [];
         for (i in 0..._moveToAnimations.length) {
@@ -351,6 +386,808 @@ class UpdateContext {
             handleMouseEvents();   
         }
     }
+
+    //
+    // begin new process
+    //
+
+    /**
+    * Phase 1: Update global input state and animations
+    **/
+    private function _updateGlobalInputState() {
+        // Capture current mouse position
+        var mousePos = GlobalEvents.getMousePosition();
+        _lastMousePosition = FastVector2.fromVector2(mousePos);
+        
+        // Track mouse down state
+        if (_mouseDownFirstPos.x == -1 && GlobalEvents.isAnyMouseButtonDown()) {
+            _mouseDownFirstPos = FastVector2.fromVector2(mousePos);
+        } else if (GlobalEvents.isNoMouseButtonDown()) {
+            _mouseDownFirstPos = new FastVector2(-1, -1);
+        }
+        
+        // Reset per-frame state
+        _mouseIsDown = -1;
+        _mouseIsReleased = -1;
+        _mouseIsScrolling = -1;
+        _isDragStart = -1;
+        _isDragEnd = -1;
+        _charString = "";
+        
+        // Capture keyboard state
+        _keysUp = GlobalEvents.isAnyKeyUp();
+        _keysDown = GlobalEvents.isAnyKeyDown();
+    }
+    
+    /**
+    * Process animations (existing logic)
+    **/
+    private function _processAnimations() {
+        var finished = [];
+        for (i in 0..._moveToAnimations.length) {
+            var moveTo = _moveToAnimations[i];
+            if (Animate.animateTick(moveTo.animIndex, moveTo.duration)) {
+                finished.push(i);
+            }
+
+            var ratio = Animate.animateGetRatio(moveTo.animIndex);
+            var startX = moveTo.start.x;
+            var endX = moveTo.end.x;
+            if (moveTo.end.x < moveTo.start.x) {
+                startX = moveTo.end.x;
+                endX = moveTo.start.x;
+            }
+
+            var startY = moveTo.start.y;
+            var endY = moveTo.end.y;
+            if (moveTo.end.y < moveTo.start.y) {
+                startY = moveTo.end.y;
+                endY = moveTo.start.y;
+            }
+
+            var startW = moveTo.start.width;
+            var endW = moveTo.end.width;
+            if (moveTo.end.width < moveTo.start.width) {
+                startW = moveTo.end.width;
+                endW = moveTo.start.width;
+            }
+
+            var startH = moveTo.start.height;
+            var endH = moveTo.end.height;
+            if (moveTo.end.height < moveTo.start.height) {
+                startH = moveTo.end.height;
+                endH = moveTo.start.height;
+            }
+
+            var x = ((endX - startX) * ratio) + startX;
+            var y = ((endY - startY) * ratio) + startY;
+            var width = ((endW - startW) * ratio) + startW;
+            var height = ((endH - startH) * ratio) + startH;
+
+            _gctx.dimensions[moveTo.contextIndex].x = x;
+            _gctx.dimensions[moveTo.contextIndex].y = y;
+            _gctx.dimensions[moveTo.contextIndex].width = width;
+            _gctx.dimensions[moveTo.contextIndex].height = height;
+        }
+        
+        _moveToAnimations.clearFromTemp(finished);
+    }
+    
+    /**
+    * Phase 2: Build list of UI elements that could receive interactions
+    **/
+    private function _buildInteractionCandidates() {
+        _tempUI = [];
+        _mouseFocusIndexUI = -1;
+        
+        var mousePos = GlobalEvents.getMousePosition();
+        var currentOrder = -1;
+        
+        // If dragging, only the drag target is a candidate
+        if (_drag.dragIndex != -1) {
+            _tempUI.push(_drag.dragIndex);
+            return;
+        }
+        
+        // Build list of elements under cursor, sorted by render order
+        var remainActive = _mouseDownFirstPos.x > -1 && _mouseDownFirstPos.y > -1;
+        
+        for (i in 0..._gctx.dimensions.length) {
+            @:privateAccess(GraphicsContext) {
+                if (!_gctx._activeDimensions[i]) continue;
+            }
+            
+            var query = _gctx.queries[i];
+            if (query == null || query.type == QUERY_STATIC) continue;
+            
+            var actualDim = _gctx.getClientDimensionsAtIndex(Direct(i))[0];
+            if (actualDim == null) continue;
+            
+            var mouseOver = remainActive ? 
+                GlobalEvents.isMouseOverDim(actualDim, _mouseDownFirstPos) :
+                GlobalEvents.isMouseOverDim(actualDim);
+            
+            if (mouseOver && actualDim.order > currentOrder) {
+                _tempUI.push(i);
+                currentOrder = actualDim.order;
+            }
+        }
+    }
+    
+    /**
+    * Phase 3: Handle drag operations (highest priority)
+    **/
+    private function _processDragOperations():Bool {
+        if (_drag.dragIndex == -1) {
+            _attemptDragStart();
+            return false;
+        }
+        
+        // Continue existing drag
+        _continueDragOperation();
+        
+        // Check for drag end
+        if (GlobalEvents.isAnyMouseButtonReleased()) {
+            _endDragOperation();
+        }
+        
+        return true; // Dragging blocks other interactions
+    }
+    
+    /**
+    * Phase 3b: Handle modal interactions (high priority)
+    **/
+    private function _processModalInteractions():Bool {
+        // If you have modals/popups, they would be handled here
+        // For now, return false to continue processing
+        return false;
+    }
+    
+    /**
+    * Phase 4: Process container scrolling
+    **/
+    private function _processContainerScrolling() {
+        var containers = _gctx.getActiveContainers();
+        var activeContainerIndex = _findActiveContainer(containers);
+        
+        if (activeContainerIndex >= 0) {
+            _handleContainerScrolling(activeContainerIndex);
+        }
+    }
+    
+    /**
+    * Phase 5: Handle focus changes from mouse clicks and tab navigation
+    **/
+    private function _processFocusChanges() {
+        // Handle tab navigation first (global)
+        _processTabNavigation();
+        
+        // Handle mouse-based focus changes
+        _processMouseFocusChanges();
+    }
+    
+    /**
+    * Process tab navigation
+    **/
+    private function _processTabNavigation() {
+        if (_keysUp.length == 0) return;
+        
+        var keyMods = GlobalEvents.getCurrentKeyModifiers();
+        var tabIndex = _keysUp.indexOf(KeyCode.Tab);
+        if (tabIndex == -1) return;
+        
+        // Remove tab from keys to prevent other processing
+        _keysUp.splice(tabIndex, 1);
+        
+        var increment = 1;
+        if (keyMods.contains(KeyCode.Shift)) {
+            increment = -1;
+        }
+        
+        _navigateToNextFocusableElement(increment);
+    }
+    
+    /**
+    * Navigate to next focusable element
+    **/
+    private function _navigateToNextFocusableElement(direction:Int) {
+        var startIndex = _activatedIndex;
+        var currentIndex = startIndex;
+        var foundNext = false;
+        
+        // Search for next focusable element
+        var attempts = 0;
+        var maxAttempts = _gctx.queries.length;
+        
+        while (attempts < maxAttempts) {
+            currentIndex += direction;
+            
+            // Wrap around
+            if (currentIndex >= _gctx.queries.length) {
+                currentIndex = 0;
+            } else if (currentIndex < 0) {
+                currentIndex = _gctx.queries.length - 1;
+            }
+            
+            var query = _gctx.queries[currentIndex];
+            if (query != null && query.type == QUERY_UI && 
+                (query.acceptsTextInput || query.acceptsKeyInput)) {
+                _activatedIndex = currentIndex;
+                foundNext = true;
+                break;
+            }
+            
+            if (currentIndex == startIndex) break;
+            attempts++;
+        }
+    }
+    
+    /**
+    * Handle focus changes from mouse clicks
+    **/
+    private function _processMouseFocusChanges() {
+        if (!GlobalEvents.isAnyMouseButtonDown() && !GlobalEvents.isAnyMouseButtonReleased()) {
+            return;
+        }
+        
+        // On mouse down, prepare for potential focus change
+        if (GlobalEvents.isAnyMouseButtonDown()) {
+            _prepareFocusChange();
+        }
+        
+        // On mouse release, commit focus change
+        if (GlobalEvents.isAnyMouseButtonReleased()) {
+            _commitFocusChange();
+        }
+    }
+    
+    /**
+    * Prepare for focus change on mouse down
+    **/
+    private function _prepareFocusChange() {
+        // Don't change focus if actively selecting text
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            if (renderer != null && renderer.isSelecting()) {
+                return; // Preserve current focus during text selection
+            }
+        }
+        
+        // Original focus change logic for non-text-selection cases
+        if (_tempUI.length == 0) {
+            // Will clear focus on mouse release
+            return;
+        }
+        
+        // Find the topmost UI element that can receive focus
+        var topMostFocusable = -1;
+        for (i in _tempUI.length - 1...0) {
+            var index = _tempUI[i];
+            var query = _gctx.queries[index];
+            if (query.acceptsTextInput || query.acceptsKeyInput) {
+                topMostFocusable = index;
+                break;
+            }
+        }
+        
+        _mouseFocusIndexUI = topMostFocusable;
+    }
+    
+    /**
+    * Commit focus change on mouse release
+    **/
+    private function _commitFocusChange() {
+        if (_tempUI.length == 0) {
+            // Clicked outside all UI - clear focus
+            _activatedIndex = -1;
+        } else if (_mouseFocusIndexUI >= 0) {
+            // Set focus to the element we clicked on
+            _activatedIndex = _mouseFocusIndexUI;
+        }
+        
+        _mouseFocusIndexUI = -1;
+    }
+    
+    /**
+    * Phase 6: Process input for the currently focused element
+    **/
+    private function _processFocusedElementInput() {
+        if (_activatedIndex == -1) return;
+        
+        var query = _gctx.queries[_activatedIndex];
+        if (query == null) return;
+        
+        if (query.acceptsTextInput) {
+            _processTextInputKeys();
+            _processTextInputMouse();
+        } else if (query.acceptsKeyInput) {
+            _processKeyInputElement();
+        }
+    }
+    
+    /**
+    * Process keyboard input for text elements
+    **/
+    private function _processTextInputKeys() {
+        var renderer = _gctx.getTextRenderer(_activatedIndex);
+        if (renderer == null) return;
+        
+        // Process character input
+        for (c in GlobalEvents.getKeyCharCode()) {
+            _charString += String.fromCharCode(c);
+            renderer.insertAt(String.fromCharCode(c), renderer.getCursorPosition());
+        }
+        
+        // Process special keys, but don't consume ALL keys
+        var consumedKeys = [];
+        
+        for (keyCode in _keysDown) {
+            var key = cast(keyCode, KeyCode);
+            var handled = false;
+            
+            switch (key) {
+                case KeyCode.Backspace:
+                    renderer.delete();
+                    handled = true;
+                    
+                case KeyCode.Delete:
+                    var cursorPos = renderer.getCursorPosition();
+                    renderer.delete(cursorPos, 1);
+                    handled = true;
+                    
+                case KeyCode.Left:
+                    renderer.moveCursor(-1);
+                    handled = true;
+                    
+                case KeyCode.Right:
+                    renderer.moveCursor(1);
+                    handled = true;
+                    
+                case KeyCode.Home:
+                    renderer.moveCursorToLineStart();
+                    handled = true;
+                    
+                case KeyCode.End:
+                    renderer.moveCursorToLineEnd();
+                    handled = true;
+                    
+                case KeyCode.Up:
+                    if (renderer.isMultiLine()) {
+                        renderer.moveCursorUp();
+                        handled = true;
+                    }
+                    
+                case KeyCode.Down:
+                    if (renderer.isMultiLine()) {
+                        renderer.moveCursorDown();
+                        handled = true;
+                    }
+                    
+                case KeyCode.Return:
+                    if (renderer.isMultiLine()) {
+                        renderer.insertAt("\n", renderer.getCursorPosition());
+                        handled = true;
+                    }
+                default:
+            }
+            
+            if (handled) {
+                consumedKeys.push(keyCode);
+            }
+        }
+        
+        // Remove consumed keys from global list so they don't affect other elements
+        for (key in consumedKeys) {
+            var index = _keysDown.indexOf(key);
+            if (index != -1) {
+                _keysDown.splice(index, 1);
+            }
+        }
+        
+        // Do the same for key up events
+        var consumedUpKeys = [];
+        for (keyCode in _keysUp) {
+            var key = cast(keyCode, KeyCode);
+            // Most key up events for text input don't need special handling
+            // but we might want to consume them to prevent other elements from seeing them
+            if (_isTextInputKey(key)) {
+                consumedUpKeys.push(keyCode);
+            }
+        }
+        
+        for (key in consumedUpKeys) {
+            var index = _keysUp.indexOf(key);
+            if (index != -1) {
+                _keysUp.splice(index, 1);
+            }
+        }
+    }
+    
+    /**
+    * Check if a key is primarily used for text input
+    **/
+    private function _isTextInputKey(key:KeyCode):Bool {
+        return switch (key) {
+            case KeyCode.Backspace | KeyCode.Delete | KeyCode.Left | KeyCode.Right | 
+                 KeyCode.Up | KeyCode.Down | KeyCode.Home | KeyCode.End | KeyCode.Return: true;
+            default: false;
+        };
+    }
+    
+    /**
+    * Process mouse input for text elements (selection, cursor positioning)
+    **/
+    private function _processTextInputMouse() {
+        var renderer = _gctx.getTextRenderer(_activatedIndex);
+        if (renderer == null) return;
+        
+        // Always process if we have an active selection, regardless of mouse position
+        if (renderer.isSelecting()) {
+            var mousePos = GlobalEvents.getMousePosition();
+            var charPos = renderer.getCharacterPositionFromMouse(mousePos.x, mousePos.y);
+            renderer.updateSelection(charPos);
+            return;
+        }
+        
+        // Only check bounds for starting new interactions
+        if (_tempUI.indexOf(_activatedIndex) == -1) return;
+        
+        // Handle mouse down to start selection
+        if (GlobalEvents.isAnyMouseButtonDown()) {
+            var mousePos = GlobalEvents.getMousePosition();
+            var charPos = renderer.getCharacterPositionFromMouse(mousePos.x, mousePos.y);
+            renderer.setCursorPosition(charPos);
+            renderer.startSelection(charPos);
+        }
+    }
+    
+    /**
+    * Process input for non-text elements that accept key input
+    **/
+    private function _processKeyInputElement() {
+        // Handle buttons, menus, etc. that respond to keys like Enter, Space
+        // This is where you'd process things like:
+        // - Enter key on buttons
+        // - Arrow keys for menu navigation
+        // - Space for checkboxes
+        // etc.
+    }
+    
+    /**
+    * Phase 7: Process general UI interactions (for non-focused elements)
+    **/
+    private function _processGeneralUIInteractions() {
+        _processMouseInteractions();
+        _processGlobalKeyboardShortcuts();
+    }
+    
+    /**
+    * Process mouse interactions for all UI elements
+    **/
+    private function _processMouseInteractions() {
+        if (_tempUI.length == 0) return;
+        
+        var topMostIndex = _tempUI[_tempUI.length - 1];
+        var query = _gctx.queries[topMostIndex];
+        
+        // Mouse down events
+        if (GlobalEvents.isAnyMouseButtonDown()) {
+            _mouseIsDown = topMostIndex;
+            _mouseButtons = GlobalEvents.getCurrentMouseButton();
+        }
+        
+        // Mouse release events
+        if (GlobalEvents.isAnyMouseButtonReleased()) {
+            _mouseIsReleased = topMostIndex;
+        }
+        
+        // Mouse scroll events
+        var scrollDelta = GlobalEvents.getMouseDelta();
+        if (scrollDelta != 0) {
+            _mouseIsScrolling = topMostIndex;
+            _mouseScrollValue = scrollDelta;
+        }
+    }
+    
+    /**
+    * Process global keyboard shortcuts (Ctrl+C, Ctrl+V, F-keys, etc.)
+    **/
+    private function _processGlobalKeyboardShortcuts() {
+        var keyMods = GlobalEvents.getCurrentKeyModifiers();
+        var ctrlPressed = keyMods.contains(KeyCode.Control);
+        
+        for (keyCode in _keysDown) {
+            var key = cast(keyCode, KeyCode);
+            var handled = false;
+            
+            if (ctrlPressed) {
+                switch (key) {
+                    case KeyCode.C:
+                        // Copy operation - could be handled by focused text input or globally
+                        _processCopyCommand();
+                        handled = true;
+                        
+                    case KeyCode.V:
+                        // Paste operation
+                        _processPasteCommand();
+                        handled = true;
+                        
+                    case KeyCode.X:
+                        // Cut operation
+                        _processCutCommand();
+                        handled = true;
+                        
+                    case KeyCode.Z:
+                        // Undo operation
+                        _processUndoCommand();
+                        handled = true;
+                        
+                    case KeyCode.Y:
+                        // Redo operation
+                        _processRedoCommand();
+                        handled = true;
+                    default:
+                }
+            }
+            
+            // F-keys and other global shortcuts
+            switch (key) {
+                case KeyCode.Escape:
+                    // Clear selection, close modals, etc.
+                    _processEscapeCommand();
+                    handled = true;
+                    
+                case KeyCode.F1:
+                    // Help
+                    handled = true;
+                    
+                default:
+                // Add other global shortcuts as needed
+            }
+            
+            if (handled) {
+                var index = _keysDown.indexOf(keyCode);
+                if (index != -1) {
+                    _keysDown.splice(index, 1);
+                }
+            }
+        }
+    }
+    
+    /**
+    * Phase 8: Update final state and cleanup
+    **/
+    private function _updateFinalState() {
+        // Any final state updates or cleanup
+        // This is where you might update hover states, tooltips, etc.
+    }
+    
+    // Helper methods for the new system
+    
+    private function _attemptDragStart() {
+        if (!GlobalEvents.isAnyMouseButtonDown()) return;
+        
+        var mousePos = GlobalEvents.getMousePosition();
+        var dragDistance = _mouseDownFirstPos.sub(FastVector2.fromVector2(mousePos));
+        
+        if (dragDistance > _mouseDragTolerance && _tempUI.length > 0) {
+            var topMostIndex = _tempUI[_tempUI.length - 1];
+            var query = _gctx.queries[topMostIndex];
+            
+            if (query.allowDragging) {
+                _drag.dragIndex = topMostIndex;
+                _drag.firstMousePosition = _mouseDownFirstPos;
+                _isDragStart = topMostIndex;
+            }
+        }
+    }
+    
+    private function _continueDragOperation() {
+        if (_drag.dragIndex == -1) return;
+        
+        var mousePos = GlobalEvents.getMousePosition();
+        var mouseDelta = new FastVector2(
+            mousePos.x - _lastMousePosition.x,
+            mousePos.y - _lastMousePosition.y
+        );
+        
+        _gctx.dimensions[_drag.dragIndex].x += mouseDelta.x;
+        _gctx.dimensions[_drag.dragIndex].y += mouseDelta.y;
+        _gctx.markDimChange(Direct(_drag.dragIndex));
+    }
+    
+    private function _endDragOperation() {
+        if (_drag.dragIndex == -1) return;
+        
+        _isDragEnd = _drag.dragIndex;
+        _drag.dragIndex = -1;
+        _drag.childIndex = -1;
+        _drag.scrollIndex = -1;
+        _drag.firstMousePosition = new FastVector2(-1, -1);
+    }
+    
+    private function _findActiveContainer(containers:Array<Dynamic>):Int {
+        var possibleActiveContainers = [];
+        var lastContainerIndex = -1;
+        
+        for (i in 0...containers.length) {
+            var context = containers[i];
+            var containerIndex = _tempUI.indexOf(DimIndexUtils.getDirectIndex(context.index));
+            if (containerIndex > lastContainerIndex && containerIndex > -1) {
+                possibleActiveContainers.push(i);
+            }
+        }
+        
+        return possibleActiveContainers.length > 0 ? 
+            possibleActiveContainers[possibleActiveContainers.length - 1] : -1;
+    }
+    
+    private function _handleContainerScrolling(containerIndex:Int):Bool {
+        // Check if focused text input should handle mouse wheel events first
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var textInputDimIndex = DimIndexUtils.getDirectIndex(_gctx.getTextRenderer(_activatedIndex).index);
+            
+            // If mouse is over text input AND there's actual wheel scrolling
+            if (_tempUI.indexOf(textInputDimIndex) != -1 && GlobalEvents.getMouseDelta() != 0) {
+                var renderer = _gctx.getTextRenderer(_activatedIndex);
+                if (renderer != null && _handleTextRendererScrolling(renderer)) {
+                    return true; // Text input consumed the scroll event
+                }
+            }
+        }
+        
+        // Handle normal container scrolling
+        return _scrollContainerAtIndex(containerIndex);
+    }
+    
+    /**
+    * Handle scrolling for text renderers with Shift key support.
+    **/
+    private function _handleTextRendererScrolling(renderer:TextRenderer):Bool {
+        var scrollDelta = GlobalEvents.getMouseDelta();
+        if (scrollDelta == 0) return false;
+        
+        var keyMods = GlobalEvents.getCurrentKeyModifiers();
+        var shiftPressed = keyMods.contains(KeyCode.Shift);
+        
+        if (shiftPressed) {
+            // Shift + wheel = horizontal scrolling
+            if (renderer.canScrollHorizontally()) {
+                renderer.scrollHorizontally(scrollDelta);
+                return true;
+            }
+        } else {
+            // Normal wheel = vertical scrolling (multi-line) or horizontal (single-line overflow)
+            if (renderer.isMultiLine() && renderer.canScrollVertically()) {
+                renderer.scrollVertically(scrollDelta);
+                return true;
+            } else if (!renderer.isMultiLine() && renderer.canScrollHorizontally()) {
+                // Single-line with overflow scrolls horizontally by default
+                renderer.scrollHorizontally(scrollDelta);
+                return true;
+            }
+        }
+        
+        return false; // Couldn't handle scrolling
+    }
+    
+    /**
+    * Enhanced container scrolling with Shift key support.
+    **/
+    private function _scrollContainerAtIndex(containerIndex:Int):Bool {
+        if (containerIndex == -1) return false;
+        
+        var scrollDelta = GlobalEvents.getMouseDelta();
+        if (scrollDelta == 0) return false;
+        
+        @:privateAccess(GraphicsContext) {
+            var i = _gctx.findContainerForDimension(containerIndex);
+            if (i < 0 || i >= _gctx._activeContainers.length) {
+                return false;
+            }
+            
+            var context = _gctx._activeContainers[i];
+            var space = context.space;
+            if (!space.scrollable) return false;
+            
+            var keyMods = GlobalEvents.getCurrentKeyModifiers();
+            var shiftPressed = keyMods.contains(KeyCode.Shift);
+            
+            var scrollAmount = scrollDelta * 20; // Adjust scroll sensitivity
+            
+            if (shiftPressed) {
+                // Shift + wheel = horizontal scrolling
+                if (space.canScrollHorizontally()) {
+                    space.scrollBy(scrollAmount, 0);
+                    return true;
+                }
+            } else {
+                // Normal wheel = vertical scrolling
+                if (space.canScrollVertically()) {
+                    space.scrollBy(0, scrollAmount);
+                    return true;
+                }
+            }
+            
+            // Handle click-and-drag scrolling (mouse button down)
+            if (GlobalEvents.isMouseButtonDown(space.scrollButtons)) {
+                var mousePos = GlobalEvents.getMousePosition();
+                var mouseDelta = new FastVector2(
+                    mousePos.x - _lastMousePosition.x,
+                    mousePos.y - _lastMousePosition.y
+                );
+                
+                // Drag scrolling works in both directions simultaneously
+                space.scrollByImmediate(-mouseDelta.x, -mouseDelta.y);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Global shortcut command implementations
+    private function _processCopyCommand() {
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            if (renderer != null) {
+                renderer.copySelection();
+            }
+        }
+    }
+    
+    private function _processPasteCommand() {
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            if (renderer != null) {
+                renderer.pasteFromClipboard();
+            }
+        }
+    }
+    
+    private function _processCutCommand() {
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            if (renderer != null) {
+                renderer.cutSelection();
+            }
+        }
+    }
+    
+    private function _processUndoCommand() {
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            if (renderer != null) {
+                renderer.undo();
+            }
+        }
+    }
+    
+    private function _processRedoCommand() {
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            if (renderer != null) {
+                renderer.redo();
+            }
+        }
+    }
+    
+    private function _processEscapeCommand() {
+        // Clear text selection if any
+        if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            if (renderer != null) {
+                renderer.clearSelection();
+            }
+        }
+        
+        // Close modals, clear focus, etc.
+        // ... additional escape handling
+    }
+
+    //
+    // end new process
+    //
 
     private function determineInitialMouseEvents() {
         if (_tempUI.length == 0 && GlobalEvents.isAnyMouseButtonDown()) {

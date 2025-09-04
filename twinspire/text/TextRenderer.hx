@@ -188,6 +188,14 @@ class TextRenderer {
     private var _isDirty:Bool = true;
     private var _selectionStart:Int = -1;
     private var _selectionEnd:Int = -1;
+    private var _isSelecting:Bool = false;
+    private var _selectionStartPos:Int = -1;
+    private var _selectionEndPos:Int = -1;
+
+    private var _scrollOffsetX:Float = 0.0;
+    private var _scrollOffsetY:Float = 0.0;
+    private var _maxScrollX:Float = 0.0;
+    private var _maxScrollY:Float = 0.0;
 
     private var _wordDirtyFlags:Array<Bool>;  // Track which cached words need recalculation
     private var _lineDirtyFlags:Array<Bool>;  // Track which lines need relayout
@@ -411,6 +419,11 @@ class TextRenderer {
     * Render using the given graphics context.
     **/
     public function render(gtx:GraphicsContext) {
+        if (_isDirty) {
+            _updateLayout(gtx);
+            _updateScrollLimits(); // Update scroll limits when layout changes
+        }
+
         if (_renderMode == Simple) {
             _renderSimple(gtx);
         } else {
@@ -481,9 +494,8 @@ class TextRenderer {
     private function _renderSimple(gtx:GraphicsContext) {
         if (_source == null || _index == null) return;
         
-        var dims = gtx.getClientDimensionsAtIndex(_index);
+        var dims = gtx.getDimensionsAtIndex(_index);
         if (dims.length == 0) return;
-        if (dims[0] == null) return;
         
         var dim = dims[0];
         var format = getTextFormat();
@@ -492,44 +504,139 @@ class TextRenderer {
         var text = Std.string(_source.getStringData());
         if (text == null || text.length == 0) return;
         
+        // Set up clipping to text field bounds
+        gtx.scissor(_index);
+        
         gtx.setColor(_options.colors != null ? _options.colors[TextForegroundColor] : Color.Black);
         gtx.setFont(format.font);
         gtx.setFontSize(format.fontSize);
         
+        // Apply scroll offset to rendering position
+        var renderX = dim.x - _scrollOffsetX;
+        var renderY = dim.y - _scrollOffsetY;
+        
         if (!_options.wordWrap || text.indexOf('\n') == -1) {
-            // Single line rendering
-            _renderSingleLine(gtx, text, dim, format);
+            // Single line rendering with horizontal scroll
+            _renderSingleLineWithOffset(gtx, text, renderX, renderY, dim, format);
         } else {
-            // Simple multi-line rendering (no word wrapping, just line breaks)
-            _renderSimpleMultiLine(gtx, text, dim, format);
+            // Multi-line rendering with vertical scroll
+            _renderMultiLineWithOffset(gtx, text, renderX, renderY, dim, format);
         }
         
-        // Render selection and cursor
+        // Render selection and cursor (with scroll offset)
         if (_options.selectable || _options.editable) {
-            _renderSimpleSelection(gtx, text, dim, format);
-            _renderSimpleCursor(gtx, text, dim, format);
+            _renderSelectionWithOffset(gtx, text, renderX, renderY, dim, format);
+            _renderCursorWithOffset(gtx, text, renderX, renderY, dim, format);
+        }
+        
+        // Disable clipping
+        gtx.disableScissor();
+    }
+
+    private function _renderSelectionWithOffset(gtx:GraphicsContext, text:String, x:Float, y:Float, dim:Dim, format:TextFormat) {
+        if (_selectionStart == -1 || _selectionEnd == -1 || _selectionStart == _selectionEnd) return;
+        
+        var selectionColor = _options.colors != null ? _options.colors[HighlightColor] : Color.fromBytes(0, 120, 215);
+        gtx.setColor(selectionColor);
+        
+        // Calculate selection bounds with scroll offset
+        var beforeSelection = text.substring(0, _selectionStart);
+        var selectedText = text.substring(_selectionStart, _selectionEnd);
+        
+        var beforeWidth = format.font.widthOfString(format.fontSize, beforeSelection);
+        var selectedWidth = format.font.widthOfString(format.fontSize, selectedText);
+        var lineHeight = format.font.height(format.fontSize);
+        
+        // Apply scroll offset to selection rendering
+        var selectionX = x + beforeWidth;
+        var selectionY = y;
+        
+        gtx.getCurrentGraphics().fillRect(selectionX, selectionY, selectedWidth, lineHeight);
+    }
+
+    private function _renderCursorWithOffset(gtx:GraphicsContext, text:String, x:Float, y:Float, dim:Dim, format:TextFormat) {
+        if (!_options.editable || !_isFocused || !_cursorVisible) return;
+        
+        var cursorColor = _options.colors != null ? _options.colors[CursorColor] : Color.Black;
+        gtx.setColor(cursorColor);
+        
+        var beforeCursor = text.substring(0, _cursorPosition);
+        var cursorX = x + format.font.widthOfString(format.fontSize, beforeCursor);
+        var lineHeight = format.font.height(format.fontSize);
+        
+        // Apply scroll offset to cursor position
+        var finalCursorX = cursorX;
+        var finalCursorY = y;
+        
+        // Only draw cursor if it's within visible bounds
+        if (finalCursorX >= dim.x && finalCursorX <= dim.x + dim.width &&
+            finalCursorY >= dim.y && finalCursorY <= dim.y + dim.height) {
+            gtx.getCurrentGraphics().drawLine(finalCursorX, finalCursorY, finalCursorX, finalCursorY + lineHeight, 1.0);
         }
     }
 
     /**
     * Render single line of text.
     **/
-    private function _renderSingleLine(gtx:GraphicsContext, text:String, dim:Dim, format:TextFormat) {
-        var x = dim.x;
-        var y = dim.y;
-        
-        // Apply text alignment
-        if (_options.alignment != TextLeft) {
+    private function _renderSingleLineWithOffset(gtx:GraphicsContext, text:String, x:Float, y:Float, dim:Dim, format:TextFormat) {
+        // Apply text alignment (but consider scroll offset)
+        var textX = x;
+        if (_options.alignment != TextLeft && _scrollOffsetX == 0) {
             var textWidth = format.font.width(format.fontSize, text);
             switch (_options.alignment) {
-                case TextCentre: x += (dim.width - textWidth) * 0.5;
-                case TextRight: x += dim.width - textWidth;
-                case TextJustified: /* No change for single line */
+                case TextCentre: textX += (dim.width - textWidth) * 0.5;
+                case TextRight: textX += dim.width - textWidth;
                 default:
             }
         }
         
-        gtx.getCurrentGraphics().drawString(text, x, y);
+        gtx.getCurrentGraphics().drawString(text, textX, y);
+    }
+
+    private function _renderMultiLineWithOffset(gtx:GraphicsContext, text:String, x:Float, y:Float, dim:Dim, format:TextFormat) {
+        var lines = text.split('\n');
+        var lineHeight = format.font.height(format.fontSize) * 1.2;
+        var currentY = y;
+        
+        // Only render visible lines for performance
+        var firstVisibleLine = Math.floor(_scrollOffsetY / lineHeight);
+        var lastVisibleLine = Math.ceil((_scrollOffsetY + dim.height) / lineHeight);
+        
+        firstVisibleLine = cast Math.max(0, firstVisibleLine);
+        lastVisibleLine = cast Math.min(lines.length - 1, lastVisibleLine);
+        
+        for (i in firstVisibleLine...lastVisibleLine + 1) {
+            if (i >= lines.length) break;
+            
+            var line = lines[i];
+            var lineY = currentY + (i * lineHeight);
+            
+            // Skip lines that are completely above or below visible area
+            if (lineY + lineHeight < dim.y || lineY > dim.y + dim.height) {
+                continue;
+            }
+            
+            var lineX = x;
+            
+            // Apply alignment for each line (consider horizontal scroll)
+            if (_options.alignment != TextLeft && line.length > 0 && _scrollOffsetX == 0) {
+                var lineWidth = format.font.width(format.fontSize, line);
+                switch (_options.alignment) {
+                    case TextCentre: lineX += (dim.width - lineWidth) * 0.5;
+                    case TextRight: lineX += dim.width - lineWidth;
+                    default:
+                }
+            }
+            
+            gtx.getCurrentGraphics().drawString(line, lineX, lineY);
+        }
+    }
+
+    private function _renderComplexWithScroll(gtx:GraphicsContext) {
+        // TODO: Implement complex mode rendering with scroll offset support
+        // This would use the _words and _lines arrays and apply scroll offsets
+        // For now, fall back to simple mode
+        _renderSimpleWithScroll(gtx);
     }
 
     /**
@@ -816,6 +923,435 @@ class TextRenderer {
             }
         }
         return _lines.length > 0 ? _lines.length - 1 : -1;
+    }
+
+    /**
+    * Get the current cursor position in the text.
+    **/
+    public function getCursorPosition():Int {
+        return _cursorPosition;
+    }
+    
+    /**
+    * Set the cursor position.
+    **/
+    public function setCursorPosition(pos:Int) {
+        _cursorPosition = Math.max(0, Math.min(pos, _source.length()));
+        _resetCursorBlink();
+    }
+    
+    /**
+    * Move cursor by a relative amount.
+    **/
+    public function moveCursor(delta:Int) {
+        setCursorPosition(_cursorPosition + delta);
+    }
+    
+    /**
+    * Move cursor to the start of the current line.
+    **/
+    public function moveCursorToLineStart() {
+        var lineStart = _getCurrentLineStart();
+        setCursorPosition(lineStart);
+    }
+    
+    /**
+    * Move cursor to the end of the current line.
+    **/
+    public function moveCursorToLineEnd() {
+        var lineEnd = _getCurrentLineEnd();
+        setCursorPosition(lineEnd);
+    }
+    
+    /**
+    * Move cursor up one line (multi-line text only).
+    **/
+    public function moveCursorUp() {
+        if (!isMultiLine()) return;
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null) return;
+        
+        var currentLineStart = _getCurrentLineStart();
+        if (currentLineStart == 0) return; // Already on first line
+        
+        // Find start of previous line
+        var prevLineEnd = currentLineStart - 2; // Skip the \n
+        while (prevLineEnd >= 0 && text.charCodeAt(prevLineEnd) != 10) {
+            prevLineEnd--;
+        }
+        var prevLineStart = prevLineEnd + 1;
+        
+        // Calculate column position in current line
+        var currentColumn = _cursorPosition - currentLineStart;
+        
+        // Calculate length of previous line
+        var prevLineLength = (currentLineStart - 1) - prevLineStart;
+        
+        // Set cursor to same column in previous line, or end if line is shorter
+        var newPos = prevLineStart + Math.min(currentColumn, prevLineLength);
+        setCursorPosition(newPos);
+    }
+    
+    /**
+    * Move cursor down one line (multi-line text only).
+    **/
+    public function moveCursorDown() {
+        if (!isMultiLine()) return;
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null) return;
+        
+        var currentLineStart = _getCurrentLineStart();
+        var currentLineEnd = _getCurrentLineEnd();
+        
+        // Find start of next line
+        var nextLineStart = currentLineEnd + 1;
+        if (nextLineStart >= text.length) return; // Already on last line
+        
+        // Find end of next line
+        var nextLineEnd = nextLineStart;
+        while (nextLineEnd < text.length && text.charCodeAt(nextLineEnd) != 10) {
+            nextLineEnd++;
+        }
+        
+        // Calculate column position in current line
+        var currentColumn = _cursorPosition - currentLineStart;
+        
+        // Calculate length of next line
+        var nextLineLength = nextLineEnd - nextLineStart;
+        
+        // Set cursor to same column in next line, or end if line is shorter
+        var newPos = nextLineStart + Math.min(currentColumn, nextLineLength);
+        setCursorPosition(newPos);
+    }
+    
+    /**
+    * Check if this text renderer supports multi-line text.
+    **/
+    public function isMultiLine():Bool {
+        return _options.wordWrap == true;
+    }
+    
+    /**
+    * Check if currently selecting text.
+    **/
+    public function isSelecting():Bool {
+        return _isSelecting;
+    }
+    
+    /**
+    * Start a text selection at the given position.
+    **/
+    public function startSelection(pos:Int) {
+        _isSelecting = true;
+        _selectionStartPos = cast Math.max(0, Math.min(pos, _source.length()));
+        _selectionEndPos = _selectionStartPos;
+        _selectionStart = _selectionStartPos;
+        _selectionEnd = _selectionEndPos;
+    }
+    
+    /**
+    * Update the selection end position.
+    **/
+    public function updateSelection(pos:Int) {
+        if (!_isSelecting) return;
+        
+        _selectionEndPos = cast Math.max(0, Math.min(pos, _source.length()));
+        
+        // Update the actual selection range (keeping start/end in correct order)
+        _selectionStart = cast Math.min(_selectionStartPos, _selectionEndPos);
+        _selectionEnd = cast Math.max(_selectionStartPos, _selectionEndPos);
+    }
+    
+    /**
+    * End the current selection.
+    **/
+    public function endSelection() {
+        _isSelecting = false;
+        // Keep the selection range for later operations (copy, delete, etc.)
+    }
+    
+    /**
+    * Clear the current selection.
+    **/
+    public function clearSelection() {
+        _isSelecting = false;
+        _selectionStart = -1;
+        _selectionEnd = -1;
+        _selectionStartPos = -1;
+        _selectionEndPos = -1;
+    }
+    
+    /**
+    * Get character position from mouse coordinates.
+    **/
+    public function getCharacterPositionFromMouse(mouseX:Float, mouseY:Float):Int {
+        if (_renderMode == Simple) {
+            return _getCharacterPositionSimple(mouseX, mouseY);
+        } else {
+            return _getCharacterPositionComplex(mouseX, mouseY);
+        }
+    }
+    
+    /**
+    * Copy selected text to clipboard.
+    **/
+    public function copySelection() {
+        if (_selectionStart == -1 || _selectionEnd == -1 || _selectionStart == _selectionEnd) {
+            return;
+        }
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null) return;
+        
+        var selectedText = text.substring(_selectionStart, _selectionEnd);
+        
+        // Set clipboard data - this would need platform-specific implementation
+        // For now, store in Application's cutData for compatibility
+        Application.instance.cutData = selectedText;
+    }
+    
+    /**
+    * Cut selected text to clipboard.
+    **/
+    public function cutSelection() {
+        if (!_options.editable) return;
+        
+        copySelection(); // Copy first
+        
+        // Then delete selection
+        if (_selectionStart != -1 && _selectionEnd != -1 && _selectionStart != _selectionEnd) {
+            delete(_selectionStart, _selectionEnd - _selectionStart);
+            setCursorPosition(_selectionStart);
+            clearSelection();
+        }
+    }
+    
+    /**
+    * Paste text from clipboard.
+    **/
+    public function pasteFromClipboard() {
+        if (!_options.editable) return;
+        
+        // Get clipboard data - for now use Application's cutData
+        var clipboardText = Application.instance.cutData;
+        if (clipboardText == null || clipboardText.length == 0) return;
+        
+        // If there's a selection, replace it
+        if (_selectionStart != -1 && _selectionEnd != -1 && _selectionStart != _selectionEnd) {
+            delete(_selectionStart, _selectionEnd - _selectionStart);
+            insertAt(clipboardText, _selectionStart);
+            setCursorPosition(_selectionStart + clipboardText.length);
+            clearSelection();
+        } else {
+            // Otherwise insert at cursor position
+            insertAt(clipboardText, _cursorPosition);
+        }
+    }
+    
+    /**
+    * Undo last operation (placeholder - would need undo stack implementation).
+    **/
+    public function undo() {
+        if (!_options.editable) return;
+        
+        // TODO: Implement undo stack
+        // For now, this is a placeholder
+    }
+    
+    /**
+    * Redo last undone operation (placeholder - would need redo stack implementation).
+    **/
+    public function redo() {
+        if (!_options.editable) return;
+        
+        // TODO: Implement redo stack  
+        // For now, this is a placeholder
+    }
+    
+    /**
+    * Enhanced delete method that handles selections properly.
+    **/
+    public override function delete(pos:Int = -1, ?length:Int = 0) {
+        if (!_options.editable || _source == null) return;
+        
+        var deletePos = pos;
+        var deleteLength = length;
+        
+        // Handle selection deletion
+        if (_selectionStart >= 0 && _selectionEnd >= 0 && _selectionStart != _selectionEnd) {
+            deletePos = _selectionStart;
+            deleteLength = _selectionEnd - _selectionStart;
+            clearSelection();
+        } else if (pos == -1) {
+            // Default to cursor position - backspace behavior
+            deletePos = _cursorPosition > 0 ? _cursorPosition - 1 : 0;
+            deleteLength = 1;
+        }
+        
+        if (deletePos < 0 || deletePos >= _source.length()) return;
+        
+        deleteLength = cast Math.min(deleteLength, _source.length() - deletePos);
+        if (deleteLength <= 0) return;
+        
+        // Update the source
+        _source.removeRange(deletePos, deletePos + deleteLength);
+        
+        // Handle cache updates based on rendering mode
+        if (_renderMode == Simple) {
+            _isDirty = true; // Simple mode just marks as dirty
+        } else {
+            // Complex mode uses selective updates (existing logic)
+            var startWordIndex = _findWordAtPosition(deletePos);
+            var endWordIndex = _findWordAtPosition(deletePos + deleteLength - 1);
+            var startLineIndex = _findLineAtPosition(deletePos);
+            var endLineIndex = _findLineAtPosition(deletePos + deleteLength - 1);
+            
+            _handleDeletion(deletePos, deleteLength, startWordIndex, endWordIndex, startLineIndex, endLineIndex);
+        }
+        
+        // Update cursor
+        _cursorPosition = cast Math.min(deletePos, _source.length());
+        
+        // Adjust selection if it exists
+        _adjustSelectionForDeletion(deletePos, deleteLength);
+    }
+    
+    /**
+    * Reset cursor blink animation.
+    **/
+    private function _resetCursorBlink() {
+        _cursorBlinkTime = 0.0;
+        _cursorVisible = true;
+    }
+    
+    /**
+    * Get character position from mouse coordinates (simple mode).
+    **/
+    private function _getCharacterPositionSimple(mouseX:Float, mouseY:Float):Int {
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return 0;
+        
+        var dim = dims[0];
+        var format = getTextFormat();
+        if (format == null) return 0;
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null) return 0;
+        
+        var relativeX = mouseX - dim.x;
+        var relativeY = mouseY - dim.y;
+        
+        // Clamp to text bounds and handle out-of-bounds gracefully
+        if (relativeY < 0) {
+            // Above text area - return start position
+            return 0;
+        }
+        
+        // For single line, just find character based on X position
+        if (!_options.wordWrap || text.indexOf('\n') == -1) {
+            if (relativeX <= 0) return 0;
+            
+            var charPos = 0;
+            var currentWidth = 0.0;
+            
+            while (charPos < text.length) {
+                var charWidth = format.font.width(format.fontSize, text.substring(charPos, charPos + 1));
+                if (currentWidth + charWidth * 0.5 > relativeX) {
+                    break;
+                }
+                currentWidth += charWidth;
+                charPos++;
+            }
+            
+            return Math.min(charPos, text.length);
+        }
+        
+        // For simple multi-line, find line first, then character
+        var lines = text.split('\n');
+        var lineHeight = format.font.height(format.fontSize) * 1.2;
+        var targetLine = Math.floor(relativeY / lineHeight);
+        
+        // Clamp line to valid range
+        if (targetLine >= lines.length) {
+            // Below text area - return end position
+            return text.length;
+        }
+        targetLine = Math.max(0, targetLine);
+        
+        var lineText = lines[targetLine];
+        
+        // Handle X position within the line
+        if (relativeX <= 0) {
+            // Left of line - return line start
+            var lineStart = 0;
+            for (i in 0...targetLine) {
+                lineStart += lines[i].length + 1; // +1 for newline
+            }
+            return lineStart;
+        }
+        
+        // Find character within line
+        var charPos = 0;
+        var currentWidth = 0.0;
+        
+        while (charPos < lineText.length) {
+            var charWidth = format.font.width(format.fontSize, lineText.substring(charPos, charPos + 1));
+            if (currentWidth + charWidth * 0.5 > relativeX) {
+                break;
+            }
+            currentWidth += charWidth;
+            charPos++;
+        }
+        
+        // Convert line-relative position to absolute position
+        var absolutePos = 0;
+        for (i in 0...targetLine) {
+            absolutePos += lines[i].length + 1; // +1 for newline
+        }
+        absolutePos += cast Math.min(charPos, lineText.length);
+        
+        return cast Math.min(absolutePos, text.length);
+    }
+    
+    /**
+    * Get character position from mouse coordinates (complex mode).
+    * This would use the word cache and line information for precise positioning.
+    **/
+    private function _getCharacterPositionComplex(mouseX:Float, mouseY:Float):Int {
+        // TODO: Implement complex mode character positioning using _words and _lines arrays
+        // For now, fall back to simple mode
+        return _getCharacterPositionSimple(mouseX, mouseY);
+    }
+    
+    /**
+    * Get the start position of the current line.
+    **/
+    private function _getCurrentLineStart():Int {
+        var text = Std.string(_source.getStringData());
+        if (text == null) return 0;
+        
+        var pos = _cursorPosition - 1;
+        while (pos >= 0 && text.charCodeAt(pos) != 10) {
+            pos--;
+        }
+        return pos + 1;
+    }
+    
+    /**
+    * Get the end position of the current line.
+    **/
+    private function _getCurrentLineEnd():Int {
+        var text = Std.string(_source.getStringData());
+        if (text == null) return 0;
+        
+        var pos = _cursorPosition;
+        while (pos < text.length && text.charCodeAt(pos) != 10) {
+            pos++;
+        }
+        return pos;
     }
     
     /**
@@ -1171,6 +1707,208 @@ class TextRenderer {
         // and potentially affect subsequent lines if wrapping changes
         
         
+    }
+
+    /**
+    * Check if the text can be scrolled horizontally.
+    **/
+    public function canScrollHorizontally():Bool {
+        if (_renderMode == Simple) {
+            return _canScrollHorizontallySimple();
+        } else {
+            return _canScrollHorizontallyComplex();
+        }
+    }
+    
+    /**
+    * Check if the text can be scrolled vertically.
+    **/
+    public function canScrollVertically():Bool {
+        if (_renderMode == Simple) {
+            return _canScrollVerticallySimple();
+        } else {
+            return _canScrollVerticallyComplex();
+        }
+    }
+    
+    /**
+    * Scroll horizontally by the given amount.
+    **/
+    public function scrollHorizontally(delta:Int) {
+        var scrollAmount = delta * 10.0; // Adjust sensitivity
+        _scrollOffsetX += scrollAmount;
+        
+        // Clamp to valid range
+        _scrollOffsetX = Math.max(0, Math.min(_scrollOffsetX, _maxScrollX));
+        
+        // Mark as needing re-render
+        _isDirty = true;
+    }
+    
+    /**
+    * Scroll vertically by the given amount.
+    **/
+    public function scrollVertically(delta:Int) {
+        var scrollAmount = delta * 10.0; // Adjust sensitivity
+        _scrollOffsetY += scrollAmount;
+        
+        // Clamp to valid range
+        _scrollOffsetY = Math.max(0, Math.min(_scrollOffsetY, _maxScrollY));
+        
+        // Mark as needing re-render
+        _isDirty = true;
+    }
+    
+    /**
+    * Get current horizontal scroll offset.
+    **/
+    public function getScrollOffsetX():Float {
+        return _scrollOffsetX;
+    }
+    
+    /**
+    * Get current vertical scroll offset.
+    **/
+    public function getScrollOffsetY():Float {
+        return _scrollOffsetY;
+    }
+    
+    /**
+    * Update scroll limits based on content size (call during layout updates).
+    **/
+    private function _updateScrollLimits() {
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return;
+        
+        var dim = dims[0];
+        var contentSize = _getContentSize();
+        
+        // Calculate maximum scroll distances
+        _maxScrollX = Math.max(0, contentSize.x - dim.width);
+        _maxScrollY = Math.max(0, contentSize.y - dim.height);
+        
+        // Clamp current offsets to new limits
+        _scrollOffsetX = Math.max(0, Math.min(_scrollOffsetX, _maxScrollX));
+        _scrollOffsetY = Math.max(0, Math.min(_scrollOffsetY, _maxScrollY));
+    }
+    
+    /**
+    * Get the total content size (width and height).
+    **/
+    private function _getContentSize():FastVector2 {
+        if (_renderMode == Simple) {
+            return _getContentSizeSimple();
+        } else {
+            return _getContentSizeComplex();
+        }
+    }
+    
+    /**
+    * Get content size in simple mode.
+    **/
+    private function _getContentSizeSimple():FastVector2 {
+        var format = getTextFormat();
+        if (format == null) return new FastVector2(0, 0);
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null || text.length == 0) return new FastVector2(0, 0);
+        
+        if (!_options.wordWrap || text.indexOf('\n') == -1) {
+            // Single line - width is text width, height is line height
+            var textWidth = format.font.widthOfString(format.fontSize, text);
+            var textHeight = format.font.height(format.fontSize);
+            return new FastVector2(textWidth, textHeight);
+        } else {
+            // Multi-line - calculate based on lines
+            var lines = text.split('\n');
+            var maxWidth = 0.0;
+            var lineHeight = format.font.height(format.fontSize) * 1.2;
+            var totalHeight = lines.length * lineHeight;
+            
+            for (line in lines) {
+                var lineWidth = format.font.widthOfString(format.fontSize, line);
+                if (lineWidth > maxWidth) {
+                    maxWidth = lineWidth;
+                }
+            }
+            
+            return new FastVector2(maxWidth, totalHeight);
+        }
+    }
+    
+    /**
+    * Get content size in complex mode.
+    **/
+    private function _getContentSizeComplex():FastVector2 {
+        if (_lines.length == 0) {
+            return new FastVector2(0, 0);
+        }
+        
+        var maxWidth = 0.0;
+        var totalHeight = 0.0;
+        
+        for (line in _lines) {
+            var lineWidth = line.lineEndX - line.lineStartX;
+            if (lineWidth > maxWidth) {
+                maxWidth = lineWidth;
+            }
+            totalHeight = Math.max(totalHeight, line.lineEndY);
+        }
+        
+        return new FastVector2(maxWidth, totalHeight);
+    }
+    
+    /**
+    * Check horizontal scrolling capability in simple mode.
+    **/
+    private function _canScrollHorizontallySimple():Bool {
+        var contentSize = _getContentSizeSimple();
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return false;
+        
+        var dim = dims[0];
+        return contentSize.x > dim.width;
+    }
+    
+    /**
+    * Check vertical scrolling capability in simple mode.
+    **/
+    private function _canScrollVerticallySimple():Bool {
+        var contentSize = _getContentSizeSimple();
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return false;
+        
+        var dim = dims[0];
+        return contentSize.y > dim.height;
+    }
+    
+    /**
+    * Check horizontal scrolling capability in complex mode.
+    **/
+    private function _canScrollHorizontallyComplex():Bool {
+        var contentSize = _getContentSizeComplex();
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return false;
+        
+        var dim = dims[0];
+        return contentSize.x > dim.width;
+    }
+    
+    /**
+    * Check vertical scrolling capability in complex mode.
+    **/
+    private function _canScrollVerticallyComplex():Bool {
+        var contentSize = _getContentSizeComplex();
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return false;
+        
+        var dim = dims[0];
+        return contentSize.y > dim.height;
     }
 
 }
