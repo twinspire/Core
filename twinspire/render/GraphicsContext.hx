@@ -15,7 +15,11 @@ import twinspire.render.QueryType;
 import twinspire.render.RenderQuery;
 import twinspire.text.InputRenderer;
 import twinspire.text.TextInputState;
-import twinspire.text.TextInputMethod;
+import twinspire.text.TextRenderer;
+import twinspire.text.TextFormat;
+import twinspire.text.IInputString;
+import twinspire.text.NormalInputString;
+import twinspire.text.RopedInputString;
 import twinspire.Application;
 import twinspire.Dimensions;
 using twinspire.extensions.ArrayExtensions;
@@ -95,6 +99,8 @@ class GraphicsContext {
     private var _dimensionCallbacks:Map<Int, DimensionCallback>;
     private var _callbackOrder:Array<Int>;
 
+    private var _textRenderers:Array<TextRenderer>;
+
     /**
     * A collection of dimensions within this context. Do not write directly.
     **/
@@ -170,6 +176,7 @@ class GraphicsContext {
         _animations = [];
         _dimensionCallbacks = [];
         _callbackOrder = [];
+        _textRenderers = [];
 
         containers = [];
         dimensions = [];
@@ -677,34 +684,6 @@ class GraphicsContext {
         state.index = Animate.animateCreateTick();
 
         _animations[index] = state;
-    }
-
-    /**
-    * Specifies the camera to use for observing dimensions.
-    **/
-    public function beginCamera(camera:Camera) {
-
-    }
-
-    /**
-    * Stop using the current camera. This function determines what indices are observable
-    * while the camera is idle, and filtering on dimensions close enough to the camera's
-    * observation of the dimension stack. Note that camera observation only applies to
-    * queries of type `STATIC` and `SPRITE`. `UI` type dimensions are ignored.
-    *
-    * To obtain the list of observed dimensions, use `getCameraObserved`.
-    **/
-    public function endCamera() {
-
-    }
-
-    /**
-    * Retrieve an array of all currently observed DimIndices. If a `DimIndex` completely
-    * overlaps the referenced dimension of another, the final `DimIndex` is the one rendered
-    * first.
-    **/
-    public function getCameraObserved():Array<DimIndex> {
-        return [];
     }
 
     /**
@@ -1807,6 +1786,38 @@ class GraphicsContext {
     }
 
     /**
+    * Create a text input with the new simplified API.
+    * 
+    * @param dimIndex The dimension reference for the text input area.
+    * @param inputString The string data source (RopedString or NormalInputString).
+    * @param options Optional rendering and behavior options.
+    * @return Returns the index for later reference.
+    **/
+    public function createTextInput(dimIndex:DimIndex, inputString:IInputString, font:Font, fontSize:Int, ?id:Id, ?options:TextRendererOptions):Int {        
+        // Create the TextRenderer
+        var renderer = new TextRenderer(inputString, options);
+        renderer.index = dimIndex;
+        
+        // Add default text format if none provided
+        if (renderer.getTextFormat() == null) {
+            var defaultFormat = new TextFormat();
+            defaultFormat.font = font;
+            defaultFormat.fontSize = fontSize;
+            defaultFormat.name = "Default";
+            renderer.addTextFormat(defaultFormat);
+            renderer.useFormatIndex(0);
+        }
+        
+        var index = _textRenderers.length;
+        _textRenderers.push(renderer);
+        
+        // Mark dimension as accepting text input
+        queries[DimIndexUtils.getDirectIndex(dimIndex)].acceptsTextInput = true;
+        
+        return index;
+    }
+
+    /**
     * Add an empty dimension to the context. This function is used to reserve a dimension index
     * for later use, such as when you want to add a dimension later in the frame.
     *
@@ -2048,52 +2059,52 @@ class GraphicsContext {
         };
     }
 
-    /**
-    * Add a container that is used as the basis for text input. An internal text input handler and text renderer
-    * is implemented in the underlying `TextInputState`. To access, use the `textInputs` variable of this class
-    * and use it to pass in your update and render contexts accordingly.
-    *
-    * You can control how the text input is rendered. There is `ImSingle`, `ImMultiline` and `Buffered`.
-    *
-    * @param dim The dimension to which this text input is rendered.
-    * @param method The renderer method to use.
-    * @param linkTo An optional index specifying that this dimension should be linked to another index.
-    *
-    * @return Returns three indices to represent the dim, container and input text states stored in this context.
-    **/
-    @:deprecated("API to be replaced with a more robust text input system in the future.")
-    public function addTextInput(dim:Dim, method:TextInputMethod, linkTo:Int = -1):TextInputResult {
-        var container = new Container();
-        var resultIndex = addUI(dim, InputRenderer.RenderId, linkTo);
-        container.dimIndex = switch (resultIndex) {
-            case Direct(index): index;
-            case Group(index): _groups[index][_groups[index].length - 1];
-        };
-        queries[container.dimIndex].acceptsTextInput = true;
-        container.manual = true;
-        container.offset = new FastVector2(0, 0);
-        container.content = new FastVector2(0, 0);
+    // /**
+    // * Add a container that is used as the basis for text input. An internal text input handler and text renderer
+    // * is implemented in the underlying `TextInputState`. To access, use the `textInputs` variable of this class
+    // * and use it to pass in your update and render contexts accordingly.
+    // *
+    // * You can control how the text input is rendered. There is `ImSingle`, `ImMultiline` and `Buffered`.
+    // *
+    // * @param dim The dimension to which this text input is rendered.
+    // * @param method The renderer method to use.
+    // * @param linkTo An optional index specifying that this dimension should be linked to another index.
+    // *
+    // * @return Returns three indices to represent the dim, container and input text states stored in this context.
+    // **/
+    // @:deprecated("API to be replaced with a more robust text input system in the future.")
+    // public function addTextInput(dim:Dim, method:TextInputMethod, linkTo:Int = -1):TextInputResult {
+    //     var container = new Container();
+    //     var resultIndex = addUI(dim, InputRenderer.RenderId, linkTo);
+    //     container.dimIndex = switch (resultIndex) {
+    //         case Direct(index): index;
+    //         case Group(index): _groups[index][_groups[index].length - 1];
+    //     };
+    //     queries[container.dimIndex].acceptsTextInput = true;
+    //     container.manual = true;
+    //     container.offset = new FastVector2(0, 0);
+    //     container.content = new FastVector2(0, 0);
 
-        _containerTemp.push(container);
-        var result = _containerTemp.length - 1;
-        if (noVirtualSceneChange) {
-            result += containers.length;
-        }
+    //     _containerTemp.push(container);
+    //     var result = _containerTemp.length - 1;
+    //     if (noVirtualSceneChange) {
+    //         result += containers.length;
+    //     }
 
-        var inputResult:TextInputResult = {
-            containerIndex: result,
-            index: resultIndex,
-            textInputIndex: textInputs.length
-        };
+    //     var inputResult:TextInputResult = {
+    //         containerIndex: result,
+    //         index: resultIndex,
+    //         textInputIndex: textInputs.length
+    //     };
 
-        addDimensionIndexToBuffer(container.dimIndex);
+    //     addDimensionIndexToBuffer(container.dimIndex);
 
-        var inputState = new TextInputState();
-        inputState.setup(inputResult, method);
-        textInputs.push(inputState);
+    //     var inputState = new TextInputState();
+    //     inputState.setup(inputResult, method);
+    //     textInputs.push(inputState);
 
-        return inputResult;
-    }
+    //     return inputResult;
+    // }
 
     /**
     * Set the scroll position of a given container. Optionally set the scrolling of the container using
@@ -3010,6 +3021,121 @@ class GraphicsContext {
         return getGraphics().generatePolarGradient(width, height, colors, stops, scale, offset, edge);
     }
 
+    //
+    // Text Input
+    //
+
+    /**
+    * Draw a text input created with createTextInput.
+    * 
+    * @param textInputIndex The index returned from createTextInput.
+    **/
+    public function drawTextInput(textInputIndex:Int) {
+        if (textInputIndex < 0 || textInputIndex >= _textRenderers.length) return;
+        
+        var renderer = _textRenderers[textInputIndex];
+        renderer.render(this);
+    }
+
+    /**
+    * Update text input state (cursor blinking, input handling).
+    * Call this in your update loop for editable text inputs.
+    * 
+    * @param textInputIndex The index of the text input.
+    **/
+    public function updateTextInput(textInputIndex:Int) {
+        if (textInputIndex < 0 || textInputIndex >= _textRenderers.length) return;
+        
+        var renderer = _textRenderers[textInputIndex];
+        renderer.update(Application.instance.updateCtx);
+    }
+
+    /**
+    * Get direct access to a text renderer for advanced operations.
+    * 
+    * @param textInputIndex The index of the text input.
+    * @return The TextRenderer instance or null if invalid index.
+    **/
+    public function getTextRenderer(textInputIndex:Int):TextRenderer {
+        if (textInputIndex < 0 || textInputIndex >= _textRenderers.length) return null;
+        return _textRenderers[textInputIndex];
+    }
+
+    /**
+    * Helper: Create a simple single-line text input.
+    * 
+    * @param dim The dimension for the input.
+    * @param initialText Optional initial text content.
+    * @param editable Whether the text can be edited.
+    * @return The text input index.
+    **/
+    public function createSingleLineInput(dim:DimIndex, font:Font, fontSize:Int, ?id:Id, initialText:String = "", editable:Bool = true):Int {
+        var inputString = new NormalInputString();
+        if (initialText.length > 0) {
+            inputString.addValue(initialText, 0);
+        }
+        
+        var options:TextRendererOptions = {
+            editable: editable,
+            selectable: editable,
+            wordWrap: false,
+            alignment: TextLeft,
+            buffered: false
+        };
+        
+        return createTextInput(dim, inputString, font, fontSize, id, options);
+    }
+
+    /**
+    * Helper: Create a multi-line text area.
+    * 
+    * @param dim The dimension for the text area.
+    * @param initialText Optional initial text content.
+    * @param editable Whether the text can be edited.
+    * @return The text input index.
+    **/
+    public function createTextArea(dim:DimIndex, font:Font, fontSize:Int, ?id:Id, initialText:String = "", editable:Bool = true):Int {
+        // Use RopedString for potentially larger multi-line content
+        var inputString = new RopedInputString();
+        if (initialText.length > 0) {
+            inputString.addValue(initialText, 0);
+        }
+        
+        var options:TextRendererOptions = {
+            editable: editable,
+            selectable: editable,
+            wordWrap: true,
+            alignment: TextLeft,
+            buffered: false  // Let TextRenderer decide based on content size
+        };
+        
+        return createTextInput(dim, inputString, font, fontSize, id, options);
+    }
+
+    /**
+    * Helper: Create a read-only text display.
+    * 
+    * @param dim The dimension for the text display.
+    * @param text The text content to display.
+    * @param wordWrap Whether to enable word wrapping.
+    * @return The text input index.
+    **/
+    public function createTextDisplay(dim:DimIndex, font:Font, fontSize:Int, text:String, ?id:Id, wordWrap:Bool = true):Int {
+        var inputString:IInputString = text.length > 500 ? new RopedInputString() : new NormalInputString();
+        if (text.length > 0) {
+            inputString.addValue(text, 0);
+        }
+        
+        var options:TextRendererOptions = {
+            editable: false,
+            selectable: true,  // Allow text selection for copy
+            wordWrap: wordWrap,
+            alignment: TextLeft,
+            buffered: false
+        };
+        
+        return createTextInput(dim, inputString, font, fontSize, id, options);
+    }
 
 
     /**

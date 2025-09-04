@@ -2,18 +2,19 @@ package twinspire.text;
 
 import kha.Image;
 import kha.Color;
+import twinspire.geom.Dim;
 import twinspire.render.UpdateContext;
 import twinspire.render.GraphicsContext;
 import kha.math.FastVector2;
 
-abstract enum TextAlignment(Int) {
+enum abstract TextAlignment(Int) {
     var TextLeft;
     var TextCentre;
     var TextRight;
     var TextJustified;
 }
 
-abstract enum TextRenderColors(Int) to Int {
+enum abstract TextRenderColors(Int) to Int {
     var TextForegroundColor;
     var TextHighlightedColor;
     var HighlightColor;
@@ -66,6 +67,17 @@ typedef LineInfo = {
     * Height of this line.
     **/
     var height:Float;
+}
+
+enum TextRenderMode {
+    /**
+    * Direct rendering for single lines and small text - no caching, immediate drawing.
+    **/
+    Simple;
+    /**
+    * Complex rendering with word cache, line layout, and optimization for large documents.
+    **/
+    Complex;
 }
 
 typedef TextRendererOptions = {
@@ -172,11 +184,19 @@ class TextRenderer {
     private var _words:Array<WordPosition>;
     private var _formats:Array<TextFormat>;
     private var _currentTextFormat:Int;
-    private var _index:DimIndex;
     private var _options:TextRendererOptions;
     private var _isDirty:Bool = true;
     private var _selectionStart:Int = -1;
     private var _selectionEnd:Int = -1;
+
+    private var _wordDirtyFlags:Array<Bool>;  // Track which cached words need recalculation
+    private var _lineDirtyFlags:Array<Bool>;  // Track which lines need relayout
+    private var _cursorPosition:Int = 0;      // Current cursor position for editing
+
+    // Rendering mode determination
+    private var _renderMode:TextRenderMode;
+    private var _characterThreshold:Int = 500;  // Switch to complex mode above this
+    private var _lineThreshold:Int = 10;        // Or above this many lines
 
     /**
     * The source input string.
@@ -200,13 +220,7 @@ class TextRenderer {
 
     public function new(sourceData:IInputString, ?options:TextRendererOptions) {
         _source = sourceData;
-
         _options = options != null ? options : {};
-        
-        // Initialize arrays
-        _lines = [];
-        _wordCache = [];
-        _words = [];
         _formats = [];
         
         // Set default options
@@ -217,6 +231,8 @@ class TextRenderer {
         if (_options.rightToLeft == null) _options.rightToLeft = false;
         if (_options.animateCursor == null) _options.animateCursor = true;
         if (_options.fadeCursor == null) _options.fadeCursor = true;
+
+        _determineRenderMode();
     }
 
     /**
@@ -255,15 +271,25 @@ class TextRenderer {
     * Insert at given position.
     **/
     public function insertAt(value:String, pos:Int) {
-        //
-        // TODO: When adding any non-alphanumeric character, check and update word cache, append to word
-        // positions, and advance the cursor (if selectable); otherwise, append to current word
-        // and calculate new position based on currently edited word.
-        //
-
-        if (_source != null) {
-            _source.addValue(value, pos);
+        if (_source == null || value.length == 0) return;
+        
+        _source.addValue(value, pos);
+        
+        // Check if we need to switch rendering modes
+        _determineRenderMode();
+        
+        if (_renderMode == Simple) {
+            _handleSimpleInsertion(pos, value);
+        } else {
+            _handleComplexInsertion(pos, value);
         }
+        
+        // Update cursor position
+        if (_options.editable) {
+            _cursorPosition = pos + value.length;
+        }
+        
+        _adjustSelectionForInsertion(pos, value.length);
     }
 
     /**
@@ -272,13 +298,13 @@ class TextRenderer {
     public function select(start:Int, end:Int) {
         if (!_options.selectable) return;
         
-        _selectionStart = Math.min(start, end);
-        _selectionEnd = Math.max(start, end);
+        _selectionStart = cast Math.min(start, end);
+        _selectionEnd = cast Math.max(start, end);
         
         // Clamp to valid range
         var maxLen = _source.length();
-        _selectionStart = Math.max(0, Math.min(_selectionStart, maxLen));
-        _selectionEnd = Math.max(0, Math.min(_selectionEnd, maxLen));
+        _selectionStart = cast Math.max(0, Math.min(_selectionStart, maxLen));
+        _selectionEnd = cast Math.max(0, Math.min(_selectionEnd, maxLen));
     }
 
     /**
@@ -286,21 +312,110 @@ class TextRenderer {
     * and specified `length`.
     **/
     public function delete(pos:Int = -1, ?length:Int = 0) {
-        // TODO
+        if (!_options.editable || _source == null) return;
+        
+        var deletePos = pos;
+        var deleteLength = length;
+        
+        // Handle selection deletion
+        if (_selectionStart >= 0 && _selectionEnd >= 0 && _selectionStart != _selectionEnd) {
+            deletePos = _selectionStart;
+            deleteLength = _selectionEnd - _selectionStart;
+            _selectionEnd = _selectionStart = -1;
+        } else if (pos == -1) {
+            deletePos = _cursorPosition > 0 ? _cursorPosition - 1 : 0;
+            deleteLength = 1;
+        }
+        
+        if (deletePos < 0 || deletePos >= _source.length()) return;
+        
+        deleteLength = cast Math.min(deleteLength, _source.length() - deletePos);
+        if (deleteLength <= 0) return;
+        
+        _source.removeRange(deletePos, deletePos + deleteLength);
+        
+        // Check if we can switch to simpler rendering mode
+        _determineRenderMode();
+        
+        if (_renderMode == Simple) {
+            _handleSimpleDeletion(deletePos, deleteLength);
+        } else {
+            _handleComplexDeletion(deletePos, deleteLength);
+        }
+        
+        _cursorPosition = deletePos;
+        _adjustSelectionForDeletion(deletePos, deleteLength);
+    }
+
+    /**
+    * Determine whether to use simple or complex rendering based on content size.
+    **/
+    private function _determineRenderMode() {
+        if (_source == null) {
+            _renderMode = Simple;
+            return;
+        }
+        
+        var textLength = _source.length();
+        var text = Std.string(_source.getStringData());
+        var lineCount = 1;
+        
+        if (text != null) {
+            // Quick line count
+            for (i in 0...text.length) {
+                if (text.charCodeAt(i) == 10) { // newline
+                    lineCount++;
+                }
+            }
+        }
+        
+        // Switch to complex mode for larger content or when word wrapping is critical
+        var needsComplex = textLength > _characterThreshold || 
+                          lineCount > _lineThreshold ||
+                          (_options.wordWrap && _options.constraints != null);
+        
+        var previousMode = _renderMode;
+        _renderMode = needsComplex ? Complex : Simple;
+        
+        // If switching from simple to complex, initialize complex structures
+        if (_renderMode == Complex && previousMode == Simple) {
+            _initializeComplexMode();
+        }
+    }
+
+    /**
+    * Initialize complex rendering structures when switching from simple mode.
+    **/
+    private function _initializeComplexMode() {
+        _lines = [];
+        _wordCache = [];
+        _words = [];
+        _wordDirtyFlags = [];
+        _lineDirtyFlags = [];
+        _isDirty = true;
     }
 
     /**
     * Get the current render state (typically a back buffer).
     **/
     public function getRenderState() {
-        // TODO
+        // This would return a cached render buffer if buffered rendering is enabled
+        if (_options.buffered) {
+            // TODO: Implement buffer management
+            return null;
+        }
+        return null;
     }
 
     /**
     * Render using the given graphics context.
     **/
     public function render(gtx:GraphicsContext) {
-        // TODO
+        if (_renderMode == Simple) {
+            _renderSimple(gtx);
+        } else {
+            _renderComplex(gtx);
+        }
     }
 
     /**
@@ -308,7 +423,754 @@ class TextRenderer {
     * repeated key strokes, key modifiers and cursor position.
     **/
     public function update(utx:UpdateContext) {
-        // TODO
+        // Handle cursor blinking, input events, etc.
+        if (_options.editable || _options.selectable) {
+            _handleInputEvents(utx);
+        }
+        
+        if (_options.animateCursor) {
+            _updateCursorAnimation(utx);
+        }
+    }
+
+    /**
+    * Simple insertion - just invalidate and let render handle it.
+    **/
+    private function _handleSimpleInsertion(pos:Int, value:String) {
+        // For simple mode, no caching - just mark as dirty for next render
+        _isDirty = true;
+    }
+
+    /**
+    * Simple deletion - just invalidate and let render handle it.
+    **/
+    private function _handleSimpleDeletion(pos:Int, length:Int) {
+        // For simple mode, no caching - just mark as dirty for next render
+        _isDirty = true;
+    }
+
+    /**
+    * Complex insertion with word cache management (from previous implementation).
+    **/
+    private function _handleComplexInsertion(pos:Int, value:String) {
+        var affectedWordIndex = _findWordAtPosition(pos);
+        var affectedLineIndex = _findLineAtPosition(pos);
+        
+        if (_isWordBoundaryChar(value)) {
+            _handleWordBoundaryInsertion(pos, value, affectedWordIndex, affectedLineIndex);
+        } else {
+            _handleInWordInsertion(pos, value, affectedWordIndex, affectedLineIndex);
+        }
+    }
+
+    /**
+    * Complex deletion with selective updates (from previous implementation).
+    **/
+    private function _handleComplexDeletion(pos:Int, length:Int) {
+        var startWordIndex = _findWordAtPosition(pos);
+        var endWordIndex = _findWordAtPosition(pos + length - 1);
+        var startLineIndex = _findLineAtPosition(pos);
+        var endLineIndex = _findLineAtPosition(pos + length - 1);
+        
+        _handleDeletion(pos, length, startWordIndex, endWordIndex, startLineIndex, endLineIndex);
+    }
+
+    /**
+    * Simple rendering for small documents - direct text drawing.
+    **/
+    private function _renderSimple(gtx:GraphicsContext) {
+        if (_source == null || _index == null) return;
+        
+        var dims = gtx.getClientDimensionsAtIndex(_index);
+        if (dims.length == 0) return;
+        if (dims[0] == null) return;
+        
+        var dim = dims[0];
+        var format = getTextFormat();
+        if (format == null) return;
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null || text.length == 0) return;
+        
+        gtx.setColor(_options.colors != null ? _options.colors[TextForegroundColor] : Color.Black);
+        gtx.setFont(format.font);
+        gtx.setFontSize(format.fontSize);
+        
+        if (!_options.wordWrap || text.indexOf('\n') == -1) {
+            // Single line rendering
+            _renderSingleLine(gtx, text, dim, format);
+        } else {
+            // Simple multi-line rendering (no word wrapping, just line breaks)
+            _renderSimpleMultiLine(gtx, text, dim, format);
+        }
+        
+        // Render selection and cursor
+        if (_options.selectable || _options.editable) {
+            _renderSimpleSelection(gtx, text, dim, format);
+            _renderSimpleCursor(gtx, text, dim, format);
+        }
+    }
+
+    /**
+    * Render single line of text.
+    **/
+    private function _renderSingleLine(gtx:GraphicsContext, text:String, dim:Dim, format:TextFormat) {
+        var x = dim.x;
+        var y = dim.y;
+        
+        // Apply text alignment
+        if (_options.alignment != TextLeft) {
+            var textWidth = format.font.width(format.fontSize, text);
+            switch (_options.alignment) {
+                case TextCentre: x += (dim.width - textWidth) * 0.5;
+                case TextRight: x += dim.width - textWidth;
+                case TextJustified: /* No change for single line */
+                default:
+            }
+        }
+        
+        gtx.getCurrentGraphics().drawString(text, x, y);
+    }
+
+    /**
+    * Render simple multi-line (only natural line breaks, no word wrapping).
+    **/
+    private function _renderSimpleMultiLine(gtx:GraphicsContext, text:String, dim:Dim, format:TextFormat) {
+        var lines = text.split('\n');
+        var lineHeight = format.font.height(format.fontSize) * 1.2; // Add some line spacing
+        var y = dim.y;
+        
+        for (line in lines) {
+            if (y + lineHeight > dim.y + dim.height) break; // Clip to bounds
+            
+            var x = dim.x;
+            
+            // Apply alignment for each line
+            if (_options.alignment != TextLeft && line.length > 0) {
+                var lineWidth = format.font.width(format.fontSize, line);
+                switch (_options.alignment) {
+                    case TextCentre: x += (dim.width - lineWidth) * 0.5;
+                    case TextRight: x += dim.width - lineWidth;
+                    default:
+                }
+            }
+            
+            gtx.getCurrentGraphics().drawString(line, x, y);
+            y += lineHeight;
+        }
+    }
+
+    /**
+    * Simple selection rendering without word cache.
+    **/
+    private function _renderSimpleSelection(gtx:GraphicsContext, text:String, dim:Dim, format:TextFormat) {
+        if (_selectionStart == -1 || _selectionEnd == -1 || _selectionStart == _selectionEnd) return;
+        
+        var selectionColor = _options.colors != null ? _options.colors[HighlightColor] : Color.fromBytes(0, 120, 215);
+        gtx.setColor(selectionColor);
+        
+        // For simple mode, just calculate selection bounds directly
+        var beforeSelection = text.substring(0, _selectionStart);
+        var selectedText = text.substring(_selectionStart, _selectionEnd);
+        
+        var beforeWidth = format.font.width(format.fontSize, beforeSelection);
+        var selectedWidth = format.font.width(format.fontSize, selectedText);
+        var lineHeight = format.font.height(format.fontSize);
+        
+        gtx.getCurrentGraphics().fillRect(dim.x + beforeWidth, dim.y, selectedWidth, lineHeight);
+    }
+
+    /**
+    * Simple cursor rendering.
+    **/
+    private function _renderSimpleCursor(gtx:GraphicsContext, text:String, dim:Dim, format:TextFormat) {
+        if (!_options.editable) return;
+        
+        var cursorColor = _options.colors != null ? _options.colors[CursorColor] : Color.Black;
+        gtx.setColor(cursorColor);
+        
+        var beforeCursor = text.substring(0, _cursorPosition);
+        var cursorX = dim.x + format.font.width(format.fontSize, beforeCursor);
+        var lineHeight = format.font.height(format.fontSize);
+        
+        // Simple cursor line
+        gtx.getCurrentGraphics().drawLine(cursorX, dim.y, cursorX, dim.y + lineHeight, 1.0);
+    }
+
+    /**
+    * Complex rendering with full word cache and layout system.
+    **/
+    private function _renderComplex(gtx:GraphicsContext) {
+        if (_isDirty) {
+            _updateComplexLayout(gtx);
+        }
+        
+        if (_options.buffered && getRenderState() != null) {
+            _renderFromBuffer(gtx);
+        } else {
+            _renderDirectComplex(gtx);
+        }
+    }
+
+    /**
+    * Get render mode for external inspection.
+    **/
+    public function getRenderMode():TextRenderMode {
+        return _renderMode;
+    }
+
+    /**
+    * Force a specific render mode (useful for testing or special cases).
+    **/
+    public function setRenderMode(mode:TextRenderMode) {
+        if (_renderMode != mode) {
+            _renderMode = mode;
+            if (mode == Complex && _lines == null) {
+                _initializeComplexMode();
+            }
+            _isDirty = true;
+        }
+    }
+
+    /**
+    * Set thresholds for automatic mode switching.
+    **/
+    public function setRenderThresholds(charThreshold:Int, lineThreshold:Int) {
+        _characterThreshold = charThreshold;
+        _lineThreshold = lineThreshold;
+        _determineRenderMode();
+    }
+
+    private function _invalidateLayout() {
+        _isDirty = true;
+        _lines = [];
+        _wordCache = [];
+        _words = [];
+    }
+
+    private function _updateLayout(gtx:GraphicsContext) {
+        if (_source == null) return;
+        
+        // Get dimension bounds for layout constraints
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return;
+        
+        var dim = dims[0];
+        var maxWidth = _options.constraints != null ? _options.constraints.x : dim.width;
+        var maxHeight = _options.constraints != null ? _options.constraints.y : dim.height;
+        
+        _buildWordCache();
+        _layoutWords(maxWidth, maxHeight);
+        _isDirty = false;
+    }
+
+    private function _buildWordCache() {
+        _wordCache = [];
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null || text.length == 0) return;
+        
+        var words = text.split(" ");
+        var currentPos = 0;
+        
+        for (i in 0...words.length) {
+            var word = words[i];
+            if (word.length > 0) {
+                // TODO: Calculate actual width using font metrics
+                var width = word.length * 8.0; // Placeholder calculation
+                
+                _wordCache.push({
+                    text: word,
+                    width: width,
+                    formatIndex: 0 // TODO: Determine format index based on position
+                });
+            }
+            currentPos += word.length + 1; // +1 for space
+        }
+    }
+
+    private function _layoutWords(maxWidth:Float, maxHeight:Float) {
+        _words = [];
+        _lines = [];
+        
+        if (_wordCache.length == 0) return;
+        
+        var currentLine = 0;
+        var currentX = 0.0;
+        var lineHeight = 16.0; // TODO: Get from font metrics
+        var currentY = 0.0;
+        
+        var lineStartIndex = 0;
+        
+        for (i in 0..._wordCache.length) {
+            var word = _wordCache[i];
+            var spaceWidth = 8.0; // TODO: Calculate space width
+            
+            // Check if word fits on current line
+            var wordWithSpace = word.width + (i < _wordCache.length - 1 ? spaceWidth : 0);
+            
+            if (_options.wordWrap && currentX + wordWithSpace > maxWidth && currentX > 0) {
+                // Finalize current line
+                _finalizeLine(lineStartIndex, i - 1, currentLine, 0.0, currentY, currentX, currentY + lineHeight);
+                
+                // Start new line
+                currentLine++;
+                currentX = 0.0;
+                currentY += lineHeight;
+                lineStartIndex = i;
+                
+                // Check height constraint
+                if (maxHeight > 0 && currentY + lineHeight > maxHeight) {
+                    break;
+                }
+            }
+            
+            // Add word to current line
+            _words.push({
+                wordIndex: i,
+                space: i < _wordCache.length - 1 ? spaceWidth : 0,
+                lineIndex: currentLine,
+                offset: currentX
+            });
+            
+            currentX += word.width;
+            if (i < _wordCache.length - 1) {
+                currentX += spaceWidth;
+            }
+        }
+        
+        // Finalize last line
+        if (_words.length > 0) {
+            _finalizeLine(lineStartIndex, _wordCache.length - 1, currentLine, 0.0, currentY, currentX, currentY + lineHeight);
+        }
+    }
+
+    private function _finalizeLine(startWordIndex:Int, endWordIndex:Int, lineIndex:Int, 
+                                 startX:Float, startY:Float, endX:Float, endY:Float) {
+        var startCharIndex = 0;
+        var endCharIndex = 0;
+        
+        // TODO: Calculate character indices from word indices
+        
+        _lines.push({
+            start: startCharIndex,
+            end: endCharIndex,
+            lineStartX: startX,
+            lineStartY: startY,
+            lineEndX: endX,
+            lineEndY: endY,
+            height: endY - startY
+        });
+    }
+
+    private function _updateComplexLayout(gtx:GraphicsContext) {
+        
+    }
+    
+    private function _renderDirectComplex(gtx:GraphicsContext) {
+        
+    }
+
+    private function _renderDirect(gtx:GraphicsContext) {
+        // TODO: Implement direct rendering
+        // This would iterate through _words and render each word
+        // with proper positioning and formatting
+    }
+
+    private function _renderFromBuffer(gtx:GraphicsContext) {
+        // TODO: Implement buffer-based rendering
+    }
+
+    private function _handleInputEvents(utx:UpdateContext) {
+        // TODO: Handle keyboard input, mouse selection, etc.
+    }
+
+    private function _updateCursorAnimation(utx:UpdateContext) {
+        // TODO: Update cursor blink animation
+    }
+
+    /**
+    * Find the word index that contains the given character position.
+    **/
+    private function _findWordAtPosition(pos:Int):Int {
+        if (_wordCache.length == 0) return -1;
+        
+        var charCount = 0;
+        for (i in 0..._wordCache.length) {
+            var wordLength = _wordCache[i].text.length;
+            if (pos >= charCount && pos <= charCount + wordLength) {
+                return i;
+            }
+            charCount += wordLength + 1; // +1 for space between words
+        }
+        return _wordCache.length - 1;
+    }
+    
+    /**
+    * Find the line index that contains the given character position.
+    **/
+    private function _findLineAtPosition(pos:Int):Int {
+        for (i in 0..._lines.length) {
+            if (pos >= _lines[i].start && pos <= _lines[i].end) {
+                return i;
+            }
+        }
+        return _lines.length > 0 ? _lines.length - 1 : -1;
+    }
+    
+    /**
+    * Check if a character typically breaks words (spaces, punctuation).
+    **/
+    private function _isWordBoundaryChar(text:String):Bool {
+        if (text.length == 0) return false;
+        var char = text.charCodeAt(0);
+        return char == 32 || // space
+               char == 9 ||  // tab
+               char == 10 || // newline
+               char == 13 || // carriage return
+               (char >= 33 && char <= 47) ||  // punctuation
+               (char >= 58 && char <= 64) ||  // more punctuation
+               (char >= 91 && char <= 96) ||  // brackets, etc.
+               (char >= 123 && char <= 126);  // braces, etc.
+    }
+    
+    /**
+    * Handle insertion at word boundaries (spaces, punctuation).
+    **/
+    private function _handleWordBoundaryInsertion(pos:Int, value:String, affectedWordIndex:Int, affectedLineIndex:Int) {
+        // For word boundary insertions, we might need to split existing words
+        // or create new word entries
+        
+        if (affectedWordIndex >= 0 && affectedWordIndex < _wordCache.length) {
+            var word = _wordCache[affectedWordIndex];
+            var localPos = _getLocalPositionInWord(pos, affectedWordIndex);
+            
+            if (localPos == 0) {
+                // Insertion at start of word - might create new word
+                _insertNewWordBefore(value, affectedWordIndex);
+            } else if (localPos >= word.text.length) {
+                // Insertion at end of word - might create new word
+                _insertNewWordAfter(value, affectedWordIndex);
+            } else {
+                // Insertion in middle of word - split the word
+                _splitWordAtPosition(affectedWordIndex, localPos, value);
+            }
+        } else {
+            // Insertion at very beginning or end of text
+            _appendNewWord(value);
+        }
+        
+        // Mark affected lines for relayout
+        _markLinesForRelayout(affectedLineIndex);
+    }
+    
+    /**
+    * Handle insertion within a word (alphanumeric characters).
+    **/
+    private function _handleInWordInsertion(pos:Int, value:String, affectedWordIndex:Int, affectedLineIndex:Int) {
+        if (affectedWordIndex >= 0 && affectedWordIndex < _wordCache.length) {
+            var word = _wordCache[affectedWordIndex];
+            var localPos = _getLocalPositionInWord(pos, affectedWordIndex);
+            
+            // Simply insert into existing word text
+            var newText = word.text.substring(0, localPos) + value + word.text.substring(localPos);
+            _wordCache[affectedWordIndex].text = newText;
+            
+            // Mark this word for width recalculation
+            _markWordDirty(affectedWordIndex);
+            
+            // Mark affected line for relayout
+            _markLinesForRelayout(affectedLineIndex);
+        }
+    }
+    
+    /**
+    * Handle deletion efficiently by only updating affected words and lines.
+    **/
+    private function _handleDeletion(deletePos:Int, deleteLength:Int, startWordIndex:Int, endWordIndex:Int, 
+                                   startLineIndex:Int, endLineIndex:Int) {
+        
+        // If deletion spans multiple words, we need to merge or remove words
+        if (startWordIndex != endWordIndex && startWordIndex >= 0 && endWordIndex >= 0) {
+            // Complex deletion spanning multiple words
+            _handleMultiWordDeletion(deletePos, deleteLength, startWordIndex, endWordIndex);
+        } else if (startWordIndex >= 0) {
+            // Deletion within a single word
+            _handleSingleWordDeletion(deletePos, deleteLength, startWordIndex);
+        }
+        
+        // Shift positions of all words after the deletion
+        _shiftWordsAfterDeletion(endWordIndex, deleteLength);
+        
+        // Mark affected lines for relayout
+        for (i in startLineIndex...cast Math.min(endLineIndex + 2, _lines.length)) {
+            _markLinesForRelayout(i);
+        }
+    }
+    
+    /**
+    * Get the position within a specific word.
+    **/
+    private function _getLocalPositionInWord(globalPos:Int, wordIndex:Int):Int {
+        var charCount = 0;
+        for (i in 0...wordIndex) {
+            charCount += _wordCache[i].text.length + 1; // +1 for space
+        }
+        return globalPos - charCount;
+    }
+    
+    /**
+    * Mark specific word as needing width recalculation.
+    **/
+    private function _markWordDirty(wordIndex:Int) {
+        if (_wordDirtyFlags.length <= wordIndex) {
+            // Extend array if needed
+            while (_wordDirtyFlags.length <= wordIndex) {
+                _wordDirtyFlags.push(false);
+            }
+        }
+        _wordDirtyFlags[wordIndex] = true;
+    }
+    
+    /**
+    * Mark lines for relayout starting from the given line index.
+    **/
+    private function _markLinesForRelayout(fromLineIndex:Int) {
+        if (fromLineIndex < 0) return;
+        
+        // Mark this line and all subsequent lines as dirty
+        // because word wrapping can affect all following lines
+        for (i in fromLineIndex..._lines.length) {
+            if (i < _lineDirtyFlags.length) {
+                _lineDirtyFlags[i] = true;
+            } else {
+                _lineDirtyFlags.push(true);
+            }
+        }
+        
+        _isDirty = true;
+    }
+    
+    /**
+    * Recalculate width for dirty words only.
+    **/
+    private function _updateDirtyWords() {
+        var format = getTextFormat();
+        if (format == null) return;
+        
+        for (i in 0..._wordCache.length) {
+            if (i < _wordDirtyFlags.length && _wordDirtyFlags[i]) {
+                var word = _wordCache[i];
+                // Use font metrics to calculate actual width
+                word.width = format.font.width(format.fontSize, word.text);
+                _wordDirtyFlags[i] = false;
+            }
+        }
+    }
+    
+    /**
+    * Relayout only dirty lines.
+    **/
+    private function _relayoutDirtyLines() {
+        if (_lines.length == 0) return;
+        
+        var format = getTextFormat();
+        if (format == null) return;
+        
+        var lineHeight = format.font.height(format.fontSize);
+        var spaceWidth = format.font.width(format.fontSize, " ");
+        
+        for (lineIndex in 0..._lines.length) {
+            if (lineIndex >= _lineDirtyFlags.length || !_lineDirtyFlags[lineIndex]) {
+                continue;
+            }
+            
+            var line = _lines[lineIndex];
+            
+            // Recalculate line layout
+            _recalculateLineLayout(lineIndex, line, lineHeight, spaceWidth);
+            
+            _lineDirtyFlags[lineIndex] = false;
+        }
+    }
+    
+    /**
+    * Insert new word before the specified index.
+    **/
+    private function _insertNewWordBefore(text:String, beforeIndex:Int) {
+        var format = getTextFormat();
+        var width = format != null ? format.font.width(format.fontSize, text) : text.length * 8.0;
+        
+        var newWord:Word = {
+            text: text,
+            width: width,
+            formatIndex: _currentTextFormat
+        };
+        
+        _wordCache.insert(beforeIndex, newWord);
+        _wordDirtyFlags.insert(beforeIndex, false);
+    }
+    
+    /**
+    * Insert new word after the specified index.
+    **/
+    private function _insertNewWordAfter(text:String, afterIndex:Int) {
+        var format = getTextFormat();
+        var width = format != null ? format.font.width(format.fontSize, text) : text.length * 8.0;
+        
+        var newWord:Word = {
+            text: text,
+            width: width,
+            formatIndex: _currentTextFormat
+        };
+        
+        _wordCache.insert(afterIndex + 1, newWord);
+        _wordDirtyFlags.insert(afterIndex + 1, false);
+    }
+    
+    /**
+    * Append new word at the end.
+    **/
+    private function _appendNewWord(text:String) {
+        var format = getTextFormat();
+        var width = format != null ? format.font.width(format.fontSize, text) : text.length * 8.0;
+        
+        var newWord:Word = {
+            text: text,
+            width: width,
+            formatIndex: _currentTextFormat
+        };
+        
+        _wordCache.push(newWord);
+        _wordDirtyFlags.push(false);
+    }
+    
+    /**
+    * Adjust selection indices after insertion.
+    **/
+    private function _adjustSelectionForInsertion(insertPos:Int, insertLength:Int) {
+        if (_selectionStart >= insertPos) {
+            _selectionStart += insertLength;
+        }
+        if (_selectionEnd >= insertPos) {
+            _selectionEnd += insertLength;
+        }
+    }
+    
+    /**
+    * Adjust selection indices after deletion.
+    **/
+    private function _adjustSelectionForDeletion(deletePos:Int, deleteLength:Int) {
+        if (_selectionStart >= deletePos + deleteLength) {
+            _selectionStart -= deleteLength;
+        } else if (_selectionStart >= deletePos) {
+            _selectionStart = deletePos;
+        }
+        
+        if (_selectionEnd >= deletePos + deleteLength) {
+            _selectionEnd -= deleteLength;
+        } else if (_selectionEnd >= deletePos) {
+            _selectionEnd = deletePos;
+        }
+        
+        // Clear selection if it becomes invalid
+        if (_selectionStart >= _selectionEnd) {
+            _selectionStart = _selectionEnd = -1;
+        }
+    }
+    
+    /**
+    * Handle deletion within a single word.
+    **/
+    private function _handleSingleWordDeletion(deletePos:Int, deleteLength:Int, wordIndex:Int) {
+        var word = _wordCache[wordIndex];
+        var localPos = _getLocalPositionInWord(deletePos, wordIndex);
+        var localEndPos = cast (Math.min(localPos + deleteLength, word.text.length), Int);
+        
+        var newText = word.text.substring(0, localPos) + word.text.substring(localEndPos);
+        
+        if (newText.length == 0) {
+            // Remove empty word
+            _wordCache.splice(wordIndex, 1);
+            if (wordIndex < _wordDirtyFlags.length) {
+                _wordDirtyFlags.splice(wordIndex, 1);
+            }
+        } else {
+            // Update word text and mark for width recalculation
+            word.text = newText;
+            _markWordDirty(wordIndex);
+        }
+    }
+    
+    /**
+    * Handle deletion spanning multiple words.
+    **/
+    private function _handleMultiWordDeletion(deletePos:Int, deleteLength:Int, startWordIndex:Int, endWordIndex:Int) {
+        // This is complex - we need to potentially merge partial words
+        // and remove words in between
+        
+        var startWord = _wordCache[startWordIndex];
+        var endWord = _wordCache[endWordIndex];
+        
+        var startLocalPos = _getLocalPositionInWord(deletePos, startWordIndex);
+        var endLocalPos = _getLocalPositionInWord(deletePos + deleteLength, endWordIndex);
+        
+        // Create merged word from start and end portions
+        var mergedText = startWord.text.substring(0, startLocalPos) + endWord.text.substring(endLocalPos);
+        
+        if (mergedText.length > 0) {
+            // Update start word with merged text
+            startWord.text = mergedText;
+            _markWordDirty(startWordIndex);
+            
+            // Remove words in between and end word
+            var removeCount = endWordIndex - startWordIndex;
+            if (removeCount > 0) {
+                _wordCache.splice(startWordIndex + 1, removeCount);
+                _wordDirtyFlags.splice(startWordIndex + 1, cast Math.min(removeCount, _wordDirtyFlags.length - startWordIndex - 1));
+            }
+        } else {
+            // Remove all affected words
+            var removeCount = endWordIndex - startWordIndex + 1;
+            _wordCache.splice(startWordIndex, removeCount);
+            _wordDirtyFlags.splice(startWordIndex, cast Math.min(removeCount, _wordDirtyFlags.length - startWordIndex));
+        }
+    }
+    
+    /**
+    * Shift word positions after deletion.
+    **/
+    private function _shiftWordsAfterDeletion(afterWordIndex:Int, deleteLength:Int) {
+        // Word positions in _words array will be recalculated during relayout
+        // This is more efficient than trying to manually adjust each position
+    }
+    
+    /**
+    * Split word at position and insert text.
+    **/
+    private function _splitWordAtPosition(wordIndex:Int, localPos:Int, insertText:String) {
+        var word = _wordCache[wordIndex];
+        var beforeText = word.text.substring(0, localPos);
+        var afterText = word.text.substring(localPos);
+        
+        // Update original word with before text + inserted text
+        word.text = beforeText + insertText;
+        _markWordDirty(wordIndex);
+        
+        // Insert new word with after text
+        if (afterText.length > 0) {
+            _insertNewWordAfter(afterText, wordIndex);
+        }
+    }
+    
+    /**
+    * Recalculate layout for a specific line.
+    **/
+    private function _recalculateLineLayout(lineIndex:Int, line:LineInfo, lineHeight:Float, spaceWidth:Float) {
+        // This would recalculate word positions, wrapping, etc. for just this line
+        // and potentially affect subsequent lines if wrapping changes
+        
+        
     }
 
 }

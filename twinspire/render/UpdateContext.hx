@@ -410,6 +410,8 @@ class UpdateContext {
 
         if (_activatedIndex > -1) {
             if (isFocusTextBased) {
+                var renderer = _gctx.getTextRenderer(_activatedIndex);
+                
                 for (c in GlobalEvents.getKeyCharCode()) {
                     _charString += String.fromCharCode(c);
                 }

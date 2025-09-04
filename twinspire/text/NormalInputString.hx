@@ -8,6 +8,8 @@ class NormalInputString extends InputString {
 
     public function new() {
         super();
+
+        data = new StringBuffer();
     }
 
     public function getStringData():Dynamic {

@@ -9,7 +9,7 @@ class TextInputState {
     /**
     * The method for rendering the underlying text state.
     **/
-    public var method:TextInputMethod;
+    //public var method:TextInputMethod;
     /**
     * The input renderer used for rendering the input state.
     **/
@@ -35,12 +35,12 @@ class TextInputState {
 
     }
 
-    public function setup(index:TextInputResult, method:TextInputMethod) {
-        this.index = index;
-        this.method = method;
+    // public function setup(index:TextInputResult, method:TextInputMethod) {
+    //     this.index = index;
+    //     this.method = method;
 
-        inputRenderer = new InputRenderer(index.containerIndex, index.textInputIndex);
-        inputHandler = new InputState();
-    }
+    //     inputRenderer = new InputRenderer(index.containerIndex, index.textInputIndex);
+    //     inputHandler = new InputState();
+    // }
 
 }
