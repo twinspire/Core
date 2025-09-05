@@ -41,6 +41,7 @@ class UpdateContext {
     private var _retainedMouseDown:Array<Int>;
 
     private var _mouseFocusIndexUI:Int;
+    private var _mouseIsOver:Int;
     private var _mouseIsDown:Int;
     private var _mouseIsScrolling:Int;
     private var _mouseScrollValue:Int;
@@ -53,7 +54,7 @@ class UpdateContext {
 
     private var _lastMousePosition:FastVector2;
     private var _mouseDownFirstPos:FastVector2;
-    private var _mouseDragTolerance:Float = 3.0;
+    private var _mouseDragTolerance:Float = 1.5;
 
     private var _drag:DragObject;
     private var _isDragStart:Int;
@@ -88,6 +89,7 @@ class UpdateContext {
         _toggles = [];
 
         _mouseFocusIndexUI = -1;
+        _mouseIsOver = -1;
         _activatedIndex = -1;
         _charString = "";
         _containerDragIndex = -1;
@@ -407,6 +409,7 @@ class UpdateContext {
         }
         
         // Reset per-frame state
+        _mouseIsOver = -1;
         _mouseIsDown = -1;
         _mouseIsReleased = -1;
         _mouseIsScrolling = -1;
@@ -869,6 +872,8 @@ class UpdateContext {
         
         var topMostIndex = _tempUI[_tempUI.length - 1];
         var query = _gctx.queries[topMostIndex];
+
+        _mouseIsOver = topMostIndex;
         
         // Mouse down events
         if (GlobalEvents.isAnyMouseButtonDown()) {
@@ -970,7 +975,7 @@ class UpdateContext {
         var mousePos = GlobalEvents.getMousePosition();
         var dragDistance = _mouseDownFirstPos.sub(FastVector2.fromVector2(mousePos));
         
-        if (dragDistance > _mouseDragTolerance && _tempUI.length > 0) {
+        if ((dragDistance.x > _mouseDragTolerance || dragDistance.y > _mouseDragTolerance) && _tempUI.length > 0) {
             var topMostIndex = _tempUI[_tempUI.length - 1];
             var query = _gctx.queries[topMostIndex];
             
@@ -1527,7 +1532,7 @@ class UpdateContext {
             case Group(item): {
                 partOfGroup = true;
                 for (dim in _gctx.getDimIndicesAtGroupIndex(item)) {
-                    if (dim == _mouseFocusIndexUI) {
+                    if (dim == _mouseIsOver) {
                         actualIndex = dim;
                         break;
                     }
@@ -1539,7 +1544,7 @@ class UpdateContext {
             return false;
         }
 
-        var result = _mouseFocusIndexUI == actualIndex && _gctx.queries[actualIndex].type != QUERY_STATIC;
+        var result = _mouseIsOver == actualIndex && _gctx.queries[actualIndex].type != QUERY_STATIC;
         if (result) {
             var parentIndex = _gctx.dimensionLinks[actualIndex];
             if (parentIndex > -1 && !partOfGroup) {

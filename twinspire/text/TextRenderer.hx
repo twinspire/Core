@@ -189,8 +189,11 @@ class TextRenderer {
     private var _selectionStart:Int = -1;
     private var _selectionEnd:Int = -1;
     private var _isSelecting:Bool = false;
+    private var _isFocused:Bool = false;
     private var _selectionStartPos:Int = -1;
     private var _selectionEndPos:Int = -1;
+    private var _cursorBlinkTime:Float;
+    private var _cursorVisible:Bool = false;
 
     private var _scrollOffsetX:Float = 0.0;
     private var _scrollOffsetY:Float = 0.0;
@@ -313,46 +316,6 @@ class TextRenderer {
         var maxLen = _source.length();
         _selectionStart = cast Math.max(0, Math.min(_selectionStart, maxLen));
         _selectionEnd = cast Math.max(0, Math.min(_selectionEnd, maxLen));
-    }
-
-    /**
-    * Delete either the current selection or at the given optional `pos`
-    * and specified `length`.
-    **/
-    public function delete(pos:Int = -1, ?length:Int = 0) {
-        if (!_options.editable || _source == null) return;
-        
-        var deletePos = pos;
-        var deleteLength = length;
-        
-        // Handle selection deletion
-        if (_selectionStart >= 0 && _selectionEnd >= 0 && _selectionStart != _selectionEnd) {
-            deletePos = _selectionStart;
-            deleteLength = _selectionEnd - _selectionStart;
-            _selectionEnd = _selectionStart = -1;
-        } else if (pos == -1) {
-            deletePos = _cursorPosition > 0 ? _cursorPosition - 1 : 0;
-            deleteLength = 1;
-        }
-        
-        if (deletePos < 0 || deletePos >= _source.length()) return;
-        
-        deleteLength = cast Math.min(deleteLength, _source.length() - deletePos);
-        if (deleteLength <= 0) return;
-        
-        _source.removeRange(deletePos, deletePos + deleteLength);
-        
-        // Check if we can switch to simpler rendering mode
-        _determineRenderMode();
-        
-        if (_renderMode == Simple) {
-            _handleSimpleDeletion(deletePos, deleteLength);
-        } else {
-            _handleComplexDeletion(deletePos, deleteLength);
-        }
-        
-        _cursorPosition = deletePos;
-        _adjustSelectionForDeletion(deletePos, deleteLength);
     }
 
     /**
@@ -494,10 +457,11 @@ class TextRenderer {
     private function _renderSimple(gtx:GraphicsContext) {
         if (_source == null || _index == null) return;
         
-        var dims = gtx.getDimensionsAtIndex(_index);
+        var dims = gtx.getClientDimensionsAtIndex(_index);
         if (dims.length == 0) return;
         
         var dim = dims[0];
+        if (dim == null) return;
         var format = getTextFormat();
         if (format == null) return;
         
@@ -543,8 +507,8 @@ class TextRenderer {
         var beforeSelection = text.substring(0, _selectionStart);
         var selectedText = text.substring(_selectionStart, _selectionEnd);
         
-        var beforeWidth = format.font.widthOfString(format.fontSize, beforeSelection);
-        var selectedWidth = format.font.widthOfString(format.fontSize, selectedText);
+        var beforeWidth = format.font.width(format.fontSize, beforeSelection);
+        var selectedWidth = format.font.width(format.fontSize, selectedText);
         var lineHeight = format.font.height(format.fontSize);
         
         // Apply scroll offset to selection rendering
@@ -561,7 +525,7 @@ class TextRenderer {
         gtx.setColor(cursorColor);
         
         var beforeCursor = text.substring(0, _cursorPosition);
-        var cursorX = x + format.font.widthOfString(format.fontSize, beforeCursor);
+        var cursorX = x + format.font.width(format.fontSize, beforeCursor);
         var lineHeight = format.font.height(format.fontSize);
         
         // Apply scroll offset to cursor position
@@ -636,7 +600,7 @@ class TextRenderer {
         // TODO: Implement complex mode rendering with scroll offset support
         // This would use the _words and _lines arrays and apply scroll offsets
         // For now, fall back to simple mode
-        _renderSimpleWithScroll(gtx);
+        _renderSimple(gtx);
     }
 
     /**
@@ -759,10 +723,12 @@ class TextRenderer {
         if (_source == null) return;
         
         // Get dimension bounds for layout constraints
-        var dims = gtx.getDimensionsAtIndex(_index);
+        var dims = gtx.getClientDimensionsAtIndex(_index);
         if (dims.length == 0) return;
         
         var dim = dims[0];
+        if (dim == null) return;
+
         var maxWidth = _options.constraints != null ? _options.constraints.x : dim.width;
         var maxHeight = _options.constraints != null ? _options.constraints.y : dim.height;
         
@@ -936,7 +902,7 @@ class TextRenderer {
     * Set the cursor position.
     **/
     public function setCursorPosition(pos:Int) {
-        _cursorPosition = Math.max(0, Math.min(pos, _source.length()));
+        _cursorPosition = cast Math.max(0, Math.min(pos, _source.length()));
         _resetCursorBlink();
     }
     
@@ -990,7 +956,7 @@ class TextRenderer {
         
         // Set cursor to same column in previous line, or end if line is shorter
         var newPos = prevLineStart + Math.min(currentColumn, prevLineLength);
-        setCursorPosition(newPos);
+        setCursorPosition(cast newPos);
     }
     
     /**
@@ -1023,7 +989,7 @@ class TextRenderer {
         
         // Set cursor to same column in next line, or end if line is shorter
         var newPos = nextLineStart + Math.min(currentColumn, nextLineLength);
-        setCursorPosition(newPos);
+        setCursorPosition(cast newPos);
     }
     
     /**
@@ -1173,7 +1139,7 @@ class TextRenderer {
     /**
     * Enhanced delete method that handles selections properly.
     **/
-    public override function delete(pos:Int = -1, ?length:Int = 0) {
+    public function delete(pos:Int = -1, ?length:Int = 0) {
         if (!_options.editable || _source == null) return;
         
         var deletePos = pos;
@@ -1266,7 +1232,7 @@ class TextRenderer {
                 charPos++;
             }
             
-            return Math.min(charPos, text.length);
+            return cast Math.min(charPos, text.length);
         }
         
         // For simple multi-line, find line first, then character
@@ -1279,7 +1245,7 @@ class TextRenderer {
             // Below text area - return end position
             return text.length;
         }
-        targetLine = Math.max(0, targetLine);
+        targetLine = cast Math.max(0, targetLine);
         
         var lineText = lines[targetLine];
         
@@ -1778,10 +1744,11 @@ class TextRenderer {
     **/
     private function _updateScrollLimits() {
         var gtx = Application.instance.graphicsCtx;
-        var dims = gtx.getDimensionsAtIndex(_index);
+        var dims = gtx.getClientDimensionsAtIndex(_index);
         if (dims.length == 0) return;
         
         var dim = dims[0];
+        if (dim == null) return;
         var contentSize = _getContentSize();
         
         // Calculate maximum scroll distances
@@ -1816,7 +1783,7 @@ class TextRenderer {
         
         if (!_options.wordWrap || text.indexOf('\n') == -1) {
             // Single line - width is text width, height is line height
-            var textWidth = format.font.widthOfString(format.fontSize, text);
+            var textWidth = format.font.width(format.fontSize, text);
             var textHeight = format.font.height(format.fontSize);
             return new FastVector2(textWidth, textHeight);
         } else {
@@ -1827,7 +1794,7 @@ class TextRenderer {
             var totalHeight = lines.length * lineHeight;
             
             for (line in lines) {
-                var lineWidth = format.font.widthOfString(format.fontSize, line);
+                var lineWidth = format.font.width(format.fontSize, line);
                 if (lineWidth > maxWidth) {
                     maxWidth = lineWidth;
                 }

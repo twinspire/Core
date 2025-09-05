@@ -245,10 +245,305 @@ class VectorSpace {
         return this;
     }
     
-    public function scrollBy(deltaX:Float, deltaY:Float):VectorSpace {
+    // Get current scroll position (positive values)
+    public function getScrollPosition():FastVector2 {
+        return new FastVector2(-_translation.x, -_translation.y);
+    }
+    
+    // Get target scroll position when smooth scrolling
+    public function getTargetScrollPosition():FastVector2 {
+        return new FastVector2(-_targetTranslation.x, -_targetTranslation.y);
+    }
+
+    /**
+    * Check if the content can be scrolled horizontally.
+    * Returns true if content width exceeds container bounds or if infinite scroll is enabled.
+    **/
+    public function canScrollHorizontally():Bool {
+        // Always allow horizontal scrolling if infinite scroll is enabled
+        if (_infiniteScroll) {
+            return true;
+        }
+        
+        // Check if scrolling is enabled at all
+        if (!_scrollable) {
+            return false;
+        }
+        
+        // Calculate total content dimensions
+        var contentLeft = _contentBounds.x;
+        var contentRight = _contentBounds.x + _contentBounds.width;
+        var totalContentWidth = contentRight - contentLeft;
+        
+        // Can scroll horizontally if content is wider than container
+        return totalContentWidth > _bounds.width;
+    }
+    
+    /**
+    * Check if the content can be scrolled vertically.
+    * Returns true if content height exceeds container bounds or if infinite scroll is enabled.
+    **/
+    public function canScrollVertically():Bool {
+        // Always allow vertical scrolling if infinite scroll is enabled
+        if (_infiniteScroll) {
+            return true;
+        }
+        
+        // Check if scrolling is enabled at all
+        if (!_scrollable) {
+            return false;
+        }
+        
+        // Calculate total content dimensions
+        var contentTop = _contentBounds.y;
+        var contentBottom = _contentBounds.y + _contentBounds.height;
+        var totalContentHeight = contentBottom - contentTop;
+        
+        // Can scroll vertically if content is taller than container
+        return totalContentHeight > _bounds.height;
+    }
+    
+    /**
+    * Get the maximum horizontal scroll distance in the positive direction.
+    * Useful for scroll bars and scroll position clamping.
+    **/
+    public function getMaxScrollX():Float {
+        if (_infiniteScroll) {
+            return Math.POSITIVE_INFINITY;
+        }
+        
+        var contentLeft = _contentBounds.x;
+        var contentRight = _contentBounds.x + _contentBounds.width;
+        var totalContentWidth = contentRight - contentLeft;
+        
+        if (totalContentWidth <= _bounds.width) {
+            return 0.0; // No scrolling possible
+        }
+        
+        // Can scroll right to show content that extends beyond container width
+        return Math.max(0, contentRight - _bounds.width);
+    }
+    
+    /**
+    * Get the maximum vertical scroll distance in the positive direction.
+    * Useful for scroll bars and scroll position clamping.
+    **/
+    public function getMaxScrollY():Float {
+        if (_infiniteScroll) {
+            return Math.POSITIVE_INFINITY;
+        }
+        
+        var contentTop = _contentBounds.y;
+        var contentBottom = _contentBounds.y + _contentBounds.height;
+        var totalContentHeight = contentBottom - contentTop;
+        
+        if (totalContentHeight <= _bounds.height) {
+            return 0.0; // No scrolling possible
+        }
+        
+        // Can scroll down to show content that extends beyond container height
+        return Math.max(0, contentBottom - _bounds.height);
+    }
+    
+    /**
+    * Get the maximum horizontal scroll distance in the negative direction.
+    * This handles cases where content has negative coordinates.
+    **/
+    public function getMinScrollX():Float {
+        if (_infiniteScroll) {
+            return Math.NEGATIVE_INFINITY;
+        }
+        
+        var contentLeft = _contentBounds.x;
+        
+        // Can scroll left to show content with negative coordinates
+        return Math.max(0, -contentLeft);
+    }
+    
+    /**
+    * Get the maximum vertical scroll distance in the negative direction.
+    * This handles cases where content has negative coordinates.
+    **/
+    public function getMinScrollY():Float {
+        if (_infiniteScroll) {
+            return Math.NEGATIVE_INFINITY;
+        }
+        
+        var contentTop = _contentBounds.y;
+        
+        // Can scroll up to show content with negative coordinates
+        return Math.max(0, -contentTop);
+    }
+    
+    /**
+    * Check if currently at the leftmost scroll position.
+    **/
+    public function isAtLeftEdge():Bool {
+        if (_infiniteScroll) {
+            return false;
+        }
+        
+        var minScroll = getMinScrollX();
+        return Math.abs(_translation.x - minScroll) < 0.1; // Small epsilon for floating point comparison
+    }
+    
+    /**
+    * Check if currently at the rightmost scroll position.
+    **/
+    public function isAtRightEdge():Bool {
+        if (_infiniteScroll) {
+            return false;
+        }
+        
+        var maxScroll = getMaxScrollX();
+        return Math.abs(_translation.x + maxScroll) < 0.1; // Small epsilon for floating point comparison
+    }
+    
+    /**
+    * Check if currently at the topmost scroll position.
+    **/
+    public function isAtTopEdge():Bool {
+        if (_infiniteScroll) {
+            return false;
+        }
+        
+        var minScroll = getMinScrollY();
+        return Math.abs(_translation.y - minScroll) < 0.1; // Small epsilon for floating point comparison
+    }
+    
+    /**
+    * Check if currently at the bottommost scroll position.
+    **/
+    public function isAtBottomEdge():Bool {
+        if (_infiniteScroll) {
+            return false;
+        }
+        
+        var maxScroll = getMaxScrollY();
+        return Math.abs(_translation.y + maxScroll) < 0.1; // Small epsilon for floating point comparison
+    }
+    
+    /**
+    * Get the current horizontal scroll position as a percentage (0.0 to 1.0).
+    * Useful for scroll bar indicators.
+    **/
+    public function getScrollPercentageX():Float {
+        if (_infiniteScroll || !canScrollHorizontally()) {
+            return 0.0;
+        }
+        
+        var minScroll = getMinScrollX();
+        var maxScroll = getMaxScrollX();
+        var totalScrollRange = minScroll + maxScroll;
+        
+        if (totalScrollRange <= 0) {
+            return 0.0;
+        }
+        
+        var currentPosition = _translation.x + maxScroll;
+        return Math.max(0.0, Math.min(1.0, currentPosition / totalScrollRange));
+    }
+    
+    /**
+    * Get the current vertical scroll position as a percentage (0.0 to 1.0).
+    * Useful for scroll bar indicators.
+    **/
+    public function getScrollPercentageY():Float {
+        if (_infiniteScroll || !canScrollVertically()) {
+            return 0.0;
+        }
+        
+        var minScroll = getMinScrollY();
+        var maxScroll = getMaxScrollY();
+        var totalScrollRange = minScroll + maxScroll;
+        
+        if (totalScrollRange <= 0) {
+            return 0.0;
+        }
+        
+        var currentPosition = _translation.y + maxScroll;
+        return Math.max(0.0, Math.min(1.0, currentPosition / totalScrollRange));
+    }
+    
+    /**
+    * Set scroll position by percentage (0.0 to 1.0) horizontally.
+    * Useful for implementing scroll bars.
+    **/
+    public function setScrollPercentageX(percentage:Float):VectorSpace {
+        if (_infiniteScroll || !canScrollHorizontally()) {
+            return this;
+        }
+        
+        percentage = Math.max(0.0, Math.min(1.0, percentage));
+        
+        var minScroll = getMinScrollX();
+        var maxScroll = getMaxScrollX();
+        var totalScrollRange = minScroll + maxScroll;
+        
+        var targetPosition = (percentage * totalScrollRange) - maxScroll;
+        
         if (_smoothScrolling) {
-            _targetTranslation.x -= deltaX;
-            _targetTranslation.y -= deltaY;
+            _targetTranslation.x = targetPosition;
+            clampTargetScrolling();
+            
+            var distance = Math.abs(_targetTranslation.x - _translation.x);
+            if (distance > _scrollThreshold) {
+                _isSmoothing = true;
+            }
+        } else {
+            _translation.x = targetPosition;
+            _targetTranslation.x = targetPosition;
+            clampScrolling();
+        }
+        
+        return this;
+    }
+    
+    /**
+    * Set scroll position by percentage (0.0 to 1.0) vertically.
+    * Useful for implementing scroll bars.
+    **/
+    public function setScrollPercentageY(percentage:Float):VectorSpace {
+        if (_infiniteScroll || !canScrollVertically()) {
+            return this;
+        }
+        
+        percentage = Math.max(0.0, Math.min(1.0, percentage));
+        
+        var minScroll = getMinScrollY();
+        var maxScroll = getMaxScrollY();
+        var totalScrollRange = minScroll + maxScroll;
+        
+        var targetPosition = (percentage * totalScrollRange) - maxScroll;
+        
+        if (_smoothScrolling) {
+            _targetTranslation.y = targetPosition;
+            clampTargetScrolling();
+            
+            var distance = Math.abs(_targetTranslation.y - _translation.y);
+            if (distance > _scrollThreshold) {
+                _isSmoothing = true;
+            }
+        } else {
+            _translation.y = targetPosition;
+            _targetTranslation.y = targetPosition;
+            clampScrolling();
+        }
+        
+        return this;
+    }
+    
+    /**
+    * Enhanced scroll by method that respects scroll capability.
+    * Only scrolls in directions where scrolling is possible.
+    **/
+    public function scrollBy(deltaX:Float, deltaY:Float):VectorSpace {
+        var actualDeltaX = canScrollHorizontally() ? deltaX : 0.0;
+        var actualDeltaY = canScrollVertically() ? deltaY : 0.0;
+        
+        if (_smoothScrolling) {
+            _targetTranslation.x -= actualDeltaX;
+            _targetTranslation.y -= actualDeltaY;
             clampTargetScrolling();
             
             // Start smoothing if we're not already at the target
@@ -259,20 +554,14 @@ class VectorSpace {
                 _isSmoothing = true;
             }
         } else {
-            return scrollByImmediate(deltaX, deltaY);
+            _translation.x -= actualDeltaX;
+            _translation.y -= actualDeltaY;
+            _targetTranslation.x = _translation.x;
+            _targetTranslation.y = _translation.y;
+            clampScrolling();
         }
         
         return this;
-    }
-    
-    // Get current scroll position (positive values)
-    public function getScrollPosition():FastVector2 {
-        return new FastVector2(-_translation.x, -_translation.y);
-    }
-    
-    // Get target scroll position when smooth scrolling
-    public function getTargetScrollPosition():FastVector2 {
-        return new FastVector2(-_targetTranslation.x, -_targetTranslation.y);
     }
     
     // Update smooth scrolling - should be called every frame
