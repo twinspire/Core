@@ -76,7 +76,11 @@ class UpdateContext {
     * Get the frame count per second.
     **/
     public static function getFrameCount() {
+        #if js
+        return 1 / Application.getCorrectedDeltaTime();
+        #else
         return 1 / _deltaTime;
+        #end
     }
 
     public function new(gctx:GraphicsContext) {
@@ -848,12 +852,7 @@ class UpdateContext {
     * Process input for non-text elements that accept key input
     **/
     private function _processKeyInputElement() {
-        // Handle buttons, menus, etc. that respond to keys like Enter, Space
-        // This is where you'd process things like:
-        // - Enter key on buttons
-        // - Arrow keys for menu navigation
-        // - Space for checkboxes
-        // etc.
+        
     }
     
     /**
@@ -1190,15 +1189,22 @@ class UpdateContext {
         // ... additional escape handling
     }
 
+    private function _validateActivatedIndex() {
+        // Ensure the activated index is still valid
+        if (_activatedIndex >= 0) {
+            if (_activatedIndex >= _gctx.queries.length || 
+                _gctx.queries[_activatedIndex] == null ||
+                !(_gctx.queries[_activatedIndex].acceptsTextInput || _gctx.queries[_activatedIndex].acceptsKeyInput)) {
+                _activatedIndex = -1;
+            }
+        }
+    }
+
     //
     // end new process
     //
 
     private function determineInitialMouseEvents() {
-        if (_tempUI.length == 0 && GlobalEvents.isAnyMouseButtonDown()) {
-            _activatedIndex = -1;
-        }
-
         var i = _tempUI.length - 1;
         var hasTextInput = false;
         while (i > -1) {
@@ -1209,7 +1215,16 @@ class UpdateContext {
             }
         }
 
-        if (!hasTextInput && GlobalEvents.isAnyMouseButtonReleased()) {
+        if (_tempUI.length == 0 && GlobalEvents.isAnyMouseButtonDown()) {
+            // Check if we're in text selection mode
+            if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
+                var renderer = _gctx.getTextRenderer(_activatedIndex);
+                if (renderer != null && renderer.isSelecting()) {
+                    return; // Don't clear focus during text selection
+                }
+            }
+            
+            // Only clear focus if this is a deliberate click outside
             _activatedIndex = -1;
         }
     }

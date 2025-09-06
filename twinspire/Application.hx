@@ -43,6 +43,8 @@ import kha.Image;
 import kha.Blob;
 import kha.Window;
 import kha.Color;
+import kha.WindowMode;
+import kha.WindowOptions;
 
 import haxe.Json;
 
@@ -181,18 +183,6 @@ class Application
 	}
 
 	/**
-	* Exits the application.
-	**/
-	public function exit() {
-		if (_isRunning) {
-			_isRunning = false;
-		}
-
-		System.removeFramesListener(app_render);
-		System.stop();
-	}
-
-	/**
 	* Check if the application is still running.
 	**/
 	public function running() {
@@ -200,77 +190,152 @@ class Application
 	}
 
 	/**
-	* Starts the running of the application.
-	**/
-	public function start() {
-		if (sceneManager != null) {
-			sceneManager.init(_graphicsContext);
-		}
-		else if (init != null) {
-			init(_graphicsContext);
-		}
+    * Get the corrected delta time for animations when frame rate control is enabled
+    * This ensures animations run at real-time speed regardless of frame rate limiting
+    */
+    public static function getCorrectedDeltaTime():Float {
+        #if js
+        if (_frameRateControlEnabled) {
+            return _customDeltaTime;
+        }
+        #end
+        // Fallback to normal Kha delta time calculation
+        if (instance != null) {
+            return System.time - instance._lastTime;
+        }
+        return 0.0;
+    }
+    
+    private function app_render(buffers:Array<Framebuffer>) {
+        var g2 = buffers[0].g2;
+        var deltaTime:Float;
+        
+        #if js
+        if (_frameRateControlEnabled) {
+            deltaTime = _customDeltaTime;
+        } else {
+            deltaTime = System.time - _lastTime;
+        }
+        #else
+        deltaTime = System.time - _lastTime;
+        #end
+        
+        Animate.animateTime(deltaTime);
 
-		System.notifyOnFrames(app_render);
+        @:privateAccess(UpdateContext) {
+            UpdateContext._deltaTime = deltaTime;
+        }
 
-		_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
-	}
+        if (sceneManager != null) {
+            sceneManager.update(_updateContext);
+        } else {
+            update(_updateContext);
+        }
 
-	private function app_render(buffers:Array<Framebuffer>) {
-		var g2 = buffers[0].g2;
-		var deltaTime = System.time - _lastTime;
-		Animate.animateTime(deltaTime);
+        g2.begin();
+        g2.clear(backColor);
 
-		@:privateAccess(UpdateContext) {
-			UpdateContext._deltaTime = deltaTime;
-		}
+        @:privateAccess(GraphicsContext) {
+            _graphicsContext._g2 = g2;
+            _graphicsContext._inRenderContext = true;
+        }
 
-		if (sceneManager != null) {
-			sceneManager.update(_updateContext);
-		}
-		else {
-			update(_updateContext);
-		}
+        if (sceneManager != null) {
+            sceneManager.render(_graphicsContext);
+        } else {
+            render(_graphicsContext);
+        }
 
-		g2.begin();
-		g2.clear(backColor);
+        @:privateAccess(GraphicsContext) {
+            _graphicsContext._inRenderContext = false;
+        }
 
-		@:privateAccess(GraphicsContext) {
-			_graphicsContext._g2 = g2;
-			_graphicsContext._inRenderContext = true;
-		}
+        if (_lastClientSize.x != System.windowWidth() || _lastClientSize.y != System.windowHeight()) {
+            if (sceneManager != null) {
+                sceneManager.resize(_graphicsContext);
+            } else {
+                resize(_graphicsContext);
+            }
 
-		if (sceneManager != null) {
-			sceneManager.render(_graphicsContext);
-		}
-		else {
-			render(_graphicsContext);
-		}
+            _lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
+        }
 
-		@:privateAccess(GraphicsContext) {
-			_graphicsContext._inRenderContext = false;
-		}
+        if (sceneManager != null) {
+            sceneManager.end(_graphicsContext, _updateContext);
+        } else {
+            end(_graphicsContext, _updateContext);
+        }
 
-		if (_lastClientSize.x != System.windowWidth() || _lastClientSize.y != System.windowHeight()) {
-			if (sceneManager != null) {
-				sceneManager.resize(_graphicsContext);
-			}
-			else {
-				resize(_graphicsContext);
-			}
+        GlobalEvents.end();
+        
+        #if js
+        if (_frameRateControlEnabled) {
+            // Update _lastTime to maintain consistency with timing
+            _lastTime += deltaTime;
+        } else {
+            _lastTime = System.time;
+        }
+        #else
+        _lastTime = System.time;
+        #end
+    }
 
-			_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
-		}
+	// private function app_render(buffers:Array<Framebuffer>) {
+	// 	var g2 = buffers[0].g2;
+	// 	var deltaTime = System.time - _lastTime;
+	// 	Animate.animateTime(deltaTime);
 
-		if (sceneManager != null) {
-			sceneManager.end(_graphicsContext, _updateContext);
-		}
-		else {
-			end(_graphicsContext, _updateContext);
-		}
+	// 	@:privateAccess(UpdateContext) {
+	// 		UpdateContext._deltaTime = deltaTime;
+	// 	}
 
-		GlobalEvents.end();
-		_lastTime = System.time;
-	}
+	// 	if (sceneManager != null) {
+	// 		sceneManager.update(_updateContext);
+	// 	}
+	// 	else {
+	// 		update(_updateContext);
+	// 	}
+
+	// 	g2.begin();
+	// 	g2.clear(backColor);
+
+	// 	@:privateAccess(GraphicsContext) {
+	// 		_graphicsContext._g2 = g2;
+	// 		_graphicsContext._inRenderContext = true;
+	// 	}
+
+	// 	if (sceneManager != null) {
+	// 		sceneManager.render(_graphicsContext);
+	// 	}
+	// 	else {
+	// 		render(_graphicsContext);
+	// 	}
+
+	// 	@:privateAccess(GraphicsContext) {
+	// 		_graphicsContext._inRenderContext = false;
+	// 	}
+
+	// 	if (_lastClientSize.x != System.windowWidth() || _lastClientSize.y != System.windowHeight()) {
+	// 		if (sceneManager != null) {
+	// 			sceneManager.resize(_graphicsContext);
+	// 		}
+	// 		else {
+	// 			resize(_graphicsContext);
+	// 		}
+
+	// 		_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
+	// 	}
+
+	// 	if (sceneManager != null) {
+	// 		sceneManager.end(_graphicsContext, _updateContext);
+	// 	}
+	// 	else {
+	// 		end(_graphicsContext, _updateContext);
+	// 	}
+
+	// 	GlobalEvents.end();
+	// 	_lastTime = System.time;
+	// }
 
 	// Event Handling routines
 
@@ -1064,50 +1129,298 @@ class Application
 		return null;
 	}
 
+	private static var _targetFrameRate:Float = 60;
+    private static var _frameInterval:Float = 1000 / 60; // milliseconds per frame
+    private static var _lastFrameTime:Float = 0;
+    private static var _frameRateControlEnabled:Bool = false;
+    private static var _actualFrameCallback:Array<Framebuffer> -> Void;
+    private static var _animationFrameId:Int = -1;
+	private static var _customDeltaTime:Float = 0.0;
+    private static var _lastRealTime:Float = 0.0;
+
 	/**
-	* Create an `Application`, initialise the system and load all available assets.
-	*
-	* @param options The system options used to declare title and size of the game client.
-	* @param callback The function handler that is called when all assets have been loaded.
-	*/
-	public static function create(options:SystemOptions, callback:Void -> Void)
-	{
-		IdAssoc.assoc = [];
+    * Set the target frame rate for the application. This bypasses Kha's frame rate
+    * control and implements manual timing, especially useful for HTML5 targets.
+    * 
+    * @param frameRate The desired frame rate (e.g., 60 for 60 FPS)
+    * @param enableControl Whether to enable frame rate control (defaults to true)
+    */
+    public static function setFrameRate(frameRate:Float, enableControl:Bool = true) {
+        _targetFrameRate = frameRate;
+        _frameInterval = 1000 / frameRate; // Convert to milliseconds per frame
+        _frameRateControlEnabled = enableControl;
+        
+        #if js
+        // Initialize timing when enabled
+        if (enableControl) {
+            _lastFrameTime = js.Browser.window.performance.now();
+			_lastRealTime = _lastFrameTime;
+            _customDeltaTime = 1.0 / frameRate; // Initialize to target frame interval in seconds
+        }
+        #end
+    }
+    
+    #if js
+    /**
+    * Our custom requestAnimationFrame callback that controls timing
+    * This completely bypasses Kha's frame system when frame rate control is enabled
+    */
+    private static function _customAnimationFrame(timestamp:Float):Void {
+        if (!_frameRateControlEnabled) {
+            return;
+        }
+        
+        var deltaTime = timestamp - _lastFrameTime;
+        
+        // Only render if enough time has passed for the target frame rate
+        if (deltaTime >= _frameInterval) {
+            // Calculate the actual time that has passed since the last real render
+            var realDeltaTime = timestamp - _lastRealTime;
+            _customDeltaTime = realDeltaTime / 1000.0; // Convert to seconds for Kha compatibility
+            _lastRealTime = timestamp;
+            
+            // Update last frame time, accounting for any leftover time
+            _lastFrameTime = timestamp - (deltaTime % _frameInterval);
+            
+            // Manually trigger Kha to render one frame
+            if (_actualFrameCallback != null) {
+                _triggerKhaFrame();
+            }
+        }
+		else {
+            // Even if we don't render, we should update the delta time for the next frame
+            // This ensures smooth delta time calculation when frames are skipped
+            var realDeltaTime = timestamp - _lastRealTime;
+            if (realDeltaTime > 0) {
+                _customDeltaTime = realDeltaTime / 1000.0;
+            }
+        }
+        
+        // Request next animation frame
+        _animationFrameId = js.Browser.window.requestAnimationFrame(_customAnimationFrame);
+    }
+    
+    /**
+    * Trigger Kha to render exactly one frame by temporarily enabling frame listeners
+    */
+    private static function _triggerKhaFrame():Void {
+        // Temporarily register our callback to get framebuffers from Kha
+        System.notifyOnFrames(_singleFrameCallback);
+    }
+    
+    /**
+    * Single-use callback that executes once then removes itself
+    */
+    private static function _singleFrameCallback(buffers:Array<Framebuffer>):Void {
+        // Remove ourselves immediately to prevent further calls
+        System.removeFramesListener(_singleFrameCallback);
+        
+        // Call the actual frame callback
+        if (_actualFrameCallback != null) {
+            _actualFrameCallback(buffers);
+        }
+    }
+    
+    /**
+    * Start our custom frame rate controlled rendering loop
+    */
+    private static function _startCustomFrameLoop():Void {
+        if (_frameRateControlEnabled) {
+            var now = js.Browser.window.performance.now();
+            _lastFrameTime = now;
+            _lastRealTime = now;
+            _customDeltaTime = 1.0 / _targetFrameRate; // Initialize to target frame time
+            _animationFrameId = js.Browser.window.requestAnimationFrame(_customAnimationFrame);
+        }
+    }
+    
+    /**
+    * Stop our custom frame rate controlled rendering loop
+    */
+    private static function _stopCustomFrameLoop():Void {
+        if (_animationFrameId != -1) {
+            js.Browser.window.cancelAnimationFrame(_animationFrameId);
+            _animationFrameId = -1;
+        }
+    }
+    #end
+    
+    /**
+    * Modified create function that supports frame rate control
+    */
+    public static function create(options:SystemOptions, callback:Void -> Void) {
+        IdAssoc.assoc = [];
 
-		System.start(options, (window:Window) ->
-		{
-			if (preloader == 0)
-				preloader = PRELOADER_BASIC;
-			
-			if (loader == null)
-				loader = new Preloader(preloader);
-			
-			System.notifyOnFrames(loader.render);
-			GlobalEvents.init();
-			GameEvent.init();
-			InputRenderer.RenderId = createId();
+        System.start(options, (window:Window) -> {
+            if (preloader == 0)
+                preloader = PRELOADER_BASIC;
+            
+            if (loader == null)
+                loader = new Preloader(preloader);
+            
+            #if js
+            if (_frameRateControlEnabled) {
+                // Use our custom frame rate controlled system
+                _actualFrameCallback = loader.render;
+                _startCustomFrameLoop();
+            } else {
+                // Use Kha's normal system
+                System.notifyOnFrames(loader.render);
+            }
+            #else
+            System.notifyOnFrames(loader.render);
+            #end
+            
+            GlobalEvents.init();
+            GameEvent.init();
+            InputRenderer.RenderId = createId();
 
-			if (!noAssetLoading)
-			{
-				Assets.loadEverything(() ->
-				{
-					instance = new Application();
-					resources = new ResourceManager();
+            if (!noAssetLoading) {
+                Assets.loadEverything(() -> {
+                    instance = new Application();
+                    resources = new ResourceManager();
 
-					System.removeFramesListener(loader.render);
-					callback();
-				});
-			}
-			else
-			{
-				instance = new Application();
-				resources = new ResourceManager();
+                    #if js
+                    if (_frameRateControlEnabled) {
+                        // Stop preloader, but keep our custom loop running
+                        _actualFrameCallback = null;
+                    } else {
+                        System.removeFramesListener(loader.render);
+                    }
+                    #else
+                    System.removeFramesListener(loader.render);
+                    #end
+                    
+                    callback();
+                });
+            } else {
+                instance = new Application();
+                resources = new ResourceManager();
 
-				System.removeFramesListener(loader.render);
-				callback();
-			}
-		});
-	}
+                #if js
+                if (_frameRateControlEnabled) {
+                    // Stop preloader, but keep our custom loop running
+                    _actualFrameCallback = null;
+                } else {
+                    System.removeFramesListener(loader.render);
+                }
+                #else
+                System.removeFramesListener(loader.render);
+                #end
+                
+                callback();
+            }
+        });
+    }
+    
+    /**
+    * Override the start method to use frame rate control
+    */
+    public function start() {
+        if (sceneManager != null) {
+            sceneManager.init(_graphicsContext);
+        } else if (init != null) {
+            init(_graphicsContext);
+        }
+
+        #if js
+        if (_frameRateControlEnabled) {
+            // Use our custom frame rate controlled system
+            _actualFrameCallback = app_render;
+            // The custom loop should already be running from create()
+            if (_animationFrameId == -1) {
+                _startCustomFrameLoop();
+            }
+        } else {
+            // Use Kha's normal system
+            System.notifyOnFrames(app_render);
+        }
+        #else
+        System.notifyOnFrames(app_render);
+        #end
+
+        _lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
+    }
+    
+    /**
+    * Override the exit method to clean up frame rate control
+    */
+    public function exit() {
+        if (_isRunning) {
+            _isRunning = false;
+        }
+
+        #if js
+        if (_frameRateControlEnabled) {
+            _stopCustomFrameLoop();
+            _actualFrameCallback = null;
+            // Also clean up any lingering Kha frame listeners
+            System.removeFramesListener(_singleFrameCallback);
+        } else {
+            System.removeFramesListener(app_render);
+        }
+        #else
+        System.removeFramesListener(app_render);
+        #end
+        
+        System.stop();
+    }
+    
+    /**
+    * Get the current target frame rate
+    */
+    public static function getTargetFrameRate():Float {
+        return _targetFrameRate;
+    }
+    
+    /**
+    * Check if frame rate control is enabled
+    */
+    public static function isFrameRateControlEnabled():Bool {
+        return _frameRateControlEnabled;
+    }
+    
+    /**
+    * Get the actual current frame rate (for debugging)
+    * This calculates FPS based on actual render timing, not callback timing
+    */
+    public static function getCurrentFrameRate():Float {
+        #if js
+        if (_frameRateControlEnabled && _lastFrameTime > 0) {
+            var currentTime = js.Browser.window.performance.now();
+            var deltaTime = currentTime - _lastFrameTime;
+            if (deltaTime > 0) {
+                return 1000.0 / deltaTime;
+            }
+        }
+        #end
+        return 0;
+    }
+    
+    /**
+    * Enable or disable frame rate control dynamically
+    */
+    public static function setFrameRateControlEnabled(enabled:Bool) {
+        #if js
+        if (_frameRateControlEnabled != enabled) {
+            _frameRateControlEnabled = enabled;
+            
+            if (enabled) {
+                // Switch from Kha's system to our custom system
+                if (_actualFrameCallback != null) {
+                    System.removeFramesListener(_actualFrameCallback);
+                }
+                _startCustomFrameLoop();
+            } else {
+                // Switch from our custom system to Kha's system
+                _stopCustomFrameLoop();
+                if (_actualFrameCallback != null) {
+                    System.notifyOnFrames(_actualFrameCallback);
+                }
+            }
+        }
+        #end
+    }
 
 	/**
 	* Create an ID.

@@ -169,7 +169,9 @@ class Dimensions {
     **/
     public static function createFromDim(dim:Dim, addLogic:AddLogic):DimResult {
         var result = dim.clone();
-        result.order = _order;
+        if (result.order < _order) {
+            result.order = _order;
+        }
         result.visible = _visibility;
 
         var resultIndex:DimIndex = null;
