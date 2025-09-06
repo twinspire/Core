@@ -541,8 +541,7 @@ class UpdateContext {
             if (topMostFocusable >= 0) {
                 _activatedIndex = topMostFocusable;
             }
-
-            if (_activatedIndex != lastActivatedIndex) {
+            else {
                 var renderer = _gctx.getTextRendererByDimIndex(Direct(lastActivatedIndex));
                 if (renderer != null) {
                     renderer.loseFocus();
