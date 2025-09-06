@@ -1119,8 +1119,7 @@ class Application
 	/**
 	* Get the 3D graphics context from the current back buffer.
 	**/
-	public static function getGraphics3D()
-	{
+	public static function getGraphics3D() {
 		if (buffer != null)
 		{
 			return buffer.g4;
@@ -1250,6 +1249,12 @@ class Application
     */
     public static function create(options:SystemOptions, callback:Void -> Void) {
         IdAssoc.assoc = [];
+
+		#if !js
+		if (_targetFrameRate > 0) {
+			options.framebuffer.frequency = Std.int(_targetFrameRate);
+		}
+		#end
 
         System.start(options, (window:Window) -> {
             if (preloader == 0)
