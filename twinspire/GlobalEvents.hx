@@ -55,6 +55,7 @@ class GlobalEvents
 	@:noCompletion var penPressure:Float;
 	@:noCompletion var penReleased:Bool;
 	@:noCompletion var penDown:Bool;
+	@:noCompletion var penErasing:Bool;
 
 	@:noCompletion var filesDropped:Array<String>;
 
@@ -504,6 +505,13 @@ class GlobalEvents
 	function isPenPressed():Bool
 	{
 		return !penDown && penReleased;
+	}
+
+	/**
+	* Get a value determining if a pen's erase button is being pressed.
+	**/
+	function isPenErasing():Bool {
+		return penErasing;
 	}
 
 	/**

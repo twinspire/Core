@@ -22,6 +22,7 @@ import twinspire.GlobalEvents;
 import twinspire.Dimensions.VerticalAlign;
 import twinspire.Dimensions.HorizontalAlign;
 import twinspire.Dimensions.*;
+import twinspire.HotKey;
 using twinspire.extensions.ArrayExtensions;
 using twinspire.utils.ArrayUtils;
 
@@ -44,6 +45,8 @@ class UpdateContext {
     private var _events:Array<GameEvent>;
     private var _eventProcessor:GameEventProcessor;
     private var _eventDispatcher:EventDispatcher;
+    private var _hotkeys:Array<HotKey>;
+    private var _hotkeyAssociations:Map<DimIndex, Array<String>>;
 
     // UI stuff
     private var _tempUI:Array<Int>;
@@ -60,6 +63,34 @@ class UpdateContext {
     private var _keysDown:Array<Int>;
     private var _charString:String;
     private var _activatedIndex:Int;
+
+    // button pressing down
+    // floating points since some buttons allow pressure
+    private var _gamepadDown:Array<Float>;
+    private var _gamepadUp:Array<Float>;
+    // axes, array of arrays for multiple joy sticks on a single gamepad,
+    // and 2 indices (first for x-axis, second for y-axis)
+    private var _gamepadAxis:Array<Array<Float>>;
+
+    // where each touch index is a finger
+    private var _touchStart:Array<FastVector2>;
+    // added to only when touch is released
+    private var _touchEnd:Array<FastVector2>;
+    private var _touchIndicesReleased:Array<Int>;
+    private var _touchPoints:Array<FastVector2>;
+    // defines the speed from the last frame given the last frame positions
+    private var _touchVelocity:Array<FastVector2>;
+    // determines the force between the start position and end position, using
+    // velocity to determine continued motion for a limited period.
+    private var _touchForce:Array<FastVector2>;
+
+    private var _penStart:FastVector2;
+    // array of floats for when the pen is moved/released,
+    // values can be retrieved by the user or used to determine force/velocity
+    // in a certain direction
+    private var _penPressure:Array<Float>;
+    private var _penEnd:FastVector2;
+    private var _penIsErasing:Bool;
 
     private var _keyRepeatStates:Map<KeyCode, KeyRepeatInfo>;
     private var _defaultInitialDelay:Float = 0.5;  // 500ms initial delay
@@ -105,6 +136,8 @@ class UpdateContext {
         _retainedMouseDown = [];
         _moveToAnimations = [];
         _toggles = [];
+        _hotkeys = [];
+        _hotkeyAssociations = [];
 
         _mouseFocusIndexUI = -1;
         _mouseIsOver = -1;
@@ -121,6 +154,56 @@ class UpdateContext {
 
         _isDragStart = -1;
         _isDragEnd = -1;
+    }
+
+    /**
+    * Add a hotkey to this context.
+    **/
+    public function addHotkey(key:HotKey) {
+        _hotkeys.push(key);
+    }
+
+    /**
+    * Allows a dimension to respond to a hot key being triggered.
+    *
+    * @param index The dimension to associate a hot key to.
+    * @param name The name of the hot key to add to the given index.
+    **/
+    public function associateKey(index:DimIndex, name:String) {
+        if (_hotkeyAssociations.exists(index)) {
+            var found = _hotkeyAssociations[index].findIndex((hk) -> hk == name);
+            if (found != -1) {
+                _hotkeyAssociations.get(index).push(name);
+            }
+        }
+        else {
+            _hotkeyAssociations[index] = [name];
+        }
+    }
+
+    /**
+    * Removes a hot key from a given dimension index.
+    **/
+    public function removeAssociatedKey(index:DimIndex, name:String) {
+        if (!_hotkeyAssociations.exists(index)) {
+            return;
+        }
+
+        var found = _hotkeyAssociations[index].findIndex((hk) -> hk == name);
+        if (found > -1) {
+            _hotkeyAssociations.get(index).splice(found, 1);
+        }
+    }
+
+    /**
+    * Removes an entire index from the hot key associations.
+    **/
+    public function removeAssociation(index:DimIndex) {
+        if (!_hotkeyAssociations.exists(index)) {
+            return;
+        }
+
+        _hotkeyAssociations.remove(index);
     }
 
     /**

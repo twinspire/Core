@@ -280,63 +280,6 @@ class Application
         #end
     }
 
-	// private function app_render(buffers:Array<Framebuffer>) {
-	// 	var g2 = buffers[0].g2;
-	// 	var deltaTime = System.time - _lastTime;
-	// 	Animate.animateTime(deltaTime);
-
-	// 	@:privateAccess(UpdateContext) {
-	// 		UpdateContext._deltaTime = deltaTime;
-	// 	}
-
-	// 	if (sceneManager != null) {
-	// 		sceneManager.update(_updateContext);
-	// 	}
-	// 	else {
-	// 		update(_updateContext);
-	// 	}
-
-	// 	g2.begin();
-	// 	g2.clear(backColor);
-
-	// 	@:privateAccess(GraphicsContext) {
-	// 		_graphicsContext._g2 = g2;
-	// 		_graphicsContext._inRenderContext = true;
-	// 	}
-
-	// 	if (sceneManager != null) {
-	// 		sceneManager.render(_graphicsContext);
-	// 	}
-	// 	else {
-	// 		render(_graphicsContext);
-	// 	}
-
-	// 	@:privateAccess(GraphicsContext) {
-	// 		_graphicsContext._inRenderContext = false;
-	// 	}
-
-	// 	if (_lastClientSize.x != System.windowWidth() || _lastClientSize.y != System.windowHeight()) {
-	// 		if (sceneManager != null) {
-	// 			sceneManager.resize(_graphicsContext);
-	// 		}
-	// 		else {
-	// 			resize(_graphicsContext);
-	// 		}
-
-	// 		_lastClientSize = new FastVector2(System.windowWidth(), System.windowHeight());
-	// 	}
-
-	// 	if (sceneManager != null) {
-	// 		sceneManager.end(_graphicsContext, _updateContext);
-	// 	}
-	// 	else {
-	// 		end(_graphicsContext, _updateContext);
-	// 	}
-
-	// 	GlobalEvents.end();
-	// 	_lastTime = System.time;
-	// }
-
 	// Event Handling routines
 
 	private function initEvents()
@@ -392,8 +335,10 @@ class Application
 			Surface.get(0).notify(_surface_onTouchStart, _surface_onTouchEnd, _surface_onTouchMove);
 		
 		#if !js
-		if (Pen.get(0) != null)
+		if (Pen.get(0) != null) {
 			Pen.get(0).notify(_pen_onPenDown, _pen_onPenUp, _pen_onPenMove);
+			Pen.get(0).notifyEraser(_pen_onPenEraserDown, _pen_onPenEraserUp, _pen_onPenEraserMove);
+		}
 		#end
 
 		if (Sensor.get(Accelerometer) != null)
@@ -688,6 +633,7 @@ class Application
 			GlobalEvents.penY = y;
 			GlobalEvents.penPressure = pressure;
 			GlobalEvents.penDown = true;
+			GlobalEvents.penErasing = false;
 		}
 
 		_events.push(e);
@@ -705,6 +651,7 @@ class Application
 			GlobalEvents.penY = y;
 			GlobalEvents.penDown = false;
 			GlobalEvents.penReleased = true;
+			GlobalEvents.penErasing = false;
 		}
 
 		_events.push(e);
@@ -721,9 +668,38 @@ class Application
 		@:privateAccess(GlobalEvents) {
 			GlobalEvents.penX = x;
 			GlobalEvents.penY = y;
+			GlobalEvents.penErasing = false;
 		}
 
 		_events.push(e);
+	}
+
+	private function _pen_onPenEraserDown(x:Int, y:Int, pressure:Float) {
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.penX = x;
+			GlobalEvents.penY = y;
+			GlobalEvents.penPressure = pressure;
+			GlobalEvents.penDown = true;
+			GlobalEvents.penErasing = true;
+		}
+	}
+	
+	private function _pen_onPenEraserUp(x:Int, y:Int, pressure:Float) {
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.penX = x;
+			GlobalEvents.penY = y;
+			GlobalEvents.penDown = false;
+			GlobalEvents.penReleased = true;
+			GlobalEvents.penErasing = true;
+		}
+	}
+
+	private function _pen_onPenEraserMove(x:Int, y:Int, pressure:Float) {
+		@:privateAccess(GlobalEvents) {
+			GlobalEvents.penX = x;
+			GlobalEvents.penY = y;
+			GlobalEvents.penErasing = true;
+		}
 	}
 
 #end
