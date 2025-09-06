@@ -2525,6 +2525,10 @@ class GraphicsContext {
         getGraphics().fontSize = fontSize;
     }
 
+    public function setOpacity(opacity:Float) {
+        getGraphics().opacity = opacity;
+    }
+
 
     //
     // Tile Maps
@@ -3059,6 +3063,16 @@ class GraphicsContext {
     public function getTextRenderer(textInputIndex:Int):TextRenderer {
         if (textInputIndex < 0 || textInputIndex >= _textRenderers.length) return null;
         return _textRenderers[textInputIndex];
+    }
+
+
+    public function getTextRendererByDimIndex(dimIndex:DimIndex):TextRenderer {
+        for (i in 0..._textRenderers.length) {
+            if (DimIndexUtils.equals(_textRenderers[i].index, dimIndex)) {
+                return _textRenderers[i];
+            }
+        }
+        return null;
     }
 
     /**

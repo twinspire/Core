@@ -256,140 +256,12 @@ class UpdateContext {
     **/
     public function begin() {
         processInputEvents();
-        return;
 
-        // simulate animations first, then check user input
-        var finished = [];
-        for (i in 0..._moveToAnimations.length) {
-            var moveTo = _moveToAnimations[i];
-            if (Animate.animateTick(moveTo.animIndex, moveTo.duration)) {
-                finished.push(i);
+        if (_activatedIndex > -1) {
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
+            if (renderer != null) {
+                renderer.update(this);
             }
-
-            var ratio = Animate.animateGetRatio(moveTo.animIndex);
-            var startX = moveTo.start.x;
-            var endX = moveTo.end.x;
-            if (moveTo.end.x < moveTo.start.x) {
-                startX = moveTo.end.x;
-                endX = moveTo.start.x;
-            }
-
-            var startY = moveTo.start.y;
-            var endY = moveTo.end.y;
-            if (moveTo.end.y < moveTo.start.y) {
-                startY = moveTo.end.y;
-                endY = moveTo.start.y;
-            }
-
-            var startW = moveTo.start.width;
-            var endW = moveTo.end.width;
-            if (moveTo.end.width < moveTo.start.width) {
-                startW = moveTo.end.width;
-                endW = moveTo.start.width;
-            }
-
-            var startH = moveTo.start.height;
-            var endH = moveTo.end.height;
-            if (moveTo.end.height < moveTo.start.height) {
-                startH = moveTo.end.height;
-                endH = moveTo.start.height;
-            }
-
-            var x = ((endX - startX) * ratio) + startX;
-            var y = ((endY - startY) * ratio) + startY;
-            var width = ((endW - startW) * ratio) + startW;
-            var height = ((endH - startH) * ratio) + startH;
-
-            _gctx.dimensions[moveTo.contextIndex].x = x;
-            _gctx.dimensions[moveTo.contextIndex].y = y;
-            _gctx.dimensions[moveTo.contextIndex].width = width;
-            _gctx.dimensions[moveTo.contextIndex].height = height;
-        }
-
-        _moveToAnimations.clearFromTemp(finished);
-
-        // check user input
-        _tempUI = [];
-        _mouseFocusIndexUI = -1;
-
-        if (_mouseDownFirstPos.x == -1 && GlobalEvents.isAnyMouseButtonDown()) {
-            _mouseDownFirstPos = FastVector2.fromVector2(GlobalEvents.getMousePosition());
-        }
-        else if (GlobalEvents.isNoMouseButtonDown()) {
-            _mouseDownFirstPos = new FastVector2(-1, -1);
-        }
-
-        var mousePos = GlobalEvents.getMousePosition();
-        var currentOrder = -1;
-
-        if (_drag.dragIndex == -1) {
-            var remainActive = false;
-            if (_mouseDownFirstPos.x > -1 && _mouseDownFirstPos.y > -1) {
-                remainActive = true;
-            }
-
-            for (i in 0..._gctx.dimensions.length) {
-                @:privateAccess(GraphicsContext) {
-                    if (!_gctx._activeDimensions[i]) {
-                        continue;
-                    }
-                }
-
-                var query = _gctx.queries[i];
-                if (query == null) {
-                    continue;
-                }
-
-                var actualDim = _gctx.getClientDimensionsAtIndex(Direct(i))[0];
-                if (actualDim == null) {
-                    continue;
-                }
-
-                var active = GlobalEvents.isMouseOverDim(actualDim);
-
-                if (remainActive) {
-                    active = GlobalEvents.isMouseOverDim(actualDim, _mouseDownFirstPos);
-                }
-
-                if (active && actualDim.order > currentOrder
-                    && query.type != QUERY_STATIC) {
-                    _tempUI.push(i);
-                    currentOrder = actualDim.order;
-                }
-            }
-        }
-        else {
-            _tempUI.push(_drag.dragIndex);
-        }
-
-        _mouseIsDown = -1;
-        _mouseIsReleased = -1;
-        _mouseIsScrolling = -1;
-        
-        determineInitialMouseEvents();
-        
-        if (!handleKeyEvents()) {
-            return;
-        }
-
-        var containers = _gctx.getActiveContainers();
-        var possibleActiveContainers = new Array<Int>();
-        var lastContainerIndex = -1;
-        for (i in 0...containers.length) {
-            var context = containers[i];
-            var containerIndex = _tempUI.indexOf(DimIndexUtils.getDirectIndex(context.index));
-            if (containerIndex > lastContainerIndex && containerIndex > -1) {
-                possibleActiveContainers.push(i);
-            }
-        }
-
-        var containerActiveIndex = -1;
-        if (possibleActiveContainers.length > 0) {
-            containerActiveIndex = possibleActiveContainers[possibleActiveContainers.length - 1];
-        }
-
-        if (!handleContainerScrolling(containerActiveIndex)) {
-            handleMouseEvents();   
         }
     }
 
@@ -633,66 +505,50 @@ class UpdateContext {
     * Handle focus changes from mouse clicks
     **/
     private function _processMouseFocusChanges() {
-        if (!GlobalEvents.isAnyMouseButtonDown() && !GlobalEvents.isAnyMouseButtonReleased()) {
-            return;
-        }
-        
-        // On mouse down, prepare for potential focus change
+        // Commit focus change immediately on mouse down
         if (GlobalEvents.isAnyMouseButtonDown()) {
-            _prepareFocusChange();
-        }
-        
-        // On mouse release, commit focus change
-        if (GlobalEvents.isAnyMouseButtonReleased()) {
-            _commitFocusChange();
+            _commitFocusChangeImmediate();
         }
     }
     
-    /**
-    * Prepare for focus change on mouse down
-    **/
-    private function _prepareFocusChange() {
+    private function _commitFocusChangeImmediate() {
         // Don't change focus if actively selecting text
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
             if (renderer != null && renderer.isSelecting()) {
                 return; // Preserve current focus during text selection
             }
         }
         
-        // Original focus change logic for non-text-selection cases
-        if (_tempUI.length == 0) {
-            // Will clear focus on mouse release
-            return;
-        }
-        
-        // Find the topmost UI element that can receive focus
-        var topMostFocusable = -1;
-        for (i in _tempUI.length - 1...0) {
-            var index = _tempUI[i];
-            var query = _gctx.queries[index];
-            if (query.acceptsTextInput || query.acceptsKeyInput) {
-                topMostFocusable = index;
-                break;
-            }
-        }
-        
-        _mouseFocusIndexUI = topMostFocusable;
-    }
-    
-    /**
-    * Commit focus change on mouse release
-    **/
-    private function _commitFocusChange() {
         if (_tempUI.length == 0) {
             // Clicked outside all UI - clear focus
             _activatedIndex = -1;
-        } else if (_mouseFocusIndexUI >= 0) {
-            // Set focus to the element we clicked on
-            _activatedIndex = _mouseFocusIndexUI;
+        } else {
+            var lastActivatedIndex = _activatedIndex;
+            // Find topmost focusable element and set focus immediately
+            var topMostFocusable = -1;
+            var i = _tempUI.length - 1;
+            while (i > -1) {
+                var index = _tempUI[i];
+                var query = _gctx.queries[index];
+                if (query != null && (query.acceptsTextInput || query.acceptsKeyInput)) {
+                    topMostFocusable = index;
+                    break;
+                }
+                i--;
+            }
+            
+            if (topMostFocusable >= 0) {
+                _activatedIndex = topMostFocusable;
+            }
+
+            if (_activatedIndex != lastActivatedIndex) {
+                var renderer = _gctx.getTextRendererByDimIndex(Direct(lastActivatedIndex));
+                if (renderer != null) {
+                    renderer.loseFocus();
+                }
+            }
         }
-        
-        _mouseFocusIndexUI = -1;
     }
     
     /**
@@ -716,7 +572,7 @@ class UpdateContext {
     * Process keyboard input for text elements
     **/
     private function _processTextInputKeys() {
-        var renderer = _gctx.getTextRenderer(_activatedIndex);
+        var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
         if (renderer == null) return;
         
         // Process character input
@@ -825,8 +681,12 @@ class UpdateContext {
     * Process mouse input for text elements (selection, cursor positioning)
     **/
     private function _processTextInputMouse() {
-        var renderer = _gctx.getTextRenderer(_activatedIndex);
+        var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
         if (renderer == null) return;
+        
+        if (GlobalEvents.isAnyMouseButtonReleased()) {
+            renderer.endSelection();
+        }
         
         // Always process if we have an active selection, regardless of mouse position
         if (renderer.isSelecting()) {
@@ -838,7 +698,7 @@ class UpdateContext {
         
         // Only check bounds for starting new interactions
         if (_tempUI.indexOf(_activatedIndex) == -1) return;
-        
+
         // Handle mouse down to start selection
         if (GlobalEvents.isAnyMouseButtonDown()) {
             var mousePos = GlobalEvents.getMousePosition();
@@ -1029,11 +889,11 @@ class UpdateContext {
     private function _handleContainerScrolling(containerIndex:Int):Bool {
         // Check if focused text input should handle mouse wheel events first
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var textInputDimIndex = DimIndexUtils.getDirectIndex(_gctx.getTextRenderer(_activatedIndex).index);
+            var textInputDimIndex = _activatedIndex;
             
             // If mouse is over text input AND there's actual wheel scrolling
             if (_tempUI.indexOf(textInputDimIndex) != -1 && GlobalEvents.getMouseDelta() != 0) {
-                var renderer = _gctx.getTextRenderer(_activatedIndex);
+                var renderer = _gctx.getTextRendererByDimIndex(Direct(textInputDimIndex));
                 if (renderer != null && _handleTextRendererScrolling(renderer)) {
                     return true; // Text input consumed the scroll event
                 }
@@ -1133,7 +993,7 @@ class UpdateContext {
     // Global shortcut command implementations
     private function _processCopyCommand() {
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
             if (renderer != null) {
                 renderer.copySelection();
             }
@@ -1142,7 +1002,7 @@ class UpdateContext {
     
     private function _processPasteCommand() {
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
             if (renderer != null) {
                 renderer.pasteFromClipboard();
             }
@@ -1151,7 +1011,7 @@ class UpdateContext {
     
     private function _processCutCommand() {
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
             if (renderer != null) {
                 renderer.cutSelection();
             }
@@ -1160,7 +1020,7 @@ class UpdateContext {
     
     private function _processUndoCommand() {
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
             if (renderer != null) {
                 renderer.undo();
             }
@@ -1169,7 +1029,7 @@ class UpdateContext {
     
     private function _processRedoCommand() {
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
             if (renderer != null) {
                 renderer.redo();
             }
@@ -1179,7 +1039,7 @@ class UpdateContext {
     private function _processEscapeCommand() {
         // Clear text selection if any
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-            var renderer = _gctx.getTextRenderer(_activatedIndex);
+            var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
             if (renderer != null) {
                 renderer.clearSelection();
             }
@@ -1218,7 +1078,7 @@ class UpdateContext {
         if (_tempUI.length == 0 && GlobalEvents.isAnyMouseButtonDown()) {
             // Check if we're in text selection mode
             if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
-                var renderer = _gctx.getTextRenderer(_activatedIndex);
+                var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
                 if (renderer != null && renderer.isSelecting()) {
                     return; // Don't clear focus during text selection
                 }
@@ -1267,7 +1127,7 @@ class UpdateContext {
 
         if (_activatedIndex > -1) {
             if (isFocusTextBased) {
-                var renderer = _gctx.getTextRenderer(_activatedIndex);
+                var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
                 
                 for (c in GlobalEvents.getKeyCharCode()) {
                     _charString += String.fromCharCode(c);
@@ -1338,9 +1198,7 @@ class UpdateContext {
             if (query.type != QUERY_UI)
                 continue;
 
-            isMouseOver = index;
-
-            
+            isMouseOver = index;       
 
             if (GlobalEvents.isAnyMouseButtonReleased()) {
                 if (query.acceptsTextInput) {

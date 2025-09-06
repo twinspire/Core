@@ -193,6 +193,7 @@ class TextRenderer {
     private var _selectionStartPos:Int = -1;
     private var _selectionEndPos:Int = -1;
     private var _cursorBlinkTime:Float;
+    private var _cursorBlinkInterval:Float = 0.5; // Blink every 0.5 seconds
     private var _cursorVisible:Bool = false;
 
     private var _scrollOffsetX:Float = 0.0;
@@ -402,9 +403,6 @@ class TextRenderer {
         // Handle cursor blinking, input events, etc.
         if (_options.editable || _options.selectable) {
             _handleInputEvents(utx);
-        }
-        
-        if (_options.animateCursor) {
             _updateCursorAnimation(utx);
         }
     }
@@ -471,13 +469,18 @@ class TextRenderer {
         // Set up clipping to text field bounds
         gtx.scissor(_index);
         
-        gtx.setColor(_options.colors != null ? _options.colors[TextForegroundColor] : Color.Black);
-        gtx.setFont(format.font);
-        gtx.setFontSize(format.fontSize);
-        
         // Apply scroll offset to rendering position
         var renderX = dim.x - _scrollOffsetX;
         var renderY = dim.y - _scrollOffsetY;
+
+        if (_options.selectable || _options.editable) {
+            // Render selection and cursor with scroll offset
+            _renderSelectionWithOffset(gtx, text, renderX, renderY, dim, format);
+        }
+
+        gtx.setColor(_options.colors != null ? _options.colors[TextForegroundColor] : Color.Black);
+        gtx.setFont(format.font);
+        gtx.setFontSize(format.fontSize);
         
         if (!_options.wordWrap || text.indexOf('\n') == -1) {
             // Single line rendering with horizontal scroll
@@ -487,9 +490,8 @@ class TextRenderer {
             _renderMultiLineWithOffset(gtx, text, renderX, renderY, dim, format);
         }
         
-        // Render selection and cursor (with scroll offset)
+        // Render cursor (with scroll offset)
         if (_options.selectable || _options.editable) {
-            _renderSelectionWithOffset(gtx, text, renderX, renderY, dim, format);
             _renderCursorWithOffset(gtx, text, renderX, renderY, dim, format);
         }
         
@@ -523,6 +525,12 @@ class TextRenderer {
         
         var cursorColor = _options.colors != null ? _options.colors[CursorColor] : Color.Black;
         gtx.setColor(cursorColor);
+        if (_options.fadeCursor) {
+            var alpha = _cursorBlinkTime / _cursorBlinkInterval; // Fade in/out effect
+            gtx.setOpacity(alpha);
+        } else {
+            gtx.setOpacity(1.0); // Always visible if not fading
+        }
         
         var beforeCursor = text.substring(0, _cursorPosition);
         var cursorX = x + format.font.width(format.fontSize, beforeCursor);
@@ -531,12 +539,14 @@ class TextRenderer {
         // Apply scroll offset to cursor position
         var finalCursorX = cursorX;
         var finalCursorY = y;
-        
+
         // Only draw cursor if it's within visible bounds
         if (finalCursorX >= dim.x && finalCursorX <= dim.x + dim.width &&
             finalCursorY >= dim.y && finalCursorY <= dim.y + dim.height) {
             gtx.getCurrentGraphics().drawLine(finalCursorX, finalCursorY, finalCursorX, finalCursorY + lineHeight, 1.0);
         }
+
+        gtx.setOpacity(1.0); // Reset opacity after drawing
     }
 
     /**
@@ -859,7 +869,17 @@ class TextRenderer {
     }
 
     private function _updateCursorAnimation(utx:UpdateContext) {
-        // TODO: Update cursor blink animation
+        _cursorBlinkTime += UpdateContext.deltaTime;
+        if (_options.fadeCursor) {
+            // Fade cursor in and out
+            var alpha = _cursorBlinkTime / _cursorBlinkInterval; // Fade in/out effect
+            _cursorVisible = alpha > _cursorBlinkInterval; // Visible when alpha is above threshold
+        }
+
+        if (_cursorBlinkTime >= _cursorBlinkInterval) { // Blink every 0.5 seconds
+            _cursorVisible = !_cursorVisible;
+            _cursorBlinkTime = 0.0;
+        }
     }
 
     /**
@@ -892,6 +912,14 @@ class TextRenderer {
     }
 
     /**
+    * Forces the text renderer to lose focus, hiding the cursor and stopping any animations.
+    **/
+    public function loseFocus() {
+        _isFocused = false;
+        _cursorVisible = false; // Hide cursor when not focused
+    }
+
+    /**
     * Get the current cursor position in the text.
     **/
     public function getCursorPosition():Int {
@@ -902,6 +930,7 @@ class TextRenderer {
     * Set the cursor position.
     **/
     public function setCursorPosition(pos:Int) {
+        _isFocused = true;
         _cursorPosition = cast Math.max(0, Math.min(pos, _source.length()));
         _resetCursorBlink();
     }
@@ -910,6 +939,7 @@ class TextRenderer {
     * Move cursor by a relative amount.
     **/
     public function moveCursor(delta:Int) {
+        _isFocused = true;
         setCursorPosition(_cursorPosition + delta);
     }
     
@@ -1011,6 +1041,7 @@ class TextRenderer {
     **/
     public function startSelection(pos:Int) {
         _isSelecting = true;
+        _isFocused = true;
         _selectionStartPos = cast Math.max(0, Math.min(pos, _source.length()));
         _selectionEndPos = _selectionStartPos;
         _selectionStart = _selectionStartPos;
