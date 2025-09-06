@@ -1,5 +1,6 @@
 package twinspire.render;
 
+import js.lib.webassembly.Table;
 import twinspire.DimIndex.DimIndexUtils;
 import twinspire.events.EventArgs;
 import twinspire.events.GameEventProcessingType;
@@ -28,6 +29,14 @@ import kha.input.KeyCode;
 import kha.math.FastVector2;
 import kha.System;
 
+typedef KeyRepeatInfo = {
+    var initialDelay:Float;
+    var repeatRate:Float;
+    var timeHeld:Float;
+    var isRepeating:Bool;
+    var lastRepeatTime:Float;
+}
+
 @:allow(Application)
 class UpdateContext {
 
@@ -51,6 +60,10 @@ class UpdateContext {
     private var _keysDown:Array<Int>;
     private var _charString:String;
     private var _activatedIndex:Int;
+
+    private var _keyRepeatStates:Map<KeyCode, KeyRepeatInfo>;
+    private var _defaultInitialDelay:Float = 0.5;  // 500ms initial delay
+    private var _defaultRepeatRate:Float = 0.05;
 
     private var _lastMousePosition:FastVector2;
     private var _mouseDownFirstPos:FastVector2;
@@ -86,6 +99,7 @@ class UpdateContext {
     public function new(gctx:GraphicsContext) {
         _gctx = gctx;
         _events = [];
+        _keyRepeatStates = new Map<KeyCode, KeyRepeatInfo>();
         _eventProcessor = new GameEventProcessor();
         _eventDispatcher = new EventDispatcher();
         _retainedMouseDown = [];
@@ -574,58 +588,103 @@ class UpdateContext {
         var renderer = _gctx.getTextRendererByDimIndex(Direct(_activatedIndex));
         if (renderer == null) return;
         
-        // Process character input
+        // Process character input (no repeat needed for character codes)
         for (c in GlobalEvents.getKeyCharCode()) {
             _charString += String.fromCharCode(c);
             renderer.insertAt(String.fromCharCode(c), renderer.getCursorPosition());
         }
         
-        // Process special keys, but don't consume ALL keys
+        // Process special keys with proper repeat timing
         var consumedKeys = [];
-        
+
         for (keyCode in _keysDown) {
             var key = cast(keyCode, KeyCode);
             var handled = false;
             
             switch (key) {
                 case KeyCode.Backspace:
-                    renderer.delete();
+                    _handleKeyWithRepeat(key, () -> {
+                        renderer.delete();
+                    });
                     handled = true;
                     
                 case KeyCode.Delete:
-                    var cursorPos = renderer.getCursorPosition();
-                    renderer.delete(cursorPos, 1);
+                    _handleKeyWithRepeat(key, () -> {
+                        var cursorPos = renderer.getCursorPosition();
+                        renderer.delete(cursorPos, 1);
+                    });
                     handled = true;
                     
                 case KeyCode.Left:
-                    renderer.moveCursor(-1);
+                    _handleKeyWithRepeat(key, () -> {
+                        renderer.enableCursorAnimation(false);
+                        if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
+                            renderer.extendSelectionLeft();
+                        } else {
+                            renderer.moveCursor(-1);
+                        }
+                    });
                     handled = true;
                     
                 case KeyCode.Right:
-                    renderer.moveCursor(1);
-                    handled = true;
-                    
-                case KeyCode.Home:
-                    renderer.moveCursorToLineStart();
-                    handled = true;
-                    
-                case KeyCode.End:
-                    renderer.moveCursorToLineEnd();
+                    _handleKeyWithRepeat(key, () -> {
+                        renderer.enableCursorAnimation(false);
+                        if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
+                            renderer.extendSelectionRight();
+                        } else {
+                            renderer.moveCursor(1);
+                        }
+                    });
                     handled = true;
                     
                 case KeyCode.Up:
                     if (renderer.isMultiLine()) {
-                        renderer.moveCursorUp();
+                        _handleKeyWithRepeat(key, () -> {
+                            renderer.enableCursorAnimation(false);
+                            if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
+                                renderer.extendSelectionUp();
+                            } else {
+                                renderer.moveCursorUp();
+                            }
+                        });
                         handled = true;
                     }
                     
                 case KeyCode.Down:
                     if (renderer.isMultiLine()) {
-                        renderer.moveCursorDown();
+                        _handleKeyWithRepeat(key, () -> {
+                            renderer.enableCursorAnimation(false);
+                            if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
+                                renderer.extendSelectionDown();
+                            } else {
+                                renderer.moveCursorDown();
+                            }
+                        });
                         handled = true;
                     }
                     
+                case KeyCode.Home:
+                    _handleKeyWithRepeat(key, () -> {
+                        if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
+                            renderer.extendSelectionToLineStart();
+                        } else {
+                            renderer.moveCursorToLineStart();
+                        }
+                    });
+                    handled = true;
+                    
+                case KeyCode.End:
+                    _handleKeyWithRepeat(key, () -> {
+                        if (GlobalEvents.isKeyDown(KeyCode.Shift)) {
+                            renderer.extendSelectionToLineEnd();
+                        } else {
+                            renderer.moveCursorToLineEnd();
+                        }
+                    });
+                    handled = true;
+                    
                 case KeyCode.Return:
+                    // Return typically doesn't repeat, just single action
                     if (renderer.isMultiLine()) {
                         renderer.insertAt("\n", renderer.getCursorPosition());
                         handled = true;
@@ -638,31 +697,95 @@ class UpdateContext {
             }
         }
         
-        // Remove consumed keys from global list so they don't affect other elements
+        // Clean up key repeat states for keys that are no longer pressed
+        _cleanupKeyRepeatStates();
+        
+        // Remove consumed keys from global list
         for (key in consumedKeys) {
             var index = _keysDown.indexOf(key);
             if (index != -1) {
                 _keysDown.splice(index, 1);
             }
         }
+
+        if (consumedKeys.length == 0) {
+            renderer.enableCursorAnimation(true);
+        }
+    }
+
+    /**
+    * Handle key with proper repeat timing.
+    **/
+    private function _handleKeyWithRepeat(key:KeyCode, action:() -> Void) {
+        if (GlobalEvents.isKeyDown(key)) {
+            if (!_keyRepeatStates.exists(key)) {
+                // First press - execute immediately
+                action();
+                
+                // Set up repeat state
+                var repeat:KeyRepeatInfo = {
+                    timeHeld: 0.0,
+                    isRepeating: false,
+                    initialDelay: _defaultInitialDelay,
+                    repeatRate: _defaultRepeatRate,
+                    lastRepeatTime: 0.0
+                };
+                
+                _keyRepeatStates.set(key, repeat);
+            } else {
+                // Key being held - handle repeat timing
+                var repeatInfo = _keyRepeatStates.get(key);
+                repeatInfo.timeHeld += deltaTime;
+                
+                if (!repeatInfo.isRepeating) {
+                    // Check if we've passed the initial delay
+                    if (repeatInfo.timeHeld >= repeatInfo.initialDelay) {
+                        repeatInfo.isRepeating = true;
+                        repeatInfo.lastRepeatTime = 0.0;
+                        action(); // First repeat
+                    }
+                } else {
+                    // In repeat mode - check repeat rate
+                    repeatInfo.lastRepeatTime += deltaTime;
+                    if (repeatInfo.lastRepeatTime >= repeatInfo.repeatRate) {
+                        repeatInfo.lastRepeatTime = 0.0;
+                        action(); // Repeated action
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+    * Clean up key repeat states for keys that are no longer pressed.
+    **/
+    private function _cleanupKeyRepeatStates() {
+        var keysToRemove:Array<KeyCode> = [];
         
-        // Do the same for key up events
-        var consumedUpKeys = [];
-        for (keyCode in _keysUp) {
-            var key = cast(keyCode, KeyCode);
-            // Most key up events for text input don't need special handling
-            // but we might want to consume them to prevent other elements from seeing them
-            if (_isTextInputKey(key)) {
-                consumedUpKeys.push(keyCode);
+        for (key in _keyRepeatStates.keys()) {
+            if (!GlobalEvents.isKeyDown(key)) {
+                keysToRemove.push(key);
             }
         }
         
-        for (key in consumedUpKeys) {
-            var index = _keysUp.indexOf(key);
-            if (index != -1) {
-                _keysUp.splice(index, 1);
-            }
+        for (key in keysToRemove) {
+            _keyRepeatStates.remove(key);
         }
+    }
+    
+    /**
+    * Set custom repeat timing for specific keys or globally.
+    **/
+    public function setKeyRepeatTiming(initialDelay:Float, repeatRate:Float) {
+        _defaultInitialDelay = initialDelay;
+        _defaultRepeatRate = repeatRate;
+    }
+    
+    /**
+    * Get current key repeat state (for debugging).
+    **/
+    public function getKeyRepeatState(key:KeyCode):KeyRepeatInfo {
+        return _keyRepeatStates.get(key);
     }
     
     /**

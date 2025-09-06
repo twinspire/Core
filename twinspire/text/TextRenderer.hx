@@ -193,8 +193,9 @@ class TextRenderer {
     private var _selectionStartPos:Int = -1;
     private var _selectionEndPos:Int = -1;
     private var _cursorBlinkTime:Float;
-    private var _cursorBlinkInterval:Float = 0.5; // Blink every 0.5 seconds
+    private var _cursorBlinkInterval:Float = 0.75;
     private var _cursorVisible:Bool = false;
+    private var _shouldCursorAnimate:Bool = true;
 
     private var _scrollOffsetX:Float = 0.0;
     private var _scrollOffsetY:Float = 0.0;
@@ -403,7 +404,12 @@ class TextRenderer {
         // Handle cursor blinking, input events, etc.
         if (_options.editable || _options.selectable) {
             _handleInputEvents(utx);
-            _updateCursorAnimation(utx);
+            if (_shouldCursorAnimate) {
+                _updateCursorAnimation(utx);
+            }
+            else {
+                _resetCursorBlink();
+            }
         }
     }
 
@@ -525,7 +531,7 @@ class TextRenderer {
         
         var cursorColor = _options.colors != null ? _options.colors[CursorColor] : Color.Black;
         gtx.setColor(cursorColor);
-        if (_options.fadeCursor) {
+        if (_options.fadeCursor && _shouldCursorAnimate) {
             var alpha = _cursorBlinkTime / _cursorBlinkInterval; // Fade in/out effect
             gtx.setOpacity(alpha);
         } else {
@@ -873,10 +879,10 @@ class TextRenderer {
         if (_options.fadeCursor) {
             // Fade cursor in and out
             var alpha = _cursorBlinkTime / _cursorBlinkInterval; // Fade in/out effect
-            _cursorVisible = alpha > _cursorBlinkInterval; // Visible when alpha is above threshold
+            _cursorVisible = alpha > 0.5; // Visible when alpha is above threshold
         }
 
-        if (_cursorBlinkTime >= _cursorBlinkInterval) { // Blink every 0.5 seconds
+        if (_cursorBlinkTime >= _cursorBlinkInterval) {
             _cursorVisible = !_cursorVisible;
             _cursorBlinkTime = 0.0;
         }
@@ -1034,6 +1040,84 @@ class TextRenderer {
     **/
     public function isSelecting():Bool {
         return _isSelecting;
+    }
+
+    /**
+    * Extend selection to the left (Shift + Left Arrow).
+    **/
+    public function extendSelectionLeft() {
+        if (!_isSelecting) {
+            startSelection(_cursorPosition);
+        }
+        
+        var newPos = Std.int(Math.max(0, _cursorPosition - 1));
+        setCursorPosition(newPos);
+        updateSelection(newPos);
+    }
+    
+    /**
+    * Extend selection to the right (Shift + Right Arrow).
+    **/
+    public function extendSelectionRight() {
+        if (!_isSelecting) {
+            startSelection(_cursorPosition);
+        }
+        
+        var newPos = Std.int(Math.min(_source.length(), _cursorPosition + 1));
+        setCursorPosition(newPos);
+        updateSelection(newPos);
+    }
+    
+    /**
+    * Extend selection up one line (Shift + Up Arrow).
+    **/
+    public function extendSelectionUp() {
+        if (!isMultiLine()) return;
+        
+        if (!_isSelecting) {
+            startSelection(_cursorPosition);
+        }
+        
+        moveCursorUp();
+        updateSelection(_cursorPosition);
+    }
+    
+    /**
+    * Extend selection down one line (Shift + Down Arrow).
+    **/
+    public function extendSelectionDown() {
+        if (!isMultiLine()) return;
+        
+        if (!_isSelecting) {
+            startSelection(_cursorPosition);
+        }
+        
+        moveCursorDown();
+        updateSelection(_cursorPosition);
+    }
+    
+    /**
+    * Extend selection to line start (Shift + Home).
+    **/
+    public function extendSelectionToLineStart() {
+        if (!_isSelecting) {
+            startSelection(_cursorPosition);
+        }
+        
+        moveCursorToLineStart();
+        updateSelection(_cursorPosition);
+    }
+    
+    /**
+    * Extend selection to line end (Shift + End).
+    **/
+    public function extendSelectionToLineEnd() {
+        if (!_isSelecting) {
+            startSelection(_cursorPosition);
+        }
+        
+        moveCursorToLineEnd();
+        updateSelection(_cursorPosition);
     }
     
     /**
@@ -1214,12 +1298,19 @@ class TextRenderer {
         // Adjust selection if it exists
         _adjustSelectionForDeletion(deletePos, deleteLength);
     }
+
+    public function enableCursorAnimation(enable:Bool) {
+        _shouldCursorAnimate = enable;
+        if (!enable) {
+            _resetCursorBlink();
+        }
+    }
     
     /**
     * Reset cursor blink animation.
     **/
     private function _resetCursorBlink() {
-        _cursorBlinkTime = 0.0;
+        _cursorBlinkTime = _cursorBlinkInterval;
         _cursorVisible = true;
     }
     
