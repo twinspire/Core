@@ -1,5 +1,6 @@
 package twinspire;
 
+import twinspire.geom.Dim;
 import twinspire.DimIndex.DimIndexUtils;
 import twinspire.render.GraphicsContext;
 using twinspire.extensions.ArrayExtensions;
@@ -13,7 +14,7 @@ typedef Dependent = {
 
 class Template {
     
-    private var dimensionRefs:Map<String, DimIndex> = new Map();
+    private var dimensionRefs:Map<String, Map<DimIndex, Dim>> = new Map();
     private var dependencies:Array<Dependent>;
 
     /**
@@ -38,31 +39,45 @@ class Template {
     * Moreover, use this function for better organisation and managing your use of `useDimension` in `GraphicsContext`.
     *
     * @param name The name to map the callback `dimProvider` to.
-    * @param dimProvider The callback used to create and update dimensions. The string is the `name` given, and an optional `DimIndex`. Return the
-    * new `Dim` from this callback.
+    * @param dimProvider The callback used to create and update dimensions. The string is the `name` given, and an optional `DimIndex`. Return a 
+    * `Map<DimIndex, Dim>` from this callback.
     * @param scope The `AddLogic` used to determine what type of dimension should be created in `GraphicsContext`.
     * @param dependsOn An optional string value specifying which `name` this dimension should depend on.
     **/
-    public function addOrUpdateDim(name:String, dimProvider:(String, ?DimIndex) -> Dim, ?scope:AddLogic, ?dependsOn:String):DimIndex {
+    public function addOrUpdateDim(name:String, dimProvider:(String, Map<DimIndex, Dim>, Bool) -> Map<DimIndex, Dim>, ?scope:AddLogic, ?dependsOn:String) {
         var existingIndex = dimensionRefs.get(name);
-        var newDim = dimProvider(name, existingIndex);
+        if (existingIndex != null) {
+            Dimensions.beginEdit();
+        }
+
+        var newDims = dimProvider(name, existingIndex ?? new Map<DimIndex, Dim>(), false);
         
         var gctx = Application.instance.graphicsCtx;
         
-        var resultIndex = gctx.setOrReinitDim(existingIndex, newDim, scope);
-        
-        // Store/update reference
-        dimensionRefs.set(name, resultIndex);
-        
-        // Handle dependencies only on creation
-        if (existingIndex == null && dependsOn != null) {
-            var dependsOnIndex = dimensionRefs.get(dependsOn);
-            if (dependsOnIndex != null) {
-                gctx.setupDirectLink(resultIndex, dependsOnIndex);
+        var first = true;
+        for (k => v in newDims) {
+            if (existingIndex != null) {
+                gctx.setOrReinitDim(k, v);
+            }
+            else {
+                gctx.setOrReinitDim(k, v, scope);
             }
         }
+
+        if (existingIndex != null) {
+            Dimensions.endEdit();
+        }
         
-        return resultIndex;
+        // Store/update reference
+        dimensionRefs.set(name, newDims);
+        
+        // Handle dependencies only on creation
+        // if (existingIndex == null && dependsOn != null) {
+        //     var dependsOnIndex = dimensionRefs.get(dependsOn);
+        //     if (dependsOnIndex != null) {
+        //         gctx.setupDirectLink(resultIndex, dependsOnIndex);
+        //     }
+        // }
     }
 
     /**
@@ -183,24 +198,21 @@ class Template {
         
         return affectedIndices;
     }
-
-    /**
-    * Get a dimension reference by name.
-    **/
-    public function getDim(name:String):DimIndex {
-        return dimensionRefs.get(name);
-    }
     
     /**
     * Update all dimensions in this template (useful for responsive layouts).
     **/
-    public function updateAll(dimProvider:(String, DimIndex) -> Dim) {
+    public function updateAll(dimProvider:(String, Map<DimIndex, Dim>, Bool) -> Map<DimIndex, Dim>) {
         var gctx = Application.instance.graphicsCtx;
         
-        for (name => index in dimensionRefs) {
-            var newDim = dimProvider(name, index);
-            gctx.setOrReinitDim(index, newDim);
+        Dimensions.beginEdit();
+        for (name => indices in dimensionRefs) {
+            var newDims = dimProvider(name, indices, true);
+            for (k => v in newDims) {
+                gctx.setOrReinitDim(k, v);
+            }
         }
+        Dimensions.endEdit();
     }
 
     /**
