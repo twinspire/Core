@@ -1,6 +1,7 @@
 package twinspire;
 
 import twinspire.geom.Dim;
+import twinspire.Dimensions.DimResult;
 import twinspire.DimIndex.DimIndexUtils;
 import twinspire.render.GraphicsContext;
 using twinspire.extensions.ArrayExtensions;
@@ -14,7 +15,8 @@ typedef Dependent = {
 
 class Template {
     
-    private var dimensionRefs:Map<String, Map<DimIndex, Dim>> = new Map();
+    private var dimensionRefs:Map<String, Array<DimResult>> = new Map();
+    private var groupRefs:Map<String, Array<DimIndex>> = new Map();
     private var dependencies:Array<Dependent>;
 
     /**
@@ -44,40 +46,95 @@ class Template {
     * @param scope The `AddLogic` used to determine what type of dimension should be created in `GraphicsContext`.
     * @param dependsOn An optional string value specifying which `name` this dimension should depend on.
     **/
-    public function addOrUpdateDim(name:String, dimProvider:(String, Map<DimIndex, Dim>, Bool) -> Map<DimIndex, Dim>, ?scope:AddLogic, ?dependsOn:String) {
-        var existingIndex = dimensionRefs.get(name);
-        if (existingIndex != null) {
-            Dimensions.beginEdit();
-        }
-
-        var newDims = dimProvider(name, existingIndex ?? new Map<DimIndex, Dim>(), false);
+    public function addOrUpdateDim(name:String, builder:(DimBuilder) -> Void, ?scope:AddLogic, ?dependsOn:String) {
+        var existingResults = dimensionRefs.get(name);
+        var existingGroups = groupRefs.get(name) ?? [];
+        var isUpdate = existingResults != null;
         
+        var dimBuilder = new DimBuilder(existingResults ?? [], isUpdate);
+        builder(dimBuilder);
+        
+        var newResults = dimBuilder.getResults();
+        var groups = dimBuilder.getGroups();
+        var groupIndices = dimBuilder.getGroupIndices(); // New method to get group DimIndices
         var gctx = Application.instance.graphicsCtx;
         
-        var first = true;
-        for (k => v in newDims) {
-            if (existingIndex != null) {
-                gctx.setOrReinitDim(k, v);
+        if (isUpdate) {
+            Dimensions.beginEdit();
+            
+            // Update existing dimensions
+            for (i in 0...newResults.length) {
+                if (i < existingResults.length && existingResults[i].index != null) {
+                    gctx.setOrReinitDim(existingResults[i].index, newResults[i].dim);
+                    newResults[i].index = existingResults[i].index;
+                } else {
+                    // Create new dimension (array grew)
+                    var result = Dimensions.createFromDim(newResults[i].dim, scope ?? Empty());
+                    newResults[i] = result;
+                }
             }
-            else {
-                gctx.setOrReinitDim(k, v, scope);
+            
+            // Clean up excess dimensions
+            for (i in newResults.length...existingResults.length) {
+                if (existingResults[i].index != null) {
+                    gctx.removeIndex(existingResults[i].index);
+                }
             }
-        }
-
-        if (existingIndex != null) {
+            
             Dimensions.endEdit();
+        } else {
+            // Create all new dimensions
+            for (i in 0...newResults.length) {
+                var result = Dimensions.createFromDim(newResults[i].dim, scope ?? Empty());
+                newResults[i] = result;
+            }
+            
+            // Set up group linking after all indices are created
+            for (group in groups) {
+                if (group.length > 1) {
+                    var firstIndex = newResults[group[0]].index;
+                    for (j in 1...group.length) {
+                        var childIndex = newResults[group[j]].index;
+                        if (firstIndex != null && childIndex != null) {
+                            gctx.setupDirectLink(childIndex, firstIndex);
+                        }
+                    }
+                }
+            }
         }
         
-        // Store/update reference
-        dimensionRefs.set(name, newDims);
-        
-        // Handle dependencies only on creation
-        // if (existingIndex == null && dependsOn != null) {
-        //     var dependsOnIndex = dimensionRefs.get(dependsOn);
-        //     if (dependsOnIndex != null) {
-        //         gctx.setupDirectLink(resultIndex, dependsOnIndex);
-        //     }
-        // }
+        dimensionRefs.set(name, newResults);
+        groupRefs.set(name, groupIndices);
+    }
+
+    /**
+    * Get the DimIndex for a specific group within a named dimension set.
+    **/
+    public function getGroupIndex(name:String, groupIndex:Int):DimIndex {
+        var groups = groupRefs.get(name);
+        return (groups != null && groupIndex < groups.length) ? groups[groupIndex] : null;
+    }
+    
+    /**
+    * Get all group indices for a named dimension set.
+    **/
+    public function getGroupIndices(name:String):Array<DimIndex> {
+        return groupRefs.get(name) ?? [];
+    }
+
+    /**
+    * Get all DimResults for a named dimension group.
+    **/
+    public function getDimResults(name:String):Array<DimResult> {
+        return dimensionRefs.get(name) ?? [];
+    }
+    
+    /**
+    * Get a specific DimResult by index.
+    **/
+    public function getDimResult(name:String, index:Int):DimResult {
+        var results = dimensionRefs.get(name);
+        return (results != null && index < results.length) ? results[index] : null;
     }
 
     /**
@@ -202,15 +259,20 @@ class Template {
     /**
     * Update all dimensions in this template (useful for responsive layouts).
     **/
-    public function updateAll(dimProvider:(String, Map<DimIndex, Dim>, Bool) -> Map<DimIndex, Dim>) {
+    public function updateAll(dimProvider:(String, Array<DimResult>) -> Array<DimResult>) {
         var gctx = Application.instance.graphicsCtx;
         
         Dimensions.beginEdit();
-        for (name => indices in dimensionRefs) {
-            var newDims = dimProvider(name, indices, true);
-            for (k => v in newDims) {
-                gctx.setOrReinitDim(k, v);
+        for (name => dimResults in dimensionRefs) {
+            var updatedResults = dimProvider(name, dimResults);
+            
+            for (i in 0...updatedResults.length) {
+                if (i < dimResults.length && dimResults[i].index != null) {
+                    gctx.setOrReinitDim(dimResults[i].index, updatedResults[i].dim);
+                }
             }
+            
+            dimensionRefs.set(name, updatedResults);
         }
         Dimensions.endEdit();
     }
