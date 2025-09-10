@@ -828,12 +828,12 @@ class GraphicsContext {
                     default: -1;
                 };
 
-                if (i > -1) {
+                if (i > -1 && !_groups[_currentGroup].contains(i)) {
                     _groups[_currentGroup].push(i);
                 }
             }
             else if (indexInt != null) {
-                if (indexInt < 0 || indexInt > _dimRecords.length) {
+                if (indexInt < 0 || indexInt > _dimRecords.length || _groups[_currentGroup].contains(indexInt)) {
                     return;
                 }
 
@@ -850,7 +850,7 @@ class GraphicsContext {
     **/
     public function setupDirectLink(child:DimIndex, parent:DimIndex) {
         switch ([ child, parent ]) {
-            case [ Direct(cindex), Direct(pindex) ]: {
+            case [ Direct(cindex, _), Direct(pindex, _) ]: {
                 if (cindex > dimensionLinks.length - 1) {
                     _dimTempLinkTo[cindex] = pindex;
                 }
@@ -1907,7 +1907,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
+        var result = DimIndex.Direct(index, renderType);
         return result;
     }
 
@@ -1965,7 +1965,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
+        var result = DimIndex.Direct(index, renderType);
         return result;
     }
 
@@ -2019,7 +2019,7 @@ class GraphicsContext {
         addDimensionIndexToBuffer(index);
         addDimensionIndexToGroup(index);
 
-        var result = _currentGroup > -1 ? DimIndex.Group(_currentGroup, renderType) : DimIndex.Direct(index, renderType);
+        var result = DimIndex.Direct(index, renderType);
         return result;
     }
 

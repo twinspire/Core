@@ -83,23 +83,32 @@ class Template {
             
             Dimensions.endEdit();
         } else {
-            // Create all new dimensions
-            for (i in 0...newResults.length) {
-                var result = Dimensions.createFromDim(newResults[i].dim, scope ?? Empty());
-                newResults[i] = result;
-            }
-            
             // Set up group linking after all indices are created
-            for (group in groups) {
+            for (i in 0...groups.length) {
+                var group = groups[i];
+                var groupIndex = switch (groupIndices[i]) {
+                    case Group(index, render): {
+                        index;
+                    }
+                    default: {
+                        -1;
+                    }
+                };
+                gctx.beginGroup(groupIndex);
+
                 if (group.length > 1) {
                     var firstIndex = newResults[group[0]].index;
+                    gctx.addToGroup(firstIndex);
                     for (j in 1...group.length) {
                         var childIndex = newResults[group[j]].index;
+                        gctx.addToGroup(childIndex);
                         if (firstIndex != null && childIndex != null) {
                             gctx.setupDirectLink(childIndex, firstIndex);
                         }
                     }
                 }
+
+                gctx.endGroup();
             }
         }
         

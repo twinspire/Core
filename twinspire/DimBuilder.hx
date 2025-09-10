@@ -24,6 +24,7 @@ class DimBuilder {
         this.currentUpdatingIndex = 0;
         this.gctx = Application.instance.graphicsCtx;
         this.groups = [];
+        this.groupIndices = [];
     }
     
     /**
@@ -44,7 +45,7 @@ class DimBuilder {
                 // Add new dimension (array is growing)
                 results.push({
                     dim: dimResult.dim,
-                    index: null
+                    index: dimResult.index
                 });
             }
         } else {
@@ -52,7 +53,7 @@ class DimBuilder {
             index = results.length;
             results.push({
                 dim: dimResult.dim,
-                index: null
+                index: dimResult.index
             });
         }
         
@@ -95,6 +96,7 @@ class DimBuilder {
         
         if (!isUpdate) {
             groupIndex = gctx.endGroup();
+            groupIndices.push(groupIndex);
         }
         
         currentGroupIndex = -1;
@@ -113,6 +115,18 @@ class DimBuilder {
     **/
     public function getGroups():Array<Array<Int>> {
         return groups;
+    }
+
+    /**
+    * Gets `DimIndex` values of `Group` from each group defined
+    * in this builder.
+    **/
+    public function getGroupIndices():Array<DimIndex> {
+        var results = new Array<DimIndex>();
+        for (g in groupIndices) {
+            results.push(Group(g));
+        }
+        return results;
     }
     
     /**
