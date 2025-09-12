@@ -1,187 +1,336 @@
 package twinspire.story;
 
-import twinspire.Application;
-
 /**
- * A high-level manager class for handling story parsing and execution.
- * This provides a convenient interface for working with the story system.
+ * Global manager for story engine functionality.
+ * Manages characters, conversations, story functions, and events.
  */
 class StoryManager
 {
-    private var parser:Parser;
-    private var currentBlock:CommandBlock;
-    private var variables:Map<String, Dynamic>;
+    /**
+     * All registered characters in the story
+     */
+    private static var characters:Map<String, Character> = new Map<String, Character>();
     
-    public function new() {
-        parser = new Parser();
-        variables = new Map<String, Dynamic>();
+    /**
+     * All conversations in the story
+     */
+    private static var conversations:Map<String, Conversation> = new Map<String, Conversation>();
+    
+    /**
+     * All registered story functions
+     */
+    private static var storyFunctions:Map<String, StoryFunction> = new Map<String, StoryFunction>();
+    
+    /**
+     * All story chapters
+     */
+    private static var chapters:Map<String, StoryChapter> = new Map<String, StoryChapter>();
+    
+    /**
+     * Global event registry
+     */
+    private static var events:StoryEventManager = new StoryEventManager();
+    
+    /**
+     * Current active conversation
+     */
+    private static var currentConversation:String = "";
+    
+    /**
+     * Function execution queue for character-aware functions
+     */
+    private static var functionQueue:Array<QueuedFunction> = [];
+    
+    /**
+     * Initialize the story manager
+     */
+    public static function initialize():Void
+    {
+        characters.clear();
+        conversations.clear();
+        storyFunctions.clear();
+        chapters.clear();
+        events = new StoryEventManager();
+        currentConversation = "";
+        functionQueue = [];
     }
     
     /**
-     * Load and parse a story file from the Twinspire resources.
-     * @param resourceName The name of the story resource to load
-     * @return Bool True if the story was loaded successfully, false otherwise
+     * Register a character with the story manager
      */
-    public function loadStory(resourceName:String):Bool {
-        try 
-        {
-            var blocksCreated = parser.parseFile(resourceName);
-            return blocksCreated > 0;
-        }
-        catch (e:Dynamic)
-        {
-            trace('Failed to load story: $resourceName - Error: $e');
-            return false;
-        }
+    public static function registerCharacter(character:Character):Void
+    {
+        characters.set(character.name, character);
+        
+        // Initialize character for all registered events
+        events.initializeCharacterForAllEvents(character);
     }
     
     /**
-     * Parse story content directly from a string.
-     * @param content The story content as a string
-     * @param sourceName Optional name for error reporting
-     * @return Bool True if parsing was successful, false otherwise
+     * Get a character by name
      */
-    public function parseStoryContent(content:String, sourceName:String = "direct"):Bool {
-        try 
-        {
-            var blocksCreated = parser.parseString(content, sourceName);
-            return blocksCreated > 0;
-        }
-        catch (e:Dynamic)
-        {
-            trace('Failed to parse story content: $sourceName - Error: $e');
-            return false;
-        }
+    public static function getCharacter(name:String):Character
+    {
+        return characters.get(name);
     }
     
     /**
-     * Start a conversation by title.
-     * @param title The title of the conversation to start
-     * @return Array<Command> The translated commands for this conversation, or null if not found
+     * Get all registered characters
      */
-    public function startConversation(title:String):Array<Command> {
-        var block = parser.getBlockByTitle(title);
-        if (block == null)
-        {
-            trace('Conversation not found: $title');
-            return null;
+    public static function getAllCharacters():Array<Character>
+    {
+        return [for (char in characters) char];
+    }
+    
+    /**
+     * Register a conversation from a CommandBlock
+     */
+    public static function registerConversation(commandBlock:CommandBlock):Conversation
+    {
+        var conversation = new Conversation(commandBlock);
+        conversations.set(commandBlock.title, conversation);
+        return conversation;
+    }
+    
+    /**
+     * Find a conversation by name
+     */
+    public static function findConversation(name:String):Conversation
+    {
+        return conversations.get(name);
+    }
+    
+    /**
+     * Get all conversations
+     */
+    public static function getAllConversations():Array<Conversation>
+    {
+        return [for (conv in conversations) conv];
+    }
+    
+    /**
+     * Register a story function
+     */
+    public static function registerStoryFunction(func:StoryFunction):Void
+    {
+        storyFunctions.set(func.name, func);
+    }
+    
+    /**
+     * Get a story function by name
+     */
+    public static function getStoryFunction(name:String):StoryFunction
+    {
+        return storyFunctions.get(name);
+    }
+    
+    /**
+     * Execute a story function with given characters and arguments
+     */
+    public static function executeStoryFunction(functionName:String, characters:Array<String>, ?args:Array<Dynamic>):Dynamic
+    {
+        var func = getStoryFunction(functionName);
+        if (func == null) {
+            throw 'Story function "$functionName" not found';
         }
         
-        currentBlock = block;
-        return translateCurrentBlock();
-    }
-    
-    /**
-     * Get the current conversation block.
-     * @return CommandBlock The current block, or null if none is set
-     */
-    public function getCurrentBlock():CommandBlock {
-        return currentBlock;
-    }
-    
-    /**
-     * Translate the current block with the current variable state.
-     * @return Array<Command> The translated commands
-     */
-    public function translateCurrentBlock():Array<Command> {
-        if (currentBlock == null)
-            return [];
+        var targetCharacters = [];
+        for (charName in characters) {
+            var char = getCharacter(charName);
+            if (char != null) {
+                targetCharacters.push(char);
+            } else {
+                throw 'Character "$charName" not found';
+            }
+        }
         
-        var options:TranslateOptions = {
-            autoParse: true,
-            parseMap: variables,
-            fallThroughRealTime: false
+        return func.execute(targetCharacters, args != null ? args : []);
+    }
+    
+    /**
+     * Queue a function for execution when required characters become available
+     */
+    public static function queueFunction(functionName:String, requiredCharacters:Array<String>, ?args:Array<Dynamic>):Void
+    {
+        var queuedFunc = new QueuedFunction(functionName, requiredCharacters, args != null ? args : []);
+        functionQueue.push(queuedFunc);
+    }
+    
+    /**
+     * Process the function queue and execute any functions that can now run
+     */
+    public static function processFunctionQueue():Array<String>
+    {
+        var executedFunctions = [];
+        var remainingQueue = [];
+        
+        for (queuedFunc in functionQueue) {
+            var canExecute = true;
+            var targetCharacters = [];
+            
+            for (charName in queuedFunc.requiredCharacters) {
+                var char = getCharacter(charName);
+                if (char != null && char.currentConversation == currentConversation) {
+                    targetCharacters.push(char);
+                } else {
+                    canExecute = false;
+                    break;
+                }
+            }
+            
+            if (canExecute) {
+                try {
+                    executeStoryFunction(queuedFunc.functionName, queuedFunc.requiredCharacters, queuedFunc.args);
+                    executedFunctions.push(queuedFunc.functionName);
+                } catch (e:Dynamic) {
+                    // Function failed to execute, keep it in queue
+                    remainingQueue.push(queuedFunc);
+                }
+            } else {
+                // Not all characters available yet
+                remainingQueue.push(queuedFunc);
+            }
+        }
+        
+        functionQueue = remainingQueue;
+        return executedFunctions;
+    }
+    
+    /**
+     * Register a story chapter
+     */
+    public static function registerChapter(chapter:StoryChapter):Void
+    {
+        chapters.set(chapter.id, chapter);
+    }
+    
+    /**
+     * Get a story chapter by ID
+     */
+    public static function getChapter(id:String):StoryChapter
+    {
+        return chapters.get(id);
+    }
+    
+    /**
+     * Set the current active conversation
+     */
+    public static function setCurrentConversation(conversationName:String):Void
+    {
+        var previous = currentConversation;
+        currentConversation = conversationName;
+        
+        // Trigger conversation change events
+        var conversation = findConversation(conversationName);
+        if (conversation != null) {
+            conversation.eventHandlers.triggerConversationChange(previous, conversationName);
+        }
+        
+        // Process function queue in case new characters are now available
+        processFunctionQueue();
+    }
+    
+    /**
+     * Get the current conversation name
+     */
+    public static function getCurrentConversation():String
+    {
+        return currentConversation;
+    }
+    
+    /**
+     * Get the event manager
+     */
+    public static function getEventManager():StoryEventManager
+    {
+        return events;
+    }
+    
+    /**
+     * Process a dialogue line and trigger relevant events and functions
+     */
+    public static function processDialogue(dialogue:String, ?characterName:String):Void
+    {
+        var character:Character = null;
+        if (characterName != null) {
+            character = getCharacter(characterName);
+        }
+        
+        var conversation = findConversation(currentConversation);
+        if (conversation != null) {
+            conversation.processDialogue(dialogue, character);
+        }
+        
+        // Trigger global events
+        events.triggerDialogueEvents(dialogue, character);
+        
+        // Process function queue
+        processFunctionQueue();
+    }
+    
+    /**
+     * Validate the current story state and report any issues
+     */
+    public static function validateStoryState():Array<String>
+    {
+        var issues = [];
+        
+        // Check for functions with missing required characters
+        for (func in storyFunctions) {
+            for (requiredChar in func.requiredCharacters) {
+                if (!characters.exists(requiredChar)) {
+                    issues.push('Story function "${func.name}" requires character "$requiredChar" which is not registered');
+                }
+            }
+        }
+        
+        // Check for conversations referencing missing characters
+        for (conversation in conversations) {
+            for (char in conversation.allCharacters) {
+                if (!characters.exists(char.name)) {
+                    issues.push('Conversation "${conversation.commandBlock.title}" references unregistered character "${char.name}"');
+                }
+            }
+        }
+        
+        return issues;
+    }
+    
+    /**
+     * Get debug information about the current story state
+     */
+    public static function getDebugInfo():Dynamic
+    {
+        return {
+            characters: [for (name in characters.keys()) name],
+            conversations: [for (name in conversations.keys()) name],
+            storyFunctions: [for (name in storyFunctions.keys()) name],
+            chapters: [for (id in chapters.keys()) id],
+            currentConversation: currentConversation,
+            queuedFunctions: functionQueue.length,
+            registeredEvents: events.getRegisteredEventNames()
         };
-        
-        return parser.translateBlock(currentBlock, options);
+    }
+}
+
+/**
+ * Represents a queued function waiting for required characters to become available
+ */
+class QueuedFunction
+{
+    public var functionName:String;
+    public var requiredCharacters:Array<String>;
+    public var args:Array<Dynamic>;
+    
+    public function new(functionName:String, requiredCharacters:Array<String>, args:Array<Dynamic>)
+    {
+        this.functionName = functionName;
+        this.requiredCharacters = requiredCharacters;
+        this.args = args;
     }
     
-    /**
-     * Set a variable that can be used in story parsing.
-     * @param name The variable name
-     * @param value The variable value
-     */
-    public function setVariable(name:String, value:Dynamic):Void {
-        variables.set(name, value);
-    }
-    
-    /**
-     * Get a variable value.
-     * @param name The variable name
-     * @return Dynamic The variable value, or null if not found
-     */
-    public function getVariable(name:String):Dynamic {
-        return variables.get(name);
-    }
-    
-    /**
-     * Check if a variable exists.
-     * @param name The variable name
-     * @return Bool True if the variable exists, false otherwise
-     */
-    public function hasVariable(name:String):Bool {
-        return variables.exists(name);
-    }
-    
-    /**
-     * Clear all variables.
-     */
-    public function clearVariables():Void {
-        variables.clear();
-    }
-    
-    /**
-     * Get all available conversation titles.
-     * @return Array<String> Array of conversation titles
-     */
-    public function getConversationTitles():Array<String> {
-        var titles = new Array<String>();
-        var blocks = parser.getBlocks();
-        for (block in blocks)
-        {
-            if (block.title != null)
-                titles.push(block.title);
-        }
-        return titles;
-    }
-    
-    /**
-     * Get all character commands defined in the story.
-     * @return Array<Command> Array of character commands
-     */
-    public function getCharacters():Array<Command> {
-        return parser.getCharacters();
-    }
-    
-    /**
-     * Set custom code parsing and execution callbacks for advanced scripting support.
-     * @param parseCallback Function to parse code strings
-     * @param executeCallback Function to execute parsed code
-     */
-    public function setScriptingCallbacks(parseCallback:(String) -> Dynamic, executeCallback:(Dynamic) -> Dynamic):Void {
-        parser.parseCodeCb = parseCallback;
-        parser.executeCodeCb = executeCallback;
-    }
-    
-    /**
-     * Generate story content from a conversation block.
-     * @param title The title of the conversation to generate content for
-     * @return String The generated story content, or empty string if not found
-     */
-    public function generateStoryContent(title:String):String {
-        var block = parser.getBlockByTitle(title);
-        if (block == null)
-            return "";
-        
-        return parser.generateContent(block);
-    }
-    
-    /**
-     * Clear all parsed story data.
-     */
-    public function clear():Void {
-        parser.clear();
-        currentBlock = null;
-        variables.clear();
+    public function toString():String
+    {
+        return 'QueuedFunction($functionName, required: $requiredCharacters)';
     }
 }
