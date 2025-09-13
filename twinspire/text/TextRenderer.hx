@@ -211,6 +211,9 @@ class TextRenderer {
     private var _characterThreshold:Int = 500;  // Switch to complex mode above this
     private var _lineThreshold:Int = 10;        // Or above this many lines
 
+    private var _autoScrollMargin:Float = 12;  // Minimum pixels from edge before scrolling
+    private var _autoScrollEnabled:Bool = true;
+
     /**
     * The source input string.
     **/
@@ -303,6 +306,11 @@ class TextRenderer {
         }
         
         _adjustSelectionForInsertion(pos, value.length);
+        
+        // Auto-scroll to keep cursor visible
+        if (_isFocused && _autoScrollEnabled) {
+            _scrollToCursor();
+        }
     }
 
     /**
@@ -386,7 +394,6 @@ class TextRenderer {
     public function render(gtx:GraphicsContext) {
         if (_isDirty) {
             _updateLayout(gtx);
-            _updateScrollLimits(); // Update scroll limits when layout changes
         }
 
         if (_renderMode == Simple) {
@@ -937,8 +944,17 @@ class TextRenderer {
     **/
     public function setCursorPosition(pos:Int) {
         _isFocused = true;
+        var oldPos = _cursorPosition;
         _cursorPosition = cast Math.max(0, Math.min(pos, _source.length()));
-        _resetCursorBlink();
+        
+        if (oldPos != _cursorPosition) {
+            _resetCursorBlink();
+            
+            // Auto-scroll to keep cursor visible when focused
+            if (_autoScrollEnabled) {
+                _scrollToCursor();
+            }
+        }
     }
     
     /**
@@ -993,6 +1009,10 @@ class TextRenderer {
         // Set cursor to same column in previous line, or end if line is shorter
         var newPos = prevLineStart + Math.min(currentColumn, prevLineLength);
         setCursorPosition(cast newPos);
+
+        if (_isFocused && _autoScrollEnabled) {
+            _scrollToCursor();
+        }
     }
     
     /**
@@ -1026,6 +1046,10 @@ class TextRenderer {
         // Set cursor to same column in next line, or end if line is shorter
         var newPos = nextLineStart + Math.min(currentColumn, nextLineLength);
         setCursorPosition(cast newPos);
+
+        if (_isFocused && _autoScrollEnabled) {
+            _scrollToCursor();
+        }
     }
     
     /**
@@ -1297,6 +1321,10 @@ class TextRenderer {
         
         // Adjust selection if it exists
         _adjustSelectionForDeletion(deletePos, deleteLength);
+
+        if (_isFocused && _autoScrollEnabled) {
+            _scrollToCursor();
+        }
     }
 
     public function enableCursorAnimation(enable:Bool) {
@@ -1312,6 +1340,158 @@ class TextRenderer {
     private function _resetCursorBlink() {
         _cursorBlinkTime = _cursorBlinkInterval;
         _cursorVisible = true;
+    }
+
+    /**
+    * Get the cursor position in content coordinates (before scroll offset is applied).
+    **/
+    private function _getCursorScreenPosition():FastVector2 {
+        if (_renderMode == Simple) {
+            return _getCursorPositionSimple();
+        } else {
+            return _getCursorPositionComplex();
+        }
+    }
+    
+    /**
+    * Get cursor position in simple rendering mode.
+    **/
+    private function _getCursorPositionSimple():FastVector2 {
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getDimensionsAtIndex(_index);
+        if (dims.length == 0) return null;
+        
+        var dim = dims[0];
+        var format = getTextFormat();
+        if (format == null) return null;
+        
+        var text = Std.string(_source.getStringData());
+        if (text == null) text = "";
+        
+        // Return position relative to text field origin (not screen position)
+        var baseX = 0.0; // Content coordinate, not screen coordinate
+        var baseY = 0.0;
+        
+        if (!_options.wordWrap || text.indexOf('\n') == -1) {
+            // Single line - cursor X is based on text width up to cursor position
+            var beforeCursor = text.substring(0, _cursorPosition);
+            var cursorX = baseX + format.font.width(format.fontSize, beforeCursor);
+            var cursorY = baseY;
+            
+            return new FastVector2(cursorX, cursorY);
+        } else {
+            // Multi-line - need to find which line the cursor is on
+            var lines = text.split('\n');
+            var lineHeight = format.font.height(format.fontSize) * 1.2;
+            var currentCharPos = 0;
+            
+            for (lineIndex in 0...lines.length) {
+                var line = lines[lineIndex];
+                var lineEnd = currentCharPos + line.length;
+                
+                if (_cursorPosition >= currentCharPos && _cursorPosition <= lineEnd) {
+                    // Cursor is on this line
+                    var positionInLine = _cursorPosition - currentCharPos;
+                    var lineText = line.substring(0, positionInLine);
+                    
+                    var cursorX = baseX + format.font.width(format.fontSize, lineText);
+                    var cursorY = baseY + (lineIndex * lineHeight);
+                    
+                    return new FastVector2(cursorX, cursorY);
+                }
+                
+                currentCharPos = lineEnd + 1; // +1 for the newline character
+            }
+            
+            // Fallback - cursor at end
+            var lastLineIndex = lines.length - 1;
+            var lastLine = lines[lastLineIndex];
+            var cursorX = baseX + format.font.width(format.fontSize, lastLine);
+            var cursorY = baseY + (lastLineIndex * lineHeight);
+            
+            return new FastVector2(cursorX, cursorY);
+        }
+    }
+    
+    /**
+    * Get cursor position in complex rendering mode.
+    **/
+    private function _getCursorPositionComplex():FastVector2 {
+        // TODO: Implement complex mode cursor positioning using _words and _lines arrays
+        // For now, fall back to simple mode
+        return _getCursorPositionSimple();
+    }
+    
+    /**
+    * Enable or disable auto-scrolling to cursor.
+    **/
+    public function setAutoScrollEnabled(enabled:Bool) {
+        _autoScrollEnabled = enabled;
+    }
+    
+    /**
+    * Set the margin from the edge before auto-scrolling triggers.
+    **/
+    public function setAutoScrollMargin(margin:Float) {
+        _autoScrollMargin = Math.max(0, margin);
+    }
+    
+    /**
+    * Get current auto-scroll margin.
+    **/
+    public function getAutoScrollMargin():Float {
+        return _autoScrollMargin;
+    }
+    
+    /**
+    * Check if auto-scrolling is enabled.
+    **/
+    public function isAutoScrollEnabled():Bool {
+        return _autoScrollEnabled;
+    }
+    
+    /**
+    * Manually trigger scroll to cursor (useful for focus changes).
+    **/
+    public function scrollToCursor() {
+        if (_autoScrollEnabled) {
+            _scrollToCursor();
+        }
+    }
+    
+    /**
+    * Enhanced focus setting that triggers cursor scroll.
+    **/
+    public function setFocused(focused:Bool) {
+        var wasFocused = _isFocused;
+        
+        // When gaining focus, scroll to cursor to ensure it's visible
+        if (focused && !wasFocused && _autoScrollEnabled) {
+            _scrollToCursor();
+        }
+    }
+    
+    /**
+    * Scroll to make a specific character position visible.
+    **/
+    public function scrollToPosition(pos:Int) {
+        if (!_autoScrollEnabled) return;
+        
+        var oldCursorPos = _cursorPosition;
+        _cursorPosition = cast Math.max(0, Math.min(pos, _source.length()));
+        _scrollToCursor();
+        _cursorPosition = oldCursorPos; // Restore original cursor position
+    }
+    
+    /**
+    * Scroll to make the current selection visible.
+    **/
+    public function scrollToSelection() {
+        if (!_autoScrollEnabled || _selectionStart == -1 || _selectionEnd == -1) return;
+        
+        // Scroll to the end of the selection (where the cursor typically is during selection)
+        var selectionEnd:Int = cast Math.max(_selectionStart, _selectionEnd);
+        scrollToPosition(selectionEnd);
     }
     
     /**
@@ -1845,6 +2025,68 @@ class TextRenderer {
         
         // Mark as needing re-render
         _isDirty = true;
+    }
+
+    /**
+    * Auto-scroll to keep the cursor visible within the text field bounds.
+    **/
+    private function _scrollToCursor() {
+        var gtx = Application.instance.graphicsCtx;
+        var dims = gtx.getClientDimensionsAtIndex(_index);
+        if (dims.length == 0) return;
+        
+        var dim = dims[0];
+        var cursorPos = _getCursorScreenPosition();
+        
+        if (cursorPos == null) return;
+
+        _updateScrollLimits();
+        
+        // Calculate where the cursor actually appears on screen
+        var cursorContentX = cursorPos.x; // Already in content coordinates
+        var cursorContentY = cursorPos.y;
+        
+        var needsHorizontalScroll = false;
+        var needsVerticalScroll = false;
+        var newScrollX = _scrollOffsetX;
+        var newScrollY = _scrollOffsetY;
+
+        var visibleLeft = _scrollOffsetX + _autoScrollMargin;
+        var visibleRight = _scrollOffsetX + dim.width - _autoScrollMargin;
+        
+        if (cursorContentX < visibleLeft) {
+            // Cursor is too far left relative to current scroll position
+            newScrollX = cursorContentX - _autoScrollMargin;
+            needsHorizontalScroll = true;
+        } else if (cursorContentX > visibleRight) {
+            // Cursor is too far right relative to current scroll position  
+            newScrollX = cursorContentX - dim.width + _autoScrollMargin;
+            needsHorizontalScroll = true;
+        }
+        
+        // Check vertical scrolling - same logic
+        var visibleTop = _scrollOffsetY + _autoScrollMargin;
+        var visibleBottom = _scrollOffsetY + dim.height - _autoScrollMargin;
+        
+        if (cursorContentY < visibleTop) {
+            newScrollY = cursorContentY - _autoScrollMargin;
+            needsVerticalScroll = true;
+        } else if (cursorContentY > visibleBottom) {
+            newScrollY = cursorContentY - dim.height + _autoScrollMargin;
+            needsVerticalScroll = true;
+        }
+        
+        // Apply scrolling if needed
+        if (needsHorizontalScroll || needsVerticalScroll) {
+            // Clamp to valid scroll range
+            newScrollX = Math.max(0, Math.min(newScrollX, _maxScrollX));
+            newScrollY = Math.max(0, Math.min(newScrollY, _maxScrollY));
+            
+            _scrollOffsetX = newScrollX;
+            _scrollOffsetY = newScrollY;
+         
+            _isDirty = true;
+        }
     }
     
     /**
