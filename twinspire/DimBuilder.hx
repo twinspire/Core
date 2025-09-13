@@ -1,11 +1,13 @@
 package twinspire;
 
+import twinspire.geom.Dim;
 import twinspire.render.GraphicsContext;
 import twinspire.Dimensions.DimResult;
 import twinspire.DimIndex;
 
 class DimBuilder {
     private var results:Array<DimResult>;
+    private var currentDimMap:Map<Int, Dim> = new Map();
     private var groups:Array<Array<Int>>;
     private var groupIndices:Array<Int> = [];
     private var isUpdate:Bool;
@@ -26,6 +28,31 @@ class DimBuilder {
         this.groups = [];
         this.groupIndices = [];
     }
+
+    /**
+    * Get the current (updated) dimension at the given index.
+    * Returns null if not found in this builder.
+    **/
+    public function getCurrentDimAtIndex(index:DimIndex):Dim {
+        var directIndex = DimIndexUtils.getDirectIndex(index);
+        return currentDimMap.get(directIndex);
+    }
+    
+    /**
+    * Update a dimension at the given index within this builder.
+    **/
+    public function updateDimAtIndex(index:DimIndex, newDim:Dim) {
+        var directIndex = DimIndexUtils.getDirectIndex(index);
+        currentDimMap.set(directIndex, newDim);
+        
+        // Also update in results array if it exists
+        for (i in 0...results.length) {
+            if (results[i].index != null && DimIndexUtils.equals(results[i].index, index)) {
+                results[i].dim = newDim;
+                break;
+            }
+        }
+    }
     
     /**
     * Add a dimension to the current group or top level.
@@ -42,6 +69,12 @@ class DimBuilder {
                 // Update existing dimension
                 results[index].dim = dimResult.dim;
                 dimResult.index = results[index].index;
+                
+                // Track the updated dimension
+                if (results[index].index != null) {
+                    var directIndex = DimIndexUtils.getDirectIndex(results[index].index);
+                    currentDimMap.set(directIndex, dimResult.dim);
+                }
             } else {
                 // Add new dimension (array is growing)
                 results.push({
@@ -59,7 +92,7 @@ class DimBuilder {
         }
         
         // Add to current group if we're in one
-        if (currentGroupIndex >= 0 && !isUpdate) {
+        if (currentGroupIndex >= 0) {
             groups[currentGroupIndex].push(index);
         }
         

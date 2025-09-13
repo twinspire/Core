@@ -114,6 +114,41 @@ class Dimensions {
         return resultIndices;
     }
 
+    private static var _currentDimBuilder:DimBuilder = null;
+    
+    /**
+    * Set the current DimBuilder context for dimension operations.
+    * This allows Dimensions API to reference updated dimensions during template building.
+    **/
+    public static function setBuilderContext(builder:DimBuilder) {
+        _currentDimBuilder = builder;
+    }
+    
+    /**
+    * Clear the current DimBuilder context.
+    **/
+    public static function clearBuilderContext() {
+        _currentDimBuilder = null;
+    }
+
+    private static function getCurrentDimAtIndex(index:DimIndex):Dim {
+        if (_currentDimBuilder != null && _currentDimBuilder.updating && index != null) {
+            // Check builder's results for updated dimension
+            var result = _currentDimBuilder.getCurrentDimAtIndex(index);
+            if (result != null) {
+                return result; // Return the updated dimension
+            }
+        }
+        
+        // Fall back to GraphicsContext
+        if (index != null) {
+            var gtx = Application.instance.graphicsCtx;
+            return gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(index));
+        }
+        
+        return null;
+    }
+
     /**
     * Begins editing dimensions. This avoids creating a `DimIndex` and invoking the underlying `GraphicsContext`
     * `add` functions. Called by `useDimension` if using this for managing dimensions.
@@ -354,7 +389,7 @@ class Dimensions {
      */
     public static function screenAlignX(aIndex:DimIndex, halign:Int, offset:FastVector2) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         if (halign == HALIGN_LEFT)
         {
@@ -378,7 +413,7 @@ class Dimensions {
      */
     public static function screenAlignY(aIndex:DimIndex, valign:Int, offset:FastVector2) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         if (valign == VALIGN_TOP)
         {
@@ -406,7 +441,7 @@ class Dimensions {
      */
     public static function dimGridEquals(containerIndex:DimIndex, columns:Int, rows:Int, ?addLogic:AddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
-        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
+        var container = getCurrentDimAtIndex(containerIndex);
 
         var cellWidth = container.width / columns;
         var cellHeight = container.height / rows;
@@ -453,7 +488,7 @@ class Dimensions {
      */
     public static function dimGridFloats(containerIndex:DimIndex, columns:Array<Float>, rows:Array<Float>, ?addLogic:AddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
-        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
+        var container = getCurrentDimAtIndex(containerIndex);
 
         var results = [];
         var startY = 0.0;
@@ -509,7 +544,7 @@ class Dimensions {
      */
     public static function dimGrid(containerIndex:DimIndex, columns:Array<DimCellSize>, rows:Array<DimCellSize>, ?addLogic:AddLogic):Array<DimResult> {
         var gtx = Application.instance.graphicsCtx;
-        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
+        var container = getCurrentDimAtIndex(containerIndex);
 
         var totalPreciseWidth = 0.0;
         var totalPreciseHeight = 0.0;
@@ -650,7 +685,7 @@ class Dimensions {
      */
     public static function dimFixedFlow(containerIndex:DimIndex, size:Dim, direction:Direction, ?addLogic:AddLogic) {
         var gtx = Application.instance.graphicsCtx;
-        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
+        var container = getCurrentDimAtIndex(containerIndex);
 
         flowContainerIndex = containerIndex;
         containerColumnOrRow = container;
@@ -685,7 +720,7 @@ class Dimensions {
      */
     public static function dimVariableFlow(containerIndex:DimIndex, direction:Direction, ?addLogic:AddLogic) {
         var gtx = Application.instance.graphicsCtx;
-        var container = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerIndex));
+        var container = getCurrentDimAtIndex(containerIndex);
 
         flowContainerIndex = containerIndex;
         containerColumnOrRow = container;
@@ -801,7 +836,7 @@ class Dimensions {
      */ 
     public static function dimOffsetX(aIndex:DimIndex, offsetX:Float, ?addLogic:AddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         var result:Dim = null;
 
@@ -835,7 +870,7 @@ class Dimensions {
      */
     public static function dimOffsetY(aIndex:DimIndex, offsetY:Float, ?addLogic:AddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         var result:Dim = null;
 
@@ -877,8 +912,8 @@ class Dimensions {
      */
     public static function dimVAlign(aIndex:DimIndex, bIndex:DimIndex, valign:Int) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
-        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
+        var a = getCurrentDimAtIndex(aIndex);
+        var b = getCurrentDimAtIndex(bIndex);
 
         if (valign == VALIGN_TOP)
         {
@@ -902,8 +937,8 @@ class Dimensions {
      */
     public static function dimHAlign(aIndex:DimIndex, bIndex:DimIndex, halign:Int) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
-        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
+        var a = getCurrentDimAtIndex(aIndex);
+        var b = getCurrentDimAtIndex(bIndex);
 
         if (halign == HALIGN_LEFT)
         {
@@ -946,8 +981,8 @@ class Dimensions {
     **/
     public static function dimVAlignOffset(aIndex:DimIndex, bIndex:DimIndex, valign:Int, offset:Float = 0.0) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
-        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
+        var a = getCurrentDimAtIndex(aIndex);
+        var b = getCurrentDimAtIndex(bIndex);
 
         if (valign == VALIGN_TOP)
         {
@@ -974,8 +1009,8 @@ class Dimensions {
     **/
     public static function dimHAlignOffset(aIndex:DimIndex, bIndex:DimIndex, halign:Int, offset:Float = 0.0) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
-        var b = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(bIndex));
+        var a = getCurrentDimAtIndex(aIndex);
+        var b = getCurrentDimAtIndex(bIndex);
 
         if (halign == HALIGN_LEFT)
         {
@@ -1018,7 +1053,7 @@ class Dimensions {
      */
     public static function dimScaleX(aIndex:DimIndex, scaleX:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         var ratioWidth = a.width * scaleX;
         var ratioX = a.x + ((a.width - ratioWidth) / 2);
@@ -1033,7 +1068,7 @@ class Dimensions {
      */
     public static function dimScaleY(aIndex:DimIndex, scaleY:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         var ratioHeight = a.height * scaleY;
         var ratioY = a.y + ((a.height - ratioHeight) / 2);
@@ -1046,7 +1081,7 @@ class Dimensions {
     **/
     public static function dimShrink(aIndex:DimIndex, amount:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         a.width = a.width - amount;
         a.height = a.height - amount;
@@ -1057,7 +1092,7 @@ class Dimensions {
     **/
     public static function dimShrinkW(aIndex:DimIndex, amount:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         a.width = a.width - amount;
     }
@@ -1067,7 +1102,7 @@ class Dimensions {
     **/
     public static function dimShrinkH(aIndex:DimIndex, amount:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         a.height = a.height - amount;
     }
@@ -1077,7 +1112,7 @@ class Dimensions {
     **/
     public static function dimGrow(aIndex:DimIndex, amount:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         a.width = a.width + amount;
         a.height = a.height + amount;
@@ -1088,7 +1123,7 @@ class Dimensions {
     **/
     public static function dimGrowW(aIndex:DimIndex, amount:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         a.width = a.width + amount;
     }
@@ -1098,7 +1133,7 @@ class Dimensions {
     **/
     public static function dimGrowH(aIndex:DimIndex, amount:Float) {
         var gtx = Application.instance.graphicsCtx;
-        var a = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(aIndex));
+        var a = getCurrentDimAtIndex(aIndex);
 
         a.height = a.height + amount;
     }

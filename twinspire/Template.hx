@@ -56,7 +56,10 @@ class Template {
             Dimensions.beginEdit();
         }
 
+        Dimensions.setBuilderContext(dimBuilder);
         builder(dimBuilder);
+        Dimensions.clearBuilderContext();
+        
         if (isUpdate) {
             Dimensions.endEdit();
         }
