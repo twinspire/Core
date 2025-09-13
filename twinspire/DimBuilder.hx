@@ -41,6 +41,7 @@ class DimBuilder {
             if (index < results.length) {
                 // Update existing dimension
                 results[index].dim = dimResult.dim;
+                dimResult.index = results[index].index;
             } else {
                 // Add new dimension (array is growing)
                 results.push({
@@ -58,7 +59,7 @@ class DimBuilder {
         }
         
         // Add to current group if we're in one
-        if (currentGroupIndex >= 0) {
+        if (currentGroupIndex >= 0 && !isUpdate) {
             groups[currentGroupIndex].push(index);
         }
         

@@ -52,7 +52,14 @@ class Template {
         var isUpdate = existingResults != null;
         
         var dimBuilder = new DimBuilder(existingResults ?? [], isUpdate);
+        if (isUpdate) {
+            Dimensions.beginEdit();
+        }
+
         builder(dimBuilder);
+        if (isUpdate) {
+            Dimensions.endEdit();
+        }
         
         var newResults = dimBuilder.getResults();
         var groups = dimBuilder.getGroups();
@@ -153,7 +160,6 @@ class Template {
     public function addAndInvoke(cb:(DimIndex, GraphicsContext) -> DimIndex, ?dependsOn:DimIndex) {
         indices.push(cb(null, Application.instance.graphicsCtx));
         callbacks.push(cb);
-
 
         if (dependsOn != null) {
             var actualIndex = DimIndexUtils.getDirectIndex(indices[indices.length - 1]);
