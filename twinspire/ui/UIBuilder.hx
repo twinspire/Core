@@ -16,14 +16,12 @@ class UIBuilder extends DimBuilder {
     // Track SceneObjects created by this builder
     private var sceneObjects:Array<SceneObject> = [];
     private var currentSceneObject:Int = 0;
-    private var isUpdating:Bool = false;
 
     private var font:Font;
     private var fontSize:Int;
     
     public function new(?existingResults:Array<DimResult>, ?isUpdate:Bool) {
         super(existingResults ?? [], isUpdate ?? false);
-        isUpdating = isUpdate ?? false;
     }
 
     private function advanceSceneObject() {
@@ -37,6 +35,8 @@ class UIBuilder extends DimBuilder {
     }
 
     public function begin() {
+        currentUpdatingIndex = 0;
+        currentGroupIndex = -1;
         Dimensions.setBuilderContext(this);
     }
 
@@ -60,21 +60,24 @@ class UIBuilder extends DimBuilder {
 
         var dim = new Dim(0, 0, size != null ? size.x : 0, size != null ? size.y : 0);
         var dimResult = Dimensions.createFromDim(dim, Ui());
+        add(dimResult);
+
         var textDimResult = createText(text, dimResult.index);
+        add(textDimResult);
 
         if (size == null) {
             Dimensions.dimGrowW(dimResult.index, textDimResult.dim.width + 6);
             Dimensions.dimGrowH(dimResult.index, textDimResult.dim.height + 6);
             dimResult.dim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(dimResult.index));
-            Dimensions.dimAlign(dimResult.index, textDimResult.index, VALIGN_CENTRE, HALIGN_MIDDLE);
         }
+
+        Dimensions.dimAlign(dimResult.index, textDimResult.index, VALIGN_CENTRE, HALIGN_MIDDLE);
         
-        add(dimResult);
         var dimIndex = advanceSceneObject();
         
         var button:Button;
         
-        if (isUpdating && dimIndex < sceneObjects.length) {
+        if (isUpdate && dimIndex < sceneObjects.length) {
             // Update existing SceneObject
             button = cast(sceneObjects[dimIndex], Button);
             button.targetContainer = dimResult.dim;
@@ -106,7 +109,7 @@ class UIBuilder extends DimBuilder {
     }
 
     public function prepareForUpdate():Void {
-        isUpdating = true;
+        isUpdate = true;
         
     }
     
