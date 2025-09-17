@@ -19,6 +19,8 @@ class UIBuilder extends DimBuilder {
 
     private var font:Font;
     private var fontSize:Int;
+
+    private var nextId:Id;
     
     public function new(?existingResults:Array<DimResult>, ?isUpdate:Bool) {
         super(existingResults ?? [], isUpdate ?? false);
@@ -28,28 +30,61 @@ class UIBuilder extends DimBuilder {
         return currentSceneObject++;
     }
 
+    /**
+    * Create text - internal. Already adds a `DimResult`, no need to add again.
+    **/
     private function createText(text:String, parent:DimIndex = null) {
         var result = Dimensions.getTextDim(font, fontSize, text, Ui(null, parent));
         add(result);
         return result;
     }
 
+    private function getId(expect:Id) {
+        if (nextId != null) {
+            var temp = nextId;
+            nextId = null;
+            return temp;
+        }
+        return expect;
+    }
+
+    /**
+    * Begin this builder. Call before using.
+    **/
     public function begin() {
         currentUpdatingIndex = 0;
         currentGroupIndex = -1;
         Dimensions.setBuilderContext(this);
     }
 
+    /**
+    * End this builder.
+    **/
     public function end() {
         Dimensions.clearBuilderContext();
     }
 
+    /**
+    * Set the font of the text to display in any object
+    * from this call.
+    **/
     public function setFont(font:Font) {
         this.font = font;
     }
 
+    /**
+    * Set the font size of the text to display in any object
+    * from this call.
+    **/
     public function setFontSize(size:Int) {
         this.fontSize = size;
+    }
+
+    /**
+    * Set the ID of the next item to create.
+    **/
+    public function setNextId(id:Id) {
+        this.nextId = id;
     }
 
     /**
@@ -57,13 +92,13 @@ class UIBuilder extends DimBuilder {
     **/
     public function button(text:String, ?size:FastVector2):Button {
         var gtx = Application.instance.graphicsCtx;
+        var id = getId(UITemplate.buttonId);
 
         var dim = new Dim(0, 0, size != null ? size.x : 0, size != null ? size.y : 0);
         var dimResult = Dimensions.createFromDim(dim, Ui());
         add(dimResult);
 
         var textDimResult = createText(text, dimResult.index);
-        add(textDimResult);
 
         if (size == null) {
             Dimensions.dimGrowW(dimResult.index, textDimResult.dim.width + 6);
@@ -85,7 +120,7 @@ class UIBuilder extends DimBuilder {
         } else {
             // Create new SceneObject
             button = new Button();
-            button.type = UITemplate.buttonId;
+            button.type = id;
             button.text = text;
             button.font = font;
             button.fontSize = fontSize;
@@ -96,7 +131,7 @@ class UIBuilder extends DimBuilder {
             gtx.beginGroup();
             gtx.addToGroup(dimResult.index);
             gtx.addToGroup(textDimResult.index);
-            button.index = Group(gtx.endGroup(), UITemplate.buttonId);
+            button.index = Group(gtx.endGroup(), id);
             
             if (dimIndex < sceneObjects.length) {
                 sceneObjects[dimIndex] = button;
@@ -108,11 +143,18 @@ class UIBuilder extends DimBuilder {
         return button;
     }
 
+    /**
+    * Used internally by Twinspire to mark the builder as updating.
+    **/
     public function prepareForUpdate():Void {
         isUpdate = true;
         
     }
     
+    /**
+    * Remove an item from the builder.
+    * After removal, call `addOrUpdateDim` again to ensure dimensions are updated.
+    **/
     public function removeSceneObject(index:Int):Bool {
         if (index >= 0 && index < sceneObjects.length) {
             sceneObjects.splice(index, 1);
@@ -121,7 +163,11 @@ class UIBuilder extends DimBuilder {
         return false;
     }
     
+    /**
+    * Get an array of the scene objects.
+    **/
     public function getSceneObjects():Array<SceneObject> {
         return sceneObjects;
     }
+
 }
