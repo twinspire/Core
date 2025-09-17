@@ -19,6 +19,10 @@ class Template {
     private var groupRefs:Map<String, Array<DimIndex>> = new Map();
     private var dependencies:Array<Dependent>;
 
+
+    private var initBuilderCallback:(String, Bool) -> IDimBuilder;
+
+
     /**
     * A collection of indices that this template belongs to.
     **/
@@ -32,6 +36,10 @@ class Template {
         indices = [];
         callbacks = [];
         dependencies = [];
+
+        initBuilderCallback = (name:String, isUpdate:Bool) -> { 
+            return new DimBuilder(dimensionRefs.get(name) ?? [], isUpdate);
+        }
     }
 
     /**
@@ -46,12 +54,12 @@ class Template {
     * @param scope The `AddLogic` used to determine what type of dimension should be created in `GraphicsContext`.
     * @param dependsOn An optional string value specifying which `name` this dimension should depend on.
     **/
-    public function addOrUpdateDim(name:String, builder:(DimBuilder) -> Void, ?scope:AddLogic, ?dependsOn:String) {
+    public function addOrUpdateDim(name:String, builder:(IDimBuilder) -> Void, ?scope:AddLogic, ?dependsOn:String) {
         var existingResults = dimensionRefs.get(name);
         var existingGroups = groupRefs.get(name) ?? [];
         var isUpdate = existingResults != null;
         
-        var dimBuilder = new DimBuilder(existingResults ?? [], isUpdate);
+        var dimBuilder = initBuilderCallback(name, isUpdate);
         if (isUpdate) {
             Dimensions.beginEdit();
         }

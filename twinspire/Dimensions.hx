@@ -114,13 +114,13 @@ class Dimensions {
         return resultIndices;
     }
 
-    private static var _currentDimBuilder:DimBuilder = null;
+    private static var _currentDimBuilder:IDimBuilder = null;
     
     /**
     * Set the current DimBuilder context for dimension operations.
     * This allows Dimensions API to reference updated dimensions during template building.
     **/
-    public static function setBuilderContext(builder:DimBuilder) {
+    public static function setBuilderContext(builder:IDimBuilder) {
         _currentDimBuilder = builder;
     }
     

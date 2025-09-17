@@ -5,7 +5,7 @@ import twinspire.render.GraphicsContext;
 import twinspire.Dimensions.DimResult;
 import twinspire.DimIndex;
 
-class DimBuilder {
+class DimBuilder implements IDimBuilder {
     private var results:Array<DimResult>;
     private var currentDimMap:Map<Int, Dim> = new Map();
     private var groups:Array<Array<Int>>;
