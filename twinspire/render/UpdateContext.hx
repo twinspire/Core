@@ -372,7 +372,6 @@ class UpdateContext {
     private function _updateGlobalInputState() {
         // Capture current mouse position
         var mousePos = GlobalEvents.getMousePosition();
-        _lastMousePosition = FastVector2.fromVector2(mousePos);
         
         // Track mouse down state
         if (_mouseDownFirstPos.x == -1 && GlobalEvents.isAnyMouseButtonDown()) {
@@ -494,8 +493,7 @@ class UpdateContext {
     * Phase 3: Handle drag operations (highest priority)
     **/
     private function _processDragOperations():Bool {
-        if (_drag.dragIndex == -1) {
-            _attemptDragStart();
+        if (!_attemptDragStart()) {
             return false;
         }
         
@@ -505,6 +503,7 @@ class UpdateContext {
         // Check for drag end
         if (GlobalEvents.isAnyMouseButtonReleased()) {
             _endDragOperation();
+            return false;
         }
         
         return true; // Dragging blocks other interactions
@@ -1034,21 +1033,35 @@ class UpdateContext {
     // Helper methods for the new system
     
     private function _attemptDragStart() {
-        if (!GlobalEvents.isAnyMouseButtonDown()) return;
+        if (!GlobalEvents.isAnyMouseButtonDown()) { 
+            _drag.dragIndex = -1;
+            _drag.childIndex = -1;
+            _drag.firstMousePosition = new FastVector2(-1, -1);
+            _drag.scrollIndex = -1;
+            return false;
+        }
         
         var mousePos = GlobalEvents.getMousePosition();
         var dragDistance = _mouseDownFirstPos.sub(FastVector2.fromVector2(mousePos));
-        
-        if ((dragDistance.x > _mouseDragTolerance || dragDistance.y > _mouseDragTolerance) && _tempUI.length > 0) {
-            var topMostIndex = _tempUI[_tempUI.length - 1];
-            var query = _gctx.queries[topMostIndex];
-            
-            if (query.allowDragging) {
-                _drag.dragIndex = topMostIndex;
-                _drag.firstMousePosition = _mouseDownFirstPos;
-                _isDragStart = topMostIndex;
-            }
+        var topMostIndex = -1;
+        if (_tempUI.length > 0) {
+            topMostIndex = _tempUI[_tempUI.length - 1];
         }
+
+        if (topMostIndex == -1) {
+            return false;
+        }
+
+        var query = _gctx.queries[topMostIndex];
+        
+        if (query.allowDragging) {
+            _drag.dragIndex = topMostIndex;
+            _drag.firstMousePosition = _mouseDownFirstPos;
+            _isDragStart = topMostIndex;
+            return true;
+        }
+
+        return false;
     }
     
     private function _continueDragOperation() {
@@ -1059,10 +1072,17 @@ class UpdateContext {
             mousePos.x - _lastMousePosition.x,
             mousePos.y - _lastMousePosition.y
         );
-        
+
         _gctx.dimensions[_drag.dragIndex].x += mouseDelta.x;
         _gctx.dimensions[_drag.dragIndex].y += mouseDelta.y;
         _gctx.markDimChange(Direct(_drag.dragIndex));
+
+        var children = _gctx.getLinksFromIndex(Direct(_drag.dragIndex));
+        for (childIndex in children) {
+            _gctx.dimensions[childIndex].x += mouseDelta.x;
+            _gctx.dimensions[childIndex].y += mouseDelta.y;
+            _gctx.markDimChange(Direct(childIndex));
+        }
     }
     
     private function _endDragOperation() {
