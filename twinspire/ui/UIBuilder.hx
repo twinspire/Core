@@ -7,6 +7,7 @@ import twinspire.geom.Dim;
 import kha.Font;
 import kha.math.FastVector2;
 import twinspire.scenes.SceneObject;
+import twinspire.render.DragOptions;
 import twinspire.Dimensions.VerticalAlign;
 import twinspire.Dimensions.HorizontalAlign;
 import twinspire.Dimensions.DimResult;
@@ -18,7 +19,9 @@ typedef ContainerContext = {
     spacing: Float,
     padding: Float,
     offsetV: Float,  // Current vertical offset
-    offsetH: Float   // Current horizontal offset
+    offsetH: Float,  // Current horizontal offset
+    nextX: Float,    // For manual positioning in Stack
+    nextY: Float 
 }
 
 class UIBuilder extends DimBuilder {
@@ -35,6 +38,9 @@ class UIBuilder extends DimBuilder {
 
     private var font:Font;
     private var fontSize:Int;
+
+    private var nextDraggable:Bool = false;
+    private var nextDragOptions:DragOptions = null;
 
     private var nextId:Id;
 
@@ -126,8 +132,7 @@ class UIBuilder extends DimBuilder {
 
         var dim = new Dim(0, 0, size != null ? size.x : 0, size != null ? size.y : 0);
         var dimResult = Dimensions.createFromDim(dim, Ui());
-        positionInContainer(dimResult.dim);
-        gtx.setOrReinitDim(dimResult.index, dimResult.dim, Ui());
+        positionInContainer(dimResult.dim, dimResult.index);
         add(dimResult);
 
         var textDimResult = createText(text, dimResult.index);
@@ -184,8 +189,7 @@ class UIBuilder extends DimBuilder {
         // Create the checkbox box dimension (20x20 square)
         var boxDim = new Dim(0, 0, 20, 20);
         var boxResult = Dimensions.createFromDim(boxDim, Ui());
-        positionInContainer(boxResult.dim);
-        gtx.setOrReinitDim(boxResult.index, boxResult.dim, Ui());
+        positionInContainer(boxResult.dim, boxResult.index);
         add(boxResult);
 
         // Create the tick dimension (inside the box, smaller)
@@ -246,14 +250,14 @@ class UIBuilder extends DimBuilder {
         var gtx = Application.instance.graphicsCtx;
         var id = getId(UITemplate.boxId);
         
-        // Create container dimension
         var containerDim = new Dim(0, 0, width, height);
         var containerResult = Dimensions.createFromDim(containerDim, Ui(id));
-        if (currentContainer != null) {
-            positionInContainer(containerResult.dim);
-            gtx.setOrReinitDim(containerResult.index, containerResult.dim, Ui(id));
-        }
         add(containerResult);
+        
+        // Position within parent container if exists
+        if (currentContainer != null) {
+            positionInContainer(containerResult.dim, containerResult.index);
+        }
         
         var dimIndex = advanceSceneObject();
         var box:Box;
@@ -262,11 +266,11 @@ class UIBuilder extends DimBuilder {
             box = cast(sceneObjects[dimIndex], Box);
             box.targetContainer = containerResult.dim;
         } else {
-            var containerInfo = gtx.createContainer(containerResult.dim, id);
+            var containerInfo = gtx.createContainer(containerResult.dim);
             var vectorSpace = containerInfo.space;
 
             box = new Box();
-            box.type = id;
+            box.type = UITemplate.boxId;
             box.orientation = orientation;
             box.spacing = spacing;
             box.padding = padding;
@@ -284,25 +288,18 @@ class UIBuilder extends DimBuilder {
         }
         
         containerDim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerResult.index));
+        
+        // Push context onto stack with Stack-specific initialization
         containerStack.push({
             bounds: containerDim,
             orientation: orientation,
             spacing: spacing,
             padding: padding,
             offsetV: padding,
-            offsetH: padding
+            offsetH: padding,
+            nextX: padding,  // Default to padding for Stack
+            nextY: padding
         });
-        
-        // Apply any dynamic content from template state
-        if (currentTemplate != null && currentContainerName != null) {
-            var state = currentTemplate.containerStates.get(currentContainerName);
-            if (state != null && state.dynamicElements.length > 0) {
-                for (factory in state.dynamicElements) {
-                    var element = factory();
-                    // Element will be auto-positioned by subsequent widget calls
-                }
-            }
-        }
 
         Dimensions.advanceOrder();
         
@@ -315,6 +312,13 @@ class UIBuilder extends DimBuilder {
 
     public function beginHorizontalBox(width:Float, height:Float, spacing:Float = 0, padding:Float = 0):Box {
         return beginBox(Horizontal, width, height, spacing, padding);
+    }
+
+    /**
+    * Begin a stack box - manual positioning container
+    **/
+    public function beginStackBox(width:Float, height:Float, padding:Float = 0):Box {
+        return beginBox(Stack, width, height, 0, padding); // spacing=0 for Stack
     }
 
     /**
@@ -342,27 +346,121 @@ class UIBuilder extends DimBuilder {
     }
 
     /**
+    * Position the next element at specific coordinates (relative to stack box)
+    **/
+    public function positionNext(x:Float, y:Float):Void {
+        if (currentContainer == null || currentContainer?.orientation != Stack) {
+            throw "positionNext can only be used inside a Stack box";
+        }
+        
+        currentContainer.nextX = x;
+        currentContainer.nextY = y;
+    }
+
+    /**
+    * Position next element at center of stack box
+    **/
+    public function positionNextCenter():Void {
+        if (currentContainer == null || currentContainer?.orientation != Stack) {
+            throw "positionNextCenter can only be used inside a Stack box";
+        }
+        
+        // Will be calculated in positionInContainer based on element size
+        currentContainer.nextX = -1; // Special flag for center
+        currentContainer.nextY = -1;
+    }
+
+    /**
+    * Make the next element in a Stack box draggable
+    * @param options Optional drag configuration
+    **/
+    public function setNextStackDraggable(draggable:Bool = true, ?options:DragOptions):Void {
+        if (currentContainer == null || currentContainer.orientation != Stack) {
+            throw "setNextStackDraggable can only be used inside a Stack box";
+        }
+        
+        nextDraggable = draggable;
+        nextDragOptions = options;
+    }
+
+    /**
     * Position element in current container
     **/
-    private function positionInContainer(elementDim:Dim):Void {
+    private function positionInContainer(elementDim:Dim, elementIndex:DimIndex):Void {
         if (currentContainer == null) return;
-        
+    
         var ctx = currentContainer;
-        var x = ctx.bounds.x + ctx.padding;
-        var y = ctx.bounds.y + ctx.padding;
+        var gtx = Application.instance.graphicsCtx;
+        var x:Float = 0;
+        var y:Float = 0;
         
         if (ctx.orientation == Vertical) {
-            y += ctx.offsetV;
+            x = ctx.bounds.x + ctx.padding;
+            y = ctx.bounds.y + ctx.offsetV;
+            
             if (stretchNext) elementDim.width = ctx.bounds.width - (ctx.padding * 2);
             ctx.offsetV += elementDim.height + ctx.spacing;
-        } else {
-            x += ctx.offsetH;
+            
+        } else if (ctx.orientation == Horizontal) {
+            x = ctx.bounds.x + ctx.offsetH;
+            y = ctx.bounds.y + ctx.padding;
+            
             if (stretchNext) elementDim.height = ctx.bounds.height - (ctx.padding * 2);
             ctx.offsetH += elementDim.width + ctx.spacing;
+            
+        } else { // Stack - manual positioning
+            // Check for center positioning flag
+            if (ctx.nextX == -1 && ctx.nextY == -1) {
+                // Center the element
+                x = ctx.bounds.x + (ctx.bounds.width - elementDim.width) / 2;
+                y = ctx.bounds.y + (ctx.bounds.height - elementDim.height) / 2;
+            } else {
+                // Manual position (relative to container bounds + padding)
+                x = ctx.bounds.x + ctx.padding + ctx.nextX;
+                y = ctx.bounds.y + ctx.padding + ctx.nextY;
+            }
+            
+            // Apply stretch in Stack box (both directions if set)
+            if (stretchNext) {
+                elementDim.width = ctx.bounds.width - (ctx.padding * 2);
+                elementDim.height = ctx.bounds.height - (ctx.padding * 2);
+            }
+            
+            // Apply draggable settings for Stack box
+            if (nextDraggable) {
+                var indices = new Array<Int>();
+                switch (elementIndex) {
+                    case Direct(idx, _): indices.push(idx);
+                    case Group(idx, _): {
+                        // For groups, apply to all indices in the group
+                        var group = gtx.getDimIndicesAtGroupIndex(idx);
+                        if (group.length > 0) {
+                            indices.concat(group);
+                        }
+                    }
+                }
+                
+                for (idx in indices) {
+                    var query = gtx.queries[idx];
+                    query.allowDragging = true;
+                    
+                    if (nextDragOptions != null) {
+                        query.dragOptions = nextDragOptions;
+                    }
+                }
+            }
+            
+            // Reset manual position and draggable settings
+            ctx.nextX = ctx.padding;
+            ctx.nextY = ctx.padding;
+            nextDraggable = false;
+            nextDragOptions = null;
         }
         
         elementDim.x = x;
         elementDim.y = y;
+
+        gtx.setOrReinitDim(elementIndex, elementDim);
         
         // Reset flags
         fillNext = false;

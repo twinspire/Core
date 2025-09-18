@@ -11,9 +11,13 @@ import twinspire.ui.UITemplate;
 enum BoxOrientation {
     Vertical;
     Horizontal;
+    Stack;
 }
 
 class Box extends SceneObject {
+
+    public var nextX:Float = 0;
+    public var nextY:Float = 0;
     
     public var orientation:BoxOrientation;
     public var spacing:Float;
