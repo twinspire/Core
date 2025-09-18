@@ -1675,8 +1675,11 @@ class GraphicsContext {
                 }
             }
         }
-        else if (index != null && isDimIndexValid(index)) {
-            var adjustedDim = adjustDimForVectorSpace(index, dim);
+        else if (index != null) {
+            var adjustedDim = dim;
+            if (isDimIndexValid(index)) {
+                adjustedDim = adjustDimForVectorSpace(index, dim);
+            }
             overrideDimension(index, adjustedDim);
             return index;
         }
