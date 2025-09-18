@@ -1,6 +1,6 @@
 package twinspire.ui;
 
-import twinspire.ui.widgets.Button;
+import twinspire.ui.widgets.*;
 import twinspire.scenes.SceneObject;
 import twinspire.render.UpdateContext;
 import twinspire.render.GraphicsContext;
@@ -10,6 +10,7 @@ class UITemplate extends Template {
     
     // Static Id variables for UI components
     public static var buttonId:Id;
+    public static var checkboxId:Id;
     
 
     // Keep a reference to the current builder for each named component
@@ -48,6 +49,10 @@ class UITemplate extends Template {
         IdAssoc.assoc[buttonId].render = Button.render;
         IdAssoc.assoc[buttonId].end = Button.end;
 
+        checkboxId = Application.createId(true);
+        IdAssoc.assoc[checkboxId].update = Checkbox.update;
+        IdAssoc.assoc[checkboxId].render = Checkbox.render;
+        IdAssoc.assoc[checkboxId].end = Checkbox.end;
     }
     
     /**

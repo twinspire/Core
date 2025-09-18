@@ -1,7 +1,7 @@
 package twinspire.ui;
 
 import twinspire.DimIndex.DimIndexUtils;
-import twinspire.ui.widgets.Button;
+import twinspire.ui.widgets.*;
 import twinspire.geom.Dim;
 import kha.Font;
 import kha.math.FastVector2;
@@ -141,6 +141,69 @@ class UIBuilder extends DimBuilder {
         }
         
         return button;
+    }
+
+    /**
+    * Create a checkbox with text.
+    **/
+    public function checkbox(text:String, checked:Bool = false):Checkbox {
+        var gtx = Application.instance.graphicsCtx;
+        var id = getId(UITemplate.checkboxId);
+
+        // Create the checkbox box dimension (20x20 square)
+        var boxDim = new Dim(0, 0, 20, 20);
+        var boxResult = Dimensions.createFromDim(boxDim, Ui());
+        add(boxResult);
+
+        // Create the tick dimension (inside the box, smaller)
+        var tickDim = new Dim(0, 0, 12, 12);
+        var tickResult = Dimensions.createFromDim(tickDim, Ui());
+        add(tickResult);
+        
+        // Center the tick inside the box
+        Dimensions.dimAlign(boxResult.index, tickResult.index, VALIGN_CENTRE, HALIGN_MIDDLE);
+
+        // Create text dimension next to the box
+        var textResult = createText(text);
+        
+        // Position text to the right of the box with some spacing
+        Dimensions.dimAlignOffset(boxResult.index, textResult.index, HALIGN_RIGHT, VALIGN_CENTRE, 8, 0);
+
+        var dimIndex = advanceSceneObject();
+        var checkbox:Checkbox;
+
+        if (isUpdate && dimIndex < sceneObjects.length) {
+            // Update existing SceneObject
+            checkbox = cast(sceneObjects[dimIndex], Checkbox);
+            checkbox.targetContainer = boxResult.dim;
+        } else {
+            // Create new SceneObject
+            checkbox = new Checkbox();
+            checkbox.type = UITemplate.checkboxId;
+            checkbox.text = text;
+            checkbox.checked = checked;
+            checkbox.font = font;
+            checkbox.fontSize = fontSize;
+            checkbox.boxIndex = boxResult.index;
+            checkbox.tickIndex = tickResult.index;
+            checkbox.textIndex = textResult.index;
+            checkbox.targetContainer = boxResult.dim;
+
+            // Create group containing all three dimensions
+            gtx.beginGroup();
+            gtx.addToGroup(boxResult.index);
+            gtx.addToGroup(tickResult.index);
+            gtx.addToGroup(textResult.index);
+            checkbox.index = Group(gtx.endGroup(), UITemplate.checkboxId);
+
+            if (dimIndex < sceneObjects.length) {
+                sceneObjects[dimIndex] = checkbox;
+            } else {
+                sceneObjects.push(checkbox);
+            }
+        }
+
+        return checkbox;
     }
 
     /**
