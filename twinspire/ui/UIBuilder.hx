@@ -303,6 +303,8 @@ class UIBuilder extends DimBuilder {
                 }
             }
         }
+
+        Dimensions.advanceOrder();
         
         return box;
     }
@@ -321,6 +323,8 @@ class UIBuilder extends DimBuilder {
     public function endBox():Void {
         if (containerStack.length == 0) throw "endBox without beginBox";
         containerStack.pop();
+
+        Dimensions.reduceOrder();
     }
 
     /**
