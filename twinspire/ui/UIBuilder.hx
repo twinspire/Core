@@ -460,14 +460,11 @@ class UIBuilder extends DimBuilder {
             var itemDim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(item.index));
             var itemSize = isHorizontal ? itemDim.width : itemDim.height;
             var itemCrossSize = isHorizontal ? itemDim.height : itemDim.width;
-            trace("Each Flow Item Dim: " + itemDim);
-            trace("Item Size: " + itemSize + ", Cross Size: " + itemCrossSize);
             
             // Check for wrap
             if (config.wrap != None && currentLine.length > 0) {
                 var availableSize = (isHorizontal ? ctx.bounds.width : ctx.bounds.height) - (ctx.padding * 2);
                 
-                trace("Available Size: " + availableSize + ", Current Line Size: " + currentLineSize);
                 if (currentLineSize + itemSize + (currentLine.length > 0 ? itemSpacing : 0) > availableSize && currentLine.length > 0) {
                     // Start new line
                     lines.push(currentLine);
@@ -499,8 +496,6 @@ class UIBuilder extends DimBuilder {
             }
         }
 
-        trace("Context bounds: " + ctx.bounds.x + ", " + ctx.bounds.y + ", " + ctx.bounds.width + ", " + ctx.bounds.height);
-        
         for (line in lines) {
             // Calculate total size and max cross size for line
             var totalItemSize:Float = 0;
@@ -520,7 +515,6 @@ class UIBuilder extends DimBuilder {
             // Calculate spacing based on justification
             var spacing:Float = 0;
             var startOffset:Float = 0;
-            trace("Starting offset: " + startOffset + ", Total Item Size: " + totalItemSize);
             
             switch (config.justify) {
                 case Start:
@@ -529,7 +523,6 @@ class UIBuilder extends DimBuilder {
                 case End:
                     spacing = itemSpacing;
                     var totalWithSpacing = totalItemSize + (itemSpacing * Math.max(0, line.length - 1));
-                    trace("Spacing: " + spacing + ", Line Count: " + line.length + ", Total: " + totalWithSpacing + ", Padding: " + ctx.padding + ", Container Size: " + containerSize);
                     startOffset = containerSize - totalWithSpacing - ctx.padding;
                 case Center:
                     spacing = itemSpacing;
@@ -550,8 +543,6 @@ class UIBuilder extends DimBuilder {
                     startOffset = ctx.padding + spacing;
             }
 
-            trace("Offset after justify calculation: " + startOffset);
-            
             // Position items in the line
             var currentPos = startOffset;
             
@@ -597,8 +588,6 @@ class UIBuilder extends DimBuilder {
                     itemDim.y = ctx.bounds.y + containerSize - currentPos - itemData.size - ctx.padding;
                 }
 
-                trace("Item Pos: (" + itemDim.x + ", " + itemDim.y + ")");
-                
                 // Update the dimension
                 gtx.setOrReinitDim(sceneObj.index, itemDim);
                 
