@@ -103,7 +103,15 @@ class UIBuilder extends DimBuilder {
 
     private function getDimension(index:DimIndex) {
         if (isUpdate) {
-            return results.find((res) -> res.index == index).dim;
+            switch (index) {
+                case Group(idx): {
+                    var wrapperIndex = Application.instance.graphicsCtx.getDimIndicesAtGroupIndex(idx)[0];
+                    return results.find((res) -> DimIndexUtils.equals(res.index, Direct(wrapperIndex))).dim;
+                }
+                default: {
+                    return results.find((res) -> DimIndexUtils.equals(res.index, index)).dim;
+                }
+            }
         }
         else {
             return Application.instance.graphicsCtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(index));
@@ -178,8 +186,7 @@ class UIBuilder extends DimBuilder {
         if (isUpdate && dimIndex < sceneObjects.length) {
             // Update existing SceneObject
             button = cast(sceneObjects[dimIndex], Button);
-            button.targetContainer = dimResult.dim;
-
+            button.lastChangedDim = dimResult.dim;
         } else {
             // Create new SceneObject
             button = new Button();
@@ -189,7 +196,7 @@ class UIBuilder extends DimBuilder {
             button.fontSize = fontSize;
             button.wrapperIndex = dimResult.index;
             button.textIndex = textDimResult.index;
-            button.targetContainer = dimResult.dim;
+            button.targetContainer = dimResult.dim.clone();
 
             gtx.beginGroup();
             gtx.addToGroup(dimResult.index);
@@ -241,7 +248,7 @@ class UIBuilder extends DimBuilder {
         if (isUpdate && dimIndex < sceneObjects.length) {
             // Update existing SceneObject
             checkbox = cast(sceneObjects[dimIndex], Checkbox);
-            checkbox.targetContainer = boxResult.dim;
+            checkbox.lastChangedDim = boxResult.dim;
         } else {
             // Create new SceneObject
             checkbox = new Checkbox();
@@ -253,7 +260,7 @@ class UIBuilder extends DimBuilder {
             checkbox.boxIndex = boxResult.index;
             checkbox.tickIndex = tickResult.index;
             checkbox.textIndex = textResult.index;
-            checkbox.targetContainer = boxResult.dim;
+            checkbox.targetContainer = boxResult.dim.clone();
 
             // Create group containing all three dimensions
             gtx.beginGroup();
@@ -295,7 +302,7 @@ class UIBuilder extends DimBuilder {
         
         if (isUpdate && dimIndex < sceneObjects.length) {
             box = cast(sceneObjects[dimIndex], Box);
-            box.targetContainer = containerResult.dim;
+            box.lastChangedDim = containerResult.dim;
         } else {
             var containerInfo = gtx.createContainer(containerResult.dim);
             var vectorSpace = containerInfo.space;
@@ -307,7 +314,7 @@ class UIBuilder extends DimBuilder {
             box.padding = padding;
             box.vectorSpace = vectorSpace;
             box.index = containerResult.index;
-            box.targetContainer = containerResult.dim;
+            box.targetContainer = containerResult.dim.clone();
             box.ownerTemplate = currentTemplate;
             box.containerName = currentContainerName;
             
@@ -393,7 +400,7 @@ class UIBuilder extends DimBuilder {
         
         if (isUpdate && dimIndex < sceneObjects.length) {
             box = cast(sceneObjects[dimIndex], Box);
-            box.targetContainer = containerResult.dim;
+            box.lastChangedDim = containerResult.dim;
             box.orientation = Flow(direction, options);  // Store direction and options
             box.spacing = spacing;
             box.padding = padding;
@@ -408,7 +415,7 @@ class UIBuilder extends DimBuilder {
             box.padding = padding;
             box.vectorSpace = vectorSpace;
             box.index = containerResult.index;
-            box.targetContainer = containerResult.dim;
+            box.targetContainer = containerResult.dim.clone();
             box.ownerTemplate = currentTemplate;
             box.containerName = currentContainerName;
             

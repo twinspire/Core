@@ -20,6 +20,10 @@ class SceneObject {
     * The initial target container when this object is first created.
     **/
     public var targetContainer:Dim;
+    /**
+    * The dimension of this object when it was last changed.
+    **/
+    public var lastChangedDim:Dim;
     
     public function new() {
 
