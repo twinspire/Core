@@ -1054,7 +1054,7 @@ class UpdateContext {
 
         var query = _gctx.queries[topMostIndex];
         
-        if (query.allowDragging) {
+        if (query.allowDragging && ((dragDistance.x < -7.5 || dragDistance.x > 7.5) || (dragDistance.y < -7.5 || dragDistance.y > 7.5))) {
             _drag.dragIndex = topMostIndex;
             _drag.firstMousePosition = _mouseDownFirstPos;
             _isDragStart = topMostIndex;
