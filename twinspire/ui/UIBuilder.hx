@@ -17,6 +17,7 @@ import twinspire.Dimensions.FlowAlign;
 import twinspire.Dimensions.FlowWrap;
 import twinspire.Dimensions.FlowConfig;
 import twinspire.AddLogic;
+using twinspire.extensions.ArrayExtensions;
 
 typedef ContainerContext = {
     bounds: Dim,
@@ -100,6 +101,15 @@ class UIBuilder extends DimBuilder {
         return expect;
     }
 
+    private function getDimension(index:DimIndex) {
+        if (isUpdate) {
+            return results.find((res) -> res.index == index).dim;
+        }
+        else {
+            return Application.instance.graphicsCtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(index));
+        }
+    }
+
     /**
     * Begin this builder. Call before using.
     **/
@@ -157,7 +167,7 @@ class UIBuilder extends DimBuilder {
         if (size == null) {
             Dimensions.dimGrowW(dimResult.index, textDimResult.dim.width + 6);
             Dimensions.dimGrowH(dimResult.index, textDimResult.dim.height + 6);
-            dimResult.dim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(dimResult.index));
+            dimResult.dim = getDimension(dimResult.index);
         }
 
         Dimensions.dimAlign(dimResult.index, textDimResult.index, VALIGN_CENTRE, HALIGN_MIDDLE);
@@ -308,7 +318,7 @@ class UIBuilder extends DimBuilder {
             }
         }
         
-        containerDim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerResult.index));
+        containerDim = getDimension(containerResult.index);
         
         // Push context onto stack with Stack-specific initialization
         containerStack.push({
@@ -409,7 +419,7 @@ class UIBuilder extends DimBuilder {
             }
         }
         
-        containerDim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(containerResult.index));
+        containerDim = getDimension(containerResult.index);
         
         // Push context onto stack
         containerStack.push({
@@ -457,7 +467,7 @@ class UIBuilder extends DimBuilder {
         var currentLineSize:Float = 0;
         
         for (item in ctx.flowItems) {
-            var itemDim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(item.index));
+            var itemDim = getDimension(item.index);
             var itemSize = isHorizontal ? itemDim.width : itemDim.height;
             var itemCrossSize = isHorizontal ? itemDim.height : itemDim.width;
             
@@ -548,7 +558,7 @@ class UIBuilder extends DimBuilder {
             
             for (itemData in line) {
                 var sceneObj = itemData.item;
-                var itemDim = gtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(sceneObj.index));
+                var itemDim = getDimension(sceneObj.index);
                 
                 // Calculate cross-axis position based on alignment
                 var crossAxisPos:Float = 0;
@@ -594,7 +604,7 @@ class UIBuilder extends DimBuilder {
                 // Update children positions (linked dimensions)
                 var children = gtx.getLinksFromIndex(sceneObj.index);
                 for (childIndex in children) {
-                    var childDim = gtx.getTempOrCurrentDimAtIndex(childIndex);
+                    var childDim = getDimension(Direct(childIndex));
                     
                     // Children are positioned relative to parent
                     // Adjust their absolute position based on parent's new position
@@ -808,7 +818,8 @@ class UIBuilder extends DimBuilder {
     **/
     public function prepareForUpdate():Void {
         isUpdate = true;
-        
+        currentSceneObject = 0;
+        currentUpdatingIndex = 0;
     }
     
     /**
