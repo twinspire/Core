@@ -67,6 +67,76 @@ typedef DimResult = {
     var ?dim:Dim;
 }
 
+enum FlowAlign {
+    /**
+    * Top for horizontal, Left for vertical
+    **/
+    Start;
+    /**
+    * Center for horizontal, Middle for vertical
+    **/
+    Center;
+    /**
+    * Bottom for horizontal, Right for vertical
+    **/
+    End;
+}
+
+// Flow justification options
+enum FlowJustify {
+    /**
+    * Pack items at start
+    **/
+    Start;
+    /**
+    * Pack items at end
+    **/
+    End;
+    /**
+    * Center items
+    **/
+    Center;
+    /**
+    * Equal space between items
+    **/
+    SpaceBetween;
+    /**
+    * Equal space around items
+    **/
+    SpaceAround;
+    /**
+    * Equal space between and around
+    **/
+    SpaceEvenly;
+}
+
+// Wrap direction for multi-line flows
+enum FlowWrap {
+    /**
+    * No wrapping
+    **/
+    None;
+    /**
+    * Wrap down for horizontal, right for vertical
+    **/
+    Forward;
+    /**
+    * Wrap up for horizontal, left for vertical
+    **/
+    Reverse;
+}
+
+// Flow configuration
+typedef FlowConfig = {
+    var justify:FlowJustify;
+    var align:FlowAlign;
+    var wrap:FlowWrap;
+    /**
+    * Space between wrapped lines
+    **/
+    var lineSpacing:Float;
+}
+
 class Dimensions {
 
     private static var _order:Int = 0;
@@ -705,6 +775,12 @@ class Dimensions {
         }
     }
 
+    private static var flowConfig:FlowConfig = null;
+    private static var flowLines:Array<Array<{dim:Dim, index:DimIndex}>> = [];
+    private static var flowCurrentLine:Array<{dim:Dim, index:DimIndex}> = [];
+    private static var flowCurrentLineSize:Float = 0;
+    private static var flowPendingDims:Array<{dim:Dim, index:DimIndex}> = [];
+
     /**
      * Create a flow container within which each time the function `getNewDim` is called,
      * a new dimension is created based on the given `direction`. The size of each item
@@ -741,12 +817,41 @@ class Dimensions {
     }
 
     /**
-    * When using variable flow, specify the last `dim`.
+    * Set next dimension for variable flow with wrap support
     **/
     public static function dimVariableSetNextDim(dim:Dim) {
-        if (containerMethod == FLOW_VARIABLE) {
+        if (containerMethod != FLOW_VARIABLE) {
             containerCellSize = dim.clone();
+            return;
         }
+        
+        if (flowConfig == null) {
+            // Fallback to original behavior
+            containerCellSize = dim.clone();
+            return;
+        }
+        
+        var isHorizontal = (containerDirection == Direction.Left || containerDirection == Direction.Right);
+        var itemSize = isHorizontal ? dim.width : dim.height;
+        
+        // Check if we need to wrap
+        var needsWrap = false;
+        if (flowConfig.wrap != None) {
+            var availableSize = isHorizontal ? containerColumnOrRow.width : containerColumnOrRow.height;
+            
+            if (flowCurrentLineSize + itemSize > availableSize && flowCurrentLine.length > 0) {
+                needsWrap = true;
+            }
+        }
+        
+        if (needsWrap) {
+            // Finish current line
+            flowLines.push(flowCurrentLine);
+            flowCurrentLine = [];
+            flowCurrentLineSize = 0;
+        }
+        
+        containerCellSize = dim.clone();
     }
 
     /**
@@ -821,6 +926,197 @@ class Dimensions {
 
         flowResults = [];
 
+        return dimResults;
+    }
+
+    /**
+    * Begin variable flow with enhanced options
+    **/
+    public static function dimVariableFlowEx(containerIndex:DimIndex, direction:Direction, config:FlowConfig, ?addLogic:AddLogic) {
+        var gtx = Application.instance.graphicsCtx;
+        var container = getCurrentDimAtIndex(containerIndex);
+
+        flowContainerIndex = containerIndex;
+        containerColumnOrRow = container;
+        containerDirection = direction;
+        containerOffset = new FastVector2();
+        
+        if (direction == Direction.Up) {
+            containerOffset = new FastVector2(0, containerColumnOrRow.getHeight() + containerColumnOrRow.getY());
+        }
+        else if (direction == Direction.Left) {
+            containerOffset = new FastVector2(containerColumnOrRow.getWidth() + containerColumnOrRow.getX(), 0);
+        }
+
+        containerMethod = FLOW_VARIABLE;
+        containerCellSize = new Dim(0, 0, 0, 0);
+        flowAddLogic = addLogic != null ? addLogic : Empty();
+        flowResults = [];
+        
+        // Initialize flow configuration
+        flowConfig = config;
+        flowLines = [];
+        flowCurrentLine = [];
+        flowCurrentLineSize = 0;
+        flowPendingDims = [];
+    }
+
+    /**
+    * Get new dimension - just creates and stores, NO positioning yet
+    **/
+    public static function getNewDimEx():DimResult {
+        if (containerColumnOrRow == null || containerCellSize == null) {
+            return {dim: null, index: null};
+        }
+        
+        // Create dimension with placeholder position (will be calculated in endFlowEx)
+        var result = new Dim(0, 0, containerCellSize.width, containerCellSize.height, _order);
+        result.visible = _visibility;
+        
+        var resultIndex:DimIndex = null;
+        if (!_editMode) {
+            resultIndex = addDimToGraphicsContext(result, flowAddLogic ?? Empty(), flowContainerIndex);
+        }
+        
+        var dimResult = {dim: result, index: resultIndex};
+        
+        // Store for line calculation
+        flowCurrentLine.push(dimResult);
+        
+        var isHorizontal = (containerDirection == Direction.Left || containerDirection == Direction.Right);
+        flowCurrentLineSize += isHorizontal ? result.width : result.height;
+        
+        // Add to pending dims for final calculation
+        flowPendingDims.push(dimResult);
+        
+        return dimResult;
+    }
+
+    /**
+    * End flow and apply final positions with justification/alignment
+    **/
+    public static function endFlowEx():Array<DimResult> {
+        if (flowConfig == null) {
+            return endFlow(); // Fallback to original
+        }
+        
+        var gtx = Application.instance.graphicsCtx;
+        
+        // Add final line
+        if (flowCurrentLine.length > 0) {
+            flowLines.push(flowCurrentLine);
+        }
+        
+        // Now calculate ALL positions with justification and alignment
+        var isHorizontal = (containerDirection == Direction.Left || containerDirection == Direction.Right);
+        var containerSize = isHorizontal ? containerColumnOrRow.width : containerColumnOrRow.height;
+        
+        var lineOffset = 0.0; // Track cross-axis offset for wrapped lines
+        
+        for (lineIdx in 0...flowLines.length) {
+            var line = flowLines[lineIdx];
+            
+            // Calculate total size and max cross size for this line
+            var totalItemSize = 0.0;
+            var maxCrossSize = 0.0;
+            
+            for (item in line) {
+                totalItemSize += isHorizontal ? item.dim.width : item.dim.height;
+                var crossSize = isHorizontal ? item.dim.height : item.dim.width;
+                if (crossSize > maxCrossSize) maxCrossSize = crossSize;
+            }
+            
+            // Calculate spacing based on justify mode
+            var spacing = 0.0;
+            var startOffset = 0.0;
+            
+            switch (flowConfig.justify) {
+                case Start:
+                    spacing = 0;
+                    startOffset = 0;
+                case End:
+                    spacing = 0;
+                    startOffset = containerSize - totalItemSize;
+                case Center:
+                    spacing = 0;
+                    startOffset = (containerSize - totalItemSize) / 2;
+                case SpaceBetween:
+                    if (line.length > 1) {
+                        spacing = (containerSize - totalItemSize) / (line.length - 1);
+                    }
+                    startOffset = 0;
+                case SpaceAround:
+                    spacing = (containerSize - totalItemSize) / line.length;
+                    startOffset = spacing / 2;
+                case SpaceEvenly:
+                    spacing = (containerSize - totalItemSize) / (line.length + 1);
+                    startOffset = spacing;
+            }
+            
+            // Apply positions to each item in the line
+            var currentMainPos = startOffset;
+            
+            for (item in line) {
+                var dim = item.dim;
+                var itemMainSize = isHorizontal ? dim.width : dim.height;
+                var itemCrossSize = isHorizontal ? dim.height : dim.width;
+                
+                // Calculate cross-axis position based on alignment
+                var crossAxisPos = 0.0;
+                switch (flowConfig.align) {
+                    case Start:
+                        crossAxisPos = 0;
+                    case Center:
+                        crossAxisPos = (maxCrossSize - itemCrossSize) / 2;
+                    case End:
+                        crossAxisPos = maxCrossSize - itemCrossSize;
+                }
+                
+                // Set final positions based on direction
+                if (containerDirection == Direction.Right) {
+                    dim.x = containerColumnOrRow.x + currentMainPos;
+                    dim.y = containerColumnOrRow.y + lineOffset + crossAxisPos;
+                }
+                else if (containerDirection == Direction.Left) {
+                    dim.x = containerColumnOrRow.x + containerSize - currentMainPos - itemMainSize;
+                    dim.y = containerColumnOrRow.y + lineOffset + crossAxisPos;
+                }
+                else if (containerDirection == Direction.Down) {
+                    dim.x = containerColumnOrRow.x + lineOffset + crossAxisPos;
+                    dim.y = containerColumnOrRow.y + currentMainPos;
+                }
+                else if (containerDirection == Direction.Up) {
+                    dim.x = containerColumnOrRow.x + lineOffset + crossAxisPos;
+                    dim.y = containerColumnOrRow.y + containerSize - currentMainPos - itemMainSize;
+                }
+                
+                // Update dimension in GraphicsContext if we have an index
+                if (item.index != null) {
+                    gtx.setOrReinitDim(item.index, dim);
+                }
+                
+                currentMainPos += itemMainSize + spacing;
+            }
+            
+            // Update line offset for next line (wrap)
+            if (flowConfig.wrap == Forward) {
+                lineOffset += maxCrossSize + flowConfig.lineSpacing;
+            } else if (flowConfig.wrap == Reverse) {
+                lineOffset -= maxCrossSize + flowConfig.lineSpacing;
+            }
+        }
+        
+        // Return the results
+        var dimResults = flowPendingDims.copy();
+        
+        // Reset flow state
+        flowResults = [];
+        flowConfig = null;
+        flowLines = [];
+        flowCurrentLine = [];
+        flowPendingDims = [];
+        flowCurrentLineSize = 0;
+        
         return dimResults;
     }
 

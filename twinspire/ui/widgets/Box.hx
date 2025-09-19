@@ -1,17 +1,20 @@
 package twinspire.ui.widgets;
 
+import twinspire.Dimensions.Direction;
 import kha.Color;
 import kha.Font;
 import twinspire.render.GraphicsContext;
 import twinspire.render.UpdateContext;
 import twinspire.render.vector.VectorSpace;
 import twinspire.scenes.SceneObject;
+import twinspire.ui.UIBuilder.FlowBoxOptions;
 import twinspire.ui.UITemplate;
 
 enum BoxOrientation {
     Vertical;
     Horizontal;
     Stack;
+    Flow(direction:Direction, ?options:FlowBoxOptions);
 }
 
 class Box extends SceneObject {
