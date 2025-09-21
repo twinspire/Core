@@ -42,6 +42,26 @@ typedef FlowBoxOptions = {
     var ?itemSpacing:Float;          // Default: spacing parameter
 }
 
+typedef GridContext = {
+    bounds: Dim,
+    columns: Int,
+    rows: Int,
+    columnSizes: Array<Dynamic>, // Can be Float, DimCellSize, or Int depending on grid type
+    rowSizes: Array<Dynamic>,
+    currentCell: Int,
+    gridType: GridType,
+    spacing: Float,
+    padding: Float,
+    totalCells: Int,
+    gridResults: Array<DimResult>
+}
+
+enum GridType {
+    Equals;
+    Floats;
+    Cells;
+}
+
 class UIBuilder extends DimBuilder {
     
     // Track SceneObjects created by this builder
@@ -114,7 +134,15 @@ class UIBuilder extends DimBuilder {
             }
         }
         else {
-            return Application.instance.graphicsCtx.getTempOrCurrentDimAtIndex(DimIndexUtils.getDirectIndex(index));
+            switch (index) {
+                case Group(idx): {
+                    var wrapperIndex = Application.instance.graphicsCtx.getDimIndicesAtGroupIndex(idx)[0];
+                    return Application.instance.graphicsCtx.getTempOrCurrentDimAtIndex(wrapperIndex);
+                }
+                case Direct(idx): {
+                    return Application.instance.graphicsCtx.getTempOrCurrentDimAtIndex(idx);
+                }
+            }
         }
     }
 
@@ -167,14 +195,38 @@ class UIBuilder extends DimBuilder {
 
         var dim = new Dim(0, 0, size != null ? size.x : 0, size != null ? size.y : 0);
         var dimResult = Dimensions.createFromDim(dim, Ui());
+        var isStretching = stretchNext;
+
         positionInContainer(dimResult.dim, dimResult.index);
         add(dimResult);
 
         var textDimResult = createText(text, dimResult.index);
 
         if (size == null) {
-            Dimensions.dimGrowW(dimResult.index, textDimResult.dim.width + 6);
-            Dimensions.dimGrowH(dimResult.index, textDimResult.dim.height + 6);
+            if (containerStack.length > 0) {
+                var box = containerStack[containerStack.length - 1];
+                switch (box.orientation) {
+                    case Flow(direction, options): {
+                        if (!isStretching) {
+                            Dimensions.dimGrowW(dimResult.index, textDimResult.dim.width + 6);
+                            Dimensions.dimGrowH(dimResult.index, textDimResult.dim.height + 6);    
+                        }
+                        else {
+                            if (direction == Left || direction == Right) {
+                                Dimensions.dimGrowW(dimResult.index, textDimResult.dim.width + 6);
+                            }
+                            else if (direction == Up || direction == Down) {
+                                Dimensions.dimGrowH(dimResult.index, textDimResult.dim.height + 6);
+                            }
+                        }
+                    }
+                    default: {
+                        Dimensions.dimGrowW(dimResult.index, textDimResult.dim.width + 6);
+                        Dimensions.dimGrowH(dimResult.index, textDimResult.dim.height + 6);
+                    }
+                }
+            }
+
             dimResult.dim = getDimension(dimResult.index);
         }
 
@@ -605,12 +657,19 @@ class UIBuilder extends DimBuilder {
                     itemDim.y = ctx.bounds.y + containerSize - currentPos - itemData.size - ctx.padding;
                 }
 
+                var groupIndex = switch(sceneObj.index) {
+                    case Group(idx): idx;
+                    default: -1;
+                }
+                var children = gtx.getDimIndicesAtGroupIndex(groupIndex);
+                var wrapperIndex = children[0];
+
                 // Update the dimension
-                gtx.setOrReinitDim(sceneObj.index, itemDim);
+                gtx.setOrReinitDim(Direct(wrapperIndex), itemDim);
                 
                 // Update children positions (linked dimensions)
-                var children = gtx.getLinksFromIndex(sceneObj.index);
-                for (childIndex in children) {
+                for (i in 1...children.length) {
+                    var childIndex = children[i];
                     var childDim = getDimension(Direct(childIndex));
                     
                     // Children are positioned relative to parent
@@ -743,9 +802,14 @@ class UIBuilder extends DimBuilder {
         // Track items for flow boxes
         switch (currentContainer.orientation) {
             case Flow(direction, options): {
-                fillNext = false;
-                stretchNext = false;
-                return;
+                switch (direction) {
+                    case Down | Up: {
+                        if (stretchNext) elementDim.width = ctx.bounds.width - (ctx.padding * 2);
+                    }
+                    case Left | Right: {
+                        if (stretchNext) elementDim.height = ctx.bounds.height - (ctx.padding * 2);
+                    }
+                }
             }
             case Vertical: {
                 x = ctx.bounds.x + ctx.padding;
