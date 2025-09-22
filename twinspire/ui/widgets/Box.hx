@@ -15,6 +15,7 @@ enum BoxOrientation {
     Horizontal;
     Stack;
     Flow(direction:Direction, ?options:FlowBoxOptions);
+    Grid;
 }
 
 class Box extends SceneObject {

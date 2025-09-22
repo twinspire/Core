@@ -8,6 +8,7 @@ import kha.Font;
 import kha.math.FastVector2;
 import twinspire.scenes.SceneObject;
 import twinspire.render.DragOptions;
+import twinspire.geom.DimCellSize;
 import twinspire.Dimensions.VerticalAlign;
 import twinspire.Dimensions.HorizontalAlign;
 import twinspire.Dimensions.DimResult;
@@ -69,6 +70,7 @@ class UIBuilder extends DimBuilder {
     private var currentSceneObject:Int = 0;
 
     private var containerStack:Array<ContainerContext> = [];
+    private var gridStack:Array<GridContext> = [];
     private var currentContainerName:String = null;
     private var currentTemplate:UITemplate = null;
     private var fillNext:Bool = false;
@@ -81,6 +83,11 @@ class UIBuilder extends DimBuilder {
     private var nextDragOptions:DragOptions = null;
 
     private var nextId:Id;
+
+    private var currentGrid(get, never):GridContext;
+    function get_currentGrid():GridContext {
+        return gridStack.length > 0 ? gridStack[gridStack.length - 1] : null;
+    }
 
     private var currentContainer(get, never):ContainerContext;
     function get_currentContainer():ContainerContext {
@@ -501,6 +508,452 @@ class UIBuilder extends DimBuilder {
     }
 
     /**
+    * Begin an equal-sized grid layout where all cells have the same dimensions
+    * @param width Grid container width
+    * @param height Grid container height  
+    * @param columns Number of equally sized columns
+    * @param rows Number of equally sized rows
+    * @param spacing Space between grid cells (optional)
+    * @param padding Internal padding around the grid (optional)
+    **/
+    public function beginGridEquals(width:Float, height:Float, columns:Int, rows:Int, spacing:Float = 0, padding:Float = 0):Box {
+        var gtx = Application.instance.graphicsCtx;
+        var id = getId(UITemplate.boxId);
+        
+        // Create container dimension
+        var containerDim = new Dim(0, 0, width, height);
+        var containerResult = Dimensions.createFromDim(containerDim, Ui(id));
+        add(containerResult);
+        
+        // Position within parent container if exists
+        if (currentContainer != null) {
+            positionInContainer(containerResult.dim, containerResult.index);
+        }
+        
+        var dimIndex = advanceSceneObject();
+        var box:Box;
+        
+        if (isUpdate && dimIndex < sceneObjects.length) {
+            box = cast(sceneObjects[dimIndex], Box);
+            box.lastChangedDim = containerResult.dim;
+        } else {
+            var containerInfo = gtx.createContainer(containerResult.dim);
+            var vectorSpace = containerInfo.space;
+
+            box = new Box();
+            box.type = UITemplate.boxId;
+            box.orientation = Grid; // Need to add Grid to BoxOrientation enum
+            box.spacing = spacing;
+            box.padding = padding;
+            box.vectorSpace = vectorSpace;
+            box.index = containerResult.index;
+            box.targetContainer = containerResult.dim.clone();
+            box.ownerTemplate = currentTemplate;
+            box.containerName = currentContainerName;
+            
+            if (dimIndex < sceneObjects.length) {
+                sceneObjects[dimIndex] = box;
+            } else {
+                sceneObjects.push(box);
+            }
+        }
+        
+        containerDim = getDimension(containerResult.index);
+        
+        // Calculate grid dimensions using Dimensions.dimGridEquals
+        var gridResults = Dimensions.dimGridEquals(containerResult.index, columns, rows);
+        
+        // Apply spacing if specified
+        if (spacing > 0) {
+            applyGridSpacing(gridResults, columns, rows, spacing);
+        }
+        
+        // Push grid context onto stack
+        gridStack.push({
+            bounds: containerDim,
+            columns: columns,
+            rows: rows,
+            columnSizes: [columns], // Store column count for equals grid
+            rowSizes: [rows], // Store row count for equals grid
+            currentCell: 0,
+            gridType: Equals,
+            spacing: spacing,
+            padding: padding,
+            totalCells: columns * rows,
+            gridResults: gridResults
+        });
+
+        Dimensions.advanceOrder();
+        
+        return box;
+    }
+
+    /**
+    * Begin a ratio-based grid layout using float percentages for column and row sizes
+    * @param width Grid container width
+    * @param height Grid container height
+    * @param columns Array of float ratios for columns (must sum to 1.0)
+    * @param rows Array of float ratios for rows (must sum to 1.0)
+    * @param spacing Space between grid cells (optional)
+    * @param padding Internal padding around the grid (optional)
+    **/
+    public function beginGridFloats(width:Float, height:Float, columns:Array<Float>, rows:Array<Float>, spacing:Float = 0, padding:Float = 0):Box {
+        // Validate that ratios sum to approximately 1.0
+        var columnSum = 0.0;
+        var rowSum = 0.0;
+        for (col in columns) columnSum += col;
+        for (row in rows) rowSum += row;
+        
+        if (Math.abs(columnSum - 1.0) > 0.001 || Math.abs(rowSum - 1.0) > 0.001) {
+            throw "Grid float ratios must sum to 1.0 (columns: " + columnSum + ", rows: " + rowSum + ")";
+        }
+        
+        var gtx = Application.instance.graphicsCtx;
+        var id = getId(UITemplate.boxId);
+        
+        // Create container dimension
+        var containerDim = new Dim(0, 0, width, height);
+        var containerResult = Dimensions.createFromDim(containerDim, Ui(id));
+        add(containerResult);
+        
+        // Position within parent container if exists
+        if (currentContainer != null) {
+            positionInContainer(containerResult.dim, containerResult.index);
+        }
+        
+        var dimIndex = advanceSceneObject();
+        var box:Box;
+        
+        if (isUpdate && dimIndex < sceneObjects.length) {
+            box = cast(sceneObjects[dimIndex], Box);
+            box.lastChangedDim = containerResult.dim;
+        } else {
+            var containerInfo = gtx.createContainer(containerResult.dim);
+            var vectorSpace = containerInfo.space;
+
+            box = new Box();
+            box.type = UITemplate.boxId;
+            box.orientation = Grid;
+            box.spacing = spacing;
+            box.padding = padding;
+            box.vectorSpace = vectorSpace;
+            box.index = containerResult.index;
+            box.targetContainer = containerResult.dim.clone();
+            box.ownerTemplate = currentTemplate;
+            box.containerName = currentContainerName;
+            
+            if (dimIndex < sceneObjects.length) {
+                sceneObjects[dimIndex] = box;
+            } else {
+                sceneObjects.push(box);
+            }
+        }
+        
+        containerDim = getDimension(containerResult.index);
+        
+        // Calculate grid dimensions using Dimensions.dimGridFloats
+        var gridResults = Dimensions.dimGridFloats(containerResult.index, columns, rows);
+        
+        // Apply spacing if specified
+        if (spacing > 0) {
+            applyGridSpacing(gridResults, columns.length, rows.length, spacing);
+        }
+        
+        // Push grid context onto stack
+        gridStack.push({
+            bounds: containerDim,
+            columns: columns.length,
+            rows: rows.length,
+            columnSizes: columns.copy(),
+            rowSizes: rows.copy(),
+            currentCell: 0,
+            gridType: Floats,
+            spacing: spacing,
+            padding: padding,
+            totalCells: columns.length * rows.length,
+            gridResults: gridResults
+        });
+
+        Dimensions.advanceOrder();
+        
+        return box;
+    }
+
+    /**
+    * Begin a cell-based grid layout using DimCellSize for precise control over column and row dimensions
+    * @param width Grid container width
+    * @param height Grid container height
+    * @param columns Array of DimCellSize for columns (mix of pixels and percentages)
+    * @param rows Array of DimCellSize for rows (mix of pixels and percentages)
+    * @param spacing Space between grid cells (optional)
+    * @param padding Internal padding around the grid (optional)
+    **/
+    public function beginGridCells(width:Float, height:Float, columns:Array<DimCellSize>, rows:Array<DimCellSize>, spacing:Float = 0, padding:Float = 0):Box {
+        var gtx = Application.instance.graphicsCtx;
+        var id = getId(UITemplate.boxId);
+        
+        // Create container dimension
+        var containerDim = new Dim(0, 0, width, height);
+        var containerResult = Dimensions.createFromDim(containerDim, Ui(id));
+        add(containerResult);
+        
+        // Position within parent container if exists
+        if (currentContainer != null) {
+            positionInContainer(containerResult.dim, containerResult.index);
+        }
+        
+        var dimIndex = advanceSceneObject();
+        var box:Box;
+        
+        if (isUpdate && dimIndex < sceneObjects.length) {
+            box = cast(sceneObjects[dimIndex], Box);
+            box.lastChangedDim = containerResult.dim;
+        } else {
+            var containerInfo = gtx.createContainer(containerResult.dim);
+            var vectorSpace = containerInfo.space;
+
+            box = new Box();
+            box.type = UITemplate.boxId;
+            box.orientation = Grid;
+            box.spacing = spacing;
+            box.padding = padding;
+            box.vectorSpace = vectorSpace;
+            box.index = containerResult.index;
+            box.targetContainer = containerResult.dim.clone();
+            box.ownerTemplate = currentTemplate;
+            box.containerName = currentContainerName;
+            
+            if (dimIndex < sceneObjects.length) {
+                sceneObjects[dimIndex] = box;
+            } else {
+                sceneObjects.push(box);
+            }
+        }
+        
+        containerDim = getDimension(containerResult.index);
+        
+        // Calculate grid dimensions using Dimensions.dimGrid
+        var gridResults = Dimensions.dimGrid(containerResult.index, columns, rows);
+        
+        // Apply spacing if specified
+        if (spacing > 0) {
+            applyGridSpacing(gridResults, columns.length, rows.length, spacing);
+        }
+        
+        // Push grid context onto stack
+        gridStack.push({
+            bounds: containerDim,
+            columns: columns.length,
+            rows: rows.length,
+            columnSizes: columns.copy(),
+            rowSizes: rows.copy(),
+            currentCell: 0,
+            gridType: Cells,
+            spacing: spacing,
+            padding: padding,
+            totalCells: columns.length * rows.length,
+            gridResults: gridResults
+        });
+
+        Dimensions.advanceOrder();
+        
+        return box;
+    }
+
+    /**
+    * End the current grid layout
+    **/
+    public function endGrid():Void {
+        if (gridStack.length == 0) {
+            throw "endGrid called without beginGrid*";
+        }
+        
+        gridStack.pop();
+        Dimensions.reduceOrder();
+    }
+
+    /**
+    * Get the next available grid cell for element placement
+    * @return DimResult for the next cell, or null if grid is full
+    **/
+    public function nextGridCell():DimResult {
+        if (currentGrid == null) {
+            throw "nextGridCell called outside of grid context";
+        }
+        
+        if (currentGrid.currentCell >= currentGrid.totalCells) {
+            return null; // Grid is full
+        }
+        
+        var cellResult = currentGrid.gridResults[currentGrid.currentCell];
+        currentGrid.currentCell++;
+        
+        return cellResult;
+    }
+
+    /**
+    * Get a specific grid cell by row and column indices
+    * @param column Column index (0-based)
+    * @param row Row index (0-based)
+    * @return DimResult for the specified cell, or null if out of bounds
+    **/
+    public function getGridCell(column:Int, row:Int):DimResult {
+        if (currentGrid == null) {
+            throw "getGridCell called outside of grid context";
+        }
+        
+        if (column < 0 || column >= currentGrid.columns || row < 0 || row >= currentGrid.rows) {
+            return null; // Out of bounds
+        }
+        
+        var cellIndex = row * currentGrid.columns + column;
+        return currentGrid.gridResults[cellIndex];
+    }
+
+    /**
+    * Skip the next N grid cells (useful for spanning cells or leaving empty spaces)
+    * @param count Number of cells to skip
+    **/
+    public function skipGridCells(count:Int):Void {
+        if (currentGrid == null) {
+            throw "skipGridCells called outside of grid context";
+        }
+        
+        currentGrid.currentCell = cast Math.min(currentGrid.currentCell + count, currentGrid.totalCells);
+    }
+
+    /**
+    * Position an element in the next available grid cell
+    **/
+    public function positionInGrid(elementDim:Dim, elementIndex:DimIndex):Bool {
+        var cellResult = nextGridCell();
+        if (cellResult == null) {
+            return false; // Grid is full
+        }
+        
+        // Position element within the cell
+        elementDim.x = cellResult.dim.x;
+        elementDim.y = cellResult.dim.y;
+        
+        // Apply fill/stretch if specified
+        if (fillNext) {
+            elementDim.width = cellResult.dim.width;
+            elementDim.height = cellResult.dim.height;
+            fillNext = false;
+        } else if (stretchNext) {
+            elementDim.width = cellResult.dim.width;
+            elementDim.height = cellResult.dim.height;
+            stretchNext = false;
+        }
+        
+        return true;
+    }
+
+    /**
+    * Position an element in a specific grid cell
+    * @param column Column index (0-based)
+    * @param row Row index (0-based)
+    **/
+    public function positionInGridCell(elementDim:Dim, elementIndex:DimIndex, column:Int, row:Int):Bool {
+        var cellResult = getGridCell(column, row);
+        if (cellResult == null) {
+            return false; // Out of bounds
+        }
+        
+        // Position element within the cell
+        elementDim.x = cellResult.dim.x;
+        elementDim.y = cellResult.dim.y;
+        
+        // Apply fill/stretch if specified
+        if (fillNext) {
+            elementDim.width = cellResult.dim.width;
+            elementDim.height = cellResult.dim.height;
+            fillNext = false;
+        } else if (stretchNext) {
+            elementDim.width = cellResult.dim.width;
+            elementDim.height = cellResult.dim.height;
+            stretchNext = false;
+        }
+        
+        return true;
+    }
+
+    /**
+    * Override positionInContainer to handle grid positioning
+    **/
+    private function positionInContainerGrid(elementDim:Dim, elementIndex:DimIndex):Void {
+        if (currentGrid != null) {
+            // We're in a grid context - use grid positioning
+            if (!positionInGrid(elementDim, elementIndex)) {
+                throw "Grid is full - cannot position more elements";
+            }
+        } else {
+            // Fallback to regular container positioning (existing logic)
+            positionInContainer(elementDim, elementIndex);
+        }
+    }
+
+    /**
+    * Apply spacing between grid cells by shrinking each cell and adjusting positions
+    **/
+    private function applyGridSpacing(gridResults:Array<DimResult>, columns:Int, rows:Int, spacing:Float):Void {
+        if (spacing <= 0 || gridResults.length == 0) return;
+        
+        var halfSpacing = spacing / 2;
+        
+        for (i in 0...gridResults.length) {
+            var cell = gridResults[i].dim;
+            var row = Math.floor(i / columns);
+            var col = i % columns;
+            
+            // Shrink cell dimensions to make room for spacing
+            var horizontalSpacing = (col == 0 || col == columns - 1) ? halfSpacing : spacing;
+            var verticalSpacing = (row == 0 || row == rows - 1) ? halfSpacing : spacing;
+            
+            cell.width -= horizontalSpacing;
+            cell.height -= verticalSpacing;
+            
+            // Adjust position to center the smaller cell
+            if (col > 0) cell.x += halfSpacing;
+            if (row > 0) cell.y += halfSpacing;
+        }
+    }
+
+    /**
+    * Convenience helper to create multiple equal DimCellSize entries
+    * @param cellSize The base cell size configuration
+    * @param count Number of identical cells to create
+    * @return Array of DimCellSize
+    **/
+    public static function createMultipleCells(cellSize:DimCellSize, count:Int):Array<DimCellSize> {
+        return Dimensions.dimMultiCellSize(cellSize, count);
+    }
+
+    /**
+    * Convenience helper to create percentage-based DimCellSize
+    * @param percentage Value between 0.0 and 1.0
+    * @return DimCellSize configured for percentage sizing
+    **/
+    public static function createPercentCell(percentage:Float):DimCellSize {
+        return {
+            value: percentage,
+            sizing: DIM_SIZING_PERCENT
+        };
+    }
+
+    /**
+    * Convenience helper to create pixel-based DimCellSize  
+    * @param pixels Fixed pixel size
+    * @return DimCellSize configured for pixel sizing
+    **/
+    public static function createPixelCell(pixels:Float):DimCellSize {
+        return {
+            value: pixels,
+            sizing: DIM_SIZING_PIXELS
+        };
+    }
+
+    /**
     * Perform flow layout calculations and update positions
     **/
     private function performFlowLayout(ctx:ContainerContext, direction:Direction, options:FlowBoxOptions):Void {
@@ -785,6 +1238,14 @@ class UIBuilder extends DimBuilder {
     * Position element in current container
     **/
     private function positionInContainer(elementDim:Dim, elementIndex:DimIndex):Void {
+        // Check if we're in a grid context first
+        if (currentGrid != null) {
+            if (!positionInGrid(elementDim, elementIndex)) {
+                throw "Grid is full - cannot position more elements";
+            }
+            return;
+        }
+
         if (currentContainer == null) return;
     
         var ctx = currentContainer;
@@ -871,6 +1332,10 @@ class UIBuilder extends DimBuilder {
                 ctx.nextY = ctx.padding;
                 nextDraggable = false;
                 nextDragOptions = null;
+            }
+            case Grid: {
+                // do nothing. Shouldn't get here
+                return;
             }
         }
         
