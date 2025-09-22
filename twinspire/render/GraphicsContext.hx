@@ -85,6 +85,7 @@ class GraphicsContext {
     private var _currentGroupRenderType:Id;
 
     private var _activeDimensions:Array<Bool>;
+    private var _enabledDimensions:Array<Bool>;
 
     private var _dormantDimIndices:Array<Int>;
     private var _dormantGroups:Array<Int>;
@@ -154,6 +155,7 @@ class GraphicsContext {
         _dimTempLinkTo = [];
         _dimForceChangeIndices = [];
         _activeDimensions = [];
+        _enabledDimensions = [];
         _containerTemp = [];
         _dormantDimIndices = [];
         _dormantGroups = [];
@@ -300,6 +302,47 @@ class GraphicsContext {
     public function clearDimensionCallbacks():Void {
         _dimensionCallbacks.clear();
         _callbackOrder = [];
+    }
+
+    /**
+    * Enabling a dimension is similar to activation, except designed to provide
+    * visual feedback to a user. Prefer this function versus activation to
+    * both enable/disable user input and provide visual feedback.
+    **/
+    public function enableDimension(index:DimIndex, enable:Bool = true) {
+        switch (index) {
+            case Direct(idx): {
+                _enabledDimensions[idx] = enable;
+                _activeDimensions[idx] = enable;
+            }
+            case Group(idx): {
+                var groupIndices = getDimIndicesAtGroupIndex(idx);
+                for (g in groupIndices) {
+                    _enabledDimensions[g] = enable;
+                    _activeDimensions[g] = enable;
+                }
+            }
+        }
+    }
+
+    /**
+    * Determines if an index is enabled and can receive events.
+    **/
+    public function isEnabled(index:DimIndex) {
+        switch (index) {
+            case Direct(idx): {
+                return _enabledDimensions[idx];
+            }
+            case Group(idx): {
+                var groupIndices = getDimIndicesAtGroupIndex(idx);
+                for (g in groupIndices) {
+                    if (!_enabledDimensions[g]) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
     }
 
     /**

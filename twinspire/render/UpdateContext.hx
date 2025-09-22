@@ -1611,6 +1611,13 @@ class UpdateContext {
     }
     
     /**
+    * Determines if a dimension is enabled.
+    **/
+    public function isEnabled(index:DimIndex) {
+        return _gctx.isEnabled(index);
+    }
+
+    /**
     * Checks that the following dimension at the given index is receiving a mouse
     * over event.
     *
