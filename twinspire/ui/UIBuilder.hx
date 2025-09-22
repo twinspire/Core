@@ -194,6 +194,19 @@ class UIBuilder extends DimBuilder {
     }
 
     /**
+    * Get the dim of the last item created.
+    **/
+    public function getLastItemDim() {
+        if (sceneObjects.length == 0) {
+            return null;
+        }
+
+        var lastObject = sceneObjects[sceneObjects.length - 1];
+        var dim = getDimension(lastObject.index);
+        return dim;
+    }
+
+    /**
     * Create a button.
     **/
     public function button(text:String, ?size:FastVector2):Button {
