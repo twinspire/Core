@@ -805,6 +805,21 @@ class UIBuilder extends DimBuilder {
     }
 
     /**
+    * Gets the current grid cell. Starts at zero.
+    **/
+    public function getCurrentGridCell():DimResult {
+        if (currentGrid == null) {
+            throw "nextGridCell called outside of grid context";
+        }
+        
+        if (currentGrid.currentCell >= currentGrid.totalCells) {
+            return null; // Grid is full
+        }
+
+        return currentGrid.gridResults[currentGrid.currentCell];
+    }
+
+    /**
     * Get a specific grid cell by row and column indices
     * @param column Column index (0-based)
     * @param row Row index (0-based)
