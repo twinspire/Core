@@ -513,7 +513,7 @@ class UIBuilder extends DimBuilder {
     * End the current tab control, returning the final state.
     **/
     public function endTabControl():TabControl {
-
+        return new TabControl();
     }
 
     /**
