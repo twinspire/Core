@@ -488,6 +488,35 @@ class UIBuilder extends DimBuilder {
     }
 
     /**
+    * Begin a new tab control.
+    *
+    * @param name Give a name for this tab control.
+    * @param width The width of this tab control.
+    * @param height The height of this tab control.
+    * @param tabPageHeight (Optional) The height of the pages in the tab selection pane. If not supplied, the height is calculated based on the font.
+    * @param extraControls (Optional) Whether or not to allow extra controls in the tab selection pane.
+    * @param extraControlWidth (Optional) The width of the container used to contain any extra controls, flowing left from the right.
+    **/
+    public function beginTabControl(name:String, width:Float, height:Float, ?tabPageHeight:Float = 0.0, ?extraControls:Bool = false, ?extraControlWidth:Float = 0.0) {
+        // perform initial calculations and cache some of the results
+        
+    }
+
+    /**
+    * Assign into the tab control the content callback of the next tab page element to create.
+    **/
+    public function assignTabPageContent(contentCallback:(IDimBuilder) -> Void) {
+
+    }
+
+    /**
+    * End the current tab control, returning the final state.
+    **/
+    public function endTabControl():TabControl {
+
+    }
+
+    /**
     * Begin a vertical or horizontal box layout.
     **/
     public function beginBox(orientation:BoxOrientation, width:Float, height:Float, spacing:Float = 0, padding:Float = 0):Box {
