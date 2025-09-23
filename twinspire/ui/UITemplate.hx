@@ -19,6 +19,7 @@ class UITemplate extends Template {
     public static var buttonId:Id;
     public static var checkboxId:Id;
     public static var boxId:Id;
+    public static var tabPageId:Id;
     
 
     public var containerStates:Map<String, ContainerState> = new Map();
@@ -68,6 +69,11 @@ class UITemplate extends Template {
         IdAssoc.assoc[boxId].update = Box.update;
         IdAssoc.assoc[boxId].render = Box.render;
         IdAssoc.assoc[boxId].end = Box.end;
+
+        tabPageId = Application.createId(true);
+        IdAssoc.assoc[tabPageId].update = TabPage.update;
+        IdAssoc.assoc[tabPageId].render = TabPage.render;
+        IdAssoc.assoc[tabPageId].end = TabPage.end;
     }
     
     /**

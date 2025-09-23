@@ -1,7 +1,9 @@
 package twinspire.ui;
 
+import js.html.Text;
 import twinspire.DimIndex.DimIndexUtils;
 import twinspire.ui.widgets.Box.BoxOrientation;
+import twinspire.ui.widgets.TabPage.TabPageStyle;
 import twinspire.ui.widgets.*;
 import twinspire.geom.Dim;
 import kha.Font;
@@ -351,6 +353,138 @@ class UIBuilder extends DimBuilder {
         trackFlowElement(checkbox);
 
         return checkbox;
+    }
+
+    /**
+    * Create a tab page.
+    **/
+    public function tabPage(text:String, ?showClose:Bool = false, ?style:TabPageStyle = RoundedCorners, ?size:FastVector2):TabPage {
+        var gtx = Application.instance.graphicsCtx;
+        var id = getId(UITemplate.tabPageId);
+
+        var dim = new Dim(0, 0, size != null ? size.x : 0, size != null ? size.y : 0);
+        var dimResult = Dimensions.createFromDim(dim, Ui());
+        var isStretching = stretchNext;
+
+        positionInContainer(dimResult.dim, dimResult.index);
+        add(dimResult);
+
+        var textDimResult = createText(text, dimResult.index);
+        
+        // Create close button if needed
+        var closeButtonDimResult:DimResult = null;
+        if (showClose) {
+            var buttonSize = Math.min(textDimResult.dim.height, 16);
+            var buttonDim = new Dim(0, 0, buttonSize, buttonSize);
+            Dimensions.advanceOrder();
+            closeButtonDimResult = Dimensions.createFromDim(buttonDim, Ui(dimResult.index));
+            Dimensions.reduceOrder();
+            add(closeButtonDimResult);
+        }
+
+        var padding = 12; // Horizontal padding
+        var triangleOffset = switch (style) {
+            case TriangularRight: {
+                padding;
+            }
+            default: {
+                0.0;
+            }
+        };
+
+        // Auto-size tab if no size specified
+        if (size == null) {
+            var textWidth = textDimResult.dim.width;
+            var textHeight = textDimResult.dim.height;
+            var closeButtonWidth = showClose ? 20 : 0; // Space for close button + padding
+            
+            if (containerStack.length > 0) {
+                var box = containerStack[containerStack.length - 1];
+                switch (box.orientation) {
+                    case Flow(direction, options): {
+                        if (!isStretching) {
+                            Dimensions.dimGrowW(dimResult.index, textWidth + closeButtonWidth + padding + triangleOffset);
+                            Dimensions.dimGrowH(dimResult.index, textHeight + 8); // Vertical padding
+                        }
+                        else {
+                            if (direction == Left || direction == Right) {
+                                Dimensions.dimGrowW(dimResult.index, textWidth + closeButtonWidth + padding + triangleOffset);
+                            }
+                            else if (direction == Up || direction == Down) {
+                                Dimensions.dimGrowH(dimResult.index, textHeight + 8);
+                            }
+                        }
+                    }
+                    default: {
+                        Dimensions.dimGrowW(dimResult.index, textWidth + closeButtonWidth + padding + triangleOffset);
+                        Dimensions.dimGrowH(dimResult.index, textHeight + 8);
+                    }
+                }
+            } else {
+                Dimensions.dimGrowW(dimResult.index, textWidth + closeButtonWidth + padding + triangleOffset);
+                Dimensions.dimGrowH(dimResult.index, textHeight + 8);
+            }
+
+            dimResult.dim = getDimension(dimResult.index);
+        }
+
+        // Position text and close button within the tab
+        Dimensions.dimAlign(dimResult.index, textDimResult.index, VALIGN_CENTRE, HALIGN_LEFT);
+        Dimensions.dimOffsetX(textDimResult.index, padding / 2); // Offset text from left edge
+        textDimResult.dim = getDimension(textDimResult.index);
+        
+        if (showClose && closeButtonDimResult != null) {
+            Dimensions.dimAlign(dimResult.index, closeButtonDimResult.index, VALIGN_CENTRE, HALIGN_RIGHT);
+            Dimensions.dimOffsetX(closeButtonDimResult.index, -((padding / 2) + triangleOffset)); // Offset from right edge
+            closeButtonDimResult.dim = getDimension(closeButtonDimResult.index);
+            
+            // Adjust text positioning to not overlap with close button
+            var availableWidth = dimResult.dim.width - closeButtonDimResult.dim.width - 18; // Extra padding
+            if (textDimResult.dim.width > availableWidth) {
+                // Could implement text truncation here if needed
+            }
+        }
+        
+        var dimIndex = advanceSceneObject();
+        var tabPage:TabPage;
+        
+        if (isUpdate && dimIndex < sceneObjects.length) {
+            // Update existing SceneObject
+            tabPage = cast(sceneObjects[dimIndex], TabPage);
+            tabPage.lastChangedDim = dimResult.dim;
+        } else {
+            // Create new SceneObject
+            tabPage = new TabPage();
+            tabPage.type = id;
+            tabPage.text = text;
+            tabPage.showClose = showClose;
+            tabPage.style = style;
+            tabPage.font = font;
+            tabPage.fontSize = fontSize;
+            tabPage.wrapperIndex = dimResult.index;
+            tabPage.textIndex = textDimResult.index;
+            tabPage.closeButtonIndex = closeButtonDimResult != null ? closeButtonDimResult.index : null;
+            tabPage.targetContainer = dimResult.dim.clone();
+
+            gtx.beginGroup();
+            gtx.addToGroup(dimResult.index);
+            gtx.addToGroup(textDimResult.index);
+            if (closeButtonDimResult != null) {
+                gtx.setupDirectLink(closeButtonDimResult.index, dimResult.index);
+                gtx.addToGroup(closeButtonDimResult.index);
+            }
+            tabPage.index = Group(gtx.endGroup(), id);
+            
+            if (dimIndex < sceneObjects.length) {
+                sceneObjects[dimIndex] = tabPage;
+            } else {
+                sceneObjects.push(tabPage);
+            }
+        }
+
+        trackFlowElement(tabPage);
+        
+        return tabPage;
     }
 
     /**

@@ -1130,7 +1130,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */ 
-    public static function dimOffsetX(aIndex:DimIndex, offsetX:Float, ?addLogic:AddLogic):DimResult {
+    public static function dimOffsetXClone(aIndex:DimIndex, offsetX:Float, ?addLogic:AddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
         var a = getCurrentDimAtIndex(aIndex);
 
@@ -1154,6 +1154,13 @@ class Dimensions {
         };
     }
 
+    public static function dimOffsetX(aIndex:DimIndex, offsetX:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = getCurrentDimAtIndex(aIndex);
+
+        a.x += offsetX;
+    }
+
     /**
      * Create a new dimension from an existing dimension, offsetting by the value of y as a margin from the given dimension.
      * If `offsetY` is less than `0`, then the new dimension will appear above the new dimension, rather than below.
@@ -1164,7 +1171,7 @@ class Dimensions {
      *
      * @return Returns a `DimResult` with a `dim`, and `index` value if available.
      */
-    public static function dimOffsetY(aIndex:DimIndex, offsetY:Float, ?addLogic:AddLogic):DimResult {
+    public static function dimOffsetYClone(aIndex:DimIndex, offsetY:Float, ?addLogic:AddLogic):DimResult {
         var gtx = Application.instance.graphicsCtx;
         var a = getCurrentDimAtIndex(aIndex);
 
@@ -1186,6 +1193,13 @@ class Dimensions {
             dim: result,
             index: resultIndex
         };
+    }
+
+    public static function dimOffsetY(aIndex:DimIndex, offsetY:Float) {
+        var gtx = Application.instance.graphicsCtx;
+        var a = getCurrentDimAtIndex(aIndex);
+
+        a.y += offsetY;
     }
 
     /**
