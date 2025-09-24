@@ -11,7 +11,7 @@ class TabControl extends SceneObject {
 
     // internals
     private var tabsContainerIndex:DimIndex;
-    private var tabContentIndex:DimIndex;
+    public var tabContentIndex:DimIndex;
     private var tabsExtraIndex:DimIndex;
     private var tabsDropdownListIndex:DimIndex;
 

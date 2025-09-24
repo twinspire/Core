@@ -96,8 +96,8 @@ class UIBuilder extends DimBuilder {
         return containerStack.length > 0 ? containerStack[containerStack.length - 1] : null;
     }
     
-    public function new(?existingResults:Array<DimResult>, ?isUpdate:Bool) {
-        super(existingResults ?? [], isUpdate ?? false);
+    public function new(?existingResults:Array<DimResult>, ?isUpdate:Bool, bounds:Dim, parentIndex:DimIndex) {
+        super(existingResults ?? [], isUpdate ?? false, bounds, parentIndex);
     }
 
     /**

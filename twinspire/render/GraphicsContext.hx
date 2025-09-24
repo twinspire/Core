@@ -75,6 +75,7 @@ class GraphicsContext {
     private var _vectorSpaces:Array<VectorSpace>;
     private var _activeContainers:Array<ContainerResult>;
     private var _containerStack:Array<ContainerResult>; // For nested containers
+    private var _nextVectorSpaceZIndex:Int = 0;
 
     private var _buffers:Array<Image>;
     private var _bufferDimensionIndices:Array<Array<Int>>;
@@ -1670,22 +1671,51 @@ class GraphicsContext {
     * @param bounds The dimensions of the container.
     * @param renderType An optional render type ID to specify how the container should be rendered.
     **/
-    public function createContainer(bounds:Dim, renderType:Id = null):ContainerResult {
-        // Create the container dimension (setup phase)
-        var containerIndex = addUI(bounds, renderType ?? Id.None);
-        
-        // Create associated VectorSpace
+    public function createContainer(bounds:Dim, renderType:Id = null, ?parentDimIndex:DimIndex, ?enableScrolling:Bool = true, ?scrollOptions:{smooth:Bool, speed:Float}):ContainerResult {
+        // Create the VectorSpace first
         var vectorSpace = new VectorSpace(bounds);
         
-        var result:ContainerResult = {
-            index: containerIndex,
-            space: vectorSpace,
-            containerIndex: _vectorSpaces.length
-        };
+        // Set up hierarchy if parent is specified
+        if (parentDimIndex != null) {
+            vectorSpace.parentDimIndex = parentDimIndex;
+            
+            // Find parent VectorSpace to calculate appropriate z-index
+            var parentVectorSpace = findVectorSpaceForDimension(parentDimIndex);
+            if (parentVectorSpace != null) {
+                // Child VectorSpaces have higher z-index than parents
+                vectorSpace.zIndex = parentVectorSpace.zIndex + 1;
+            } else {
+                vectorSpace.zIndex = _nextVectorSpaceZIndex++;
+            }
+        } else {
+            // Root level VectorSpace
+            vectorSpace.zIndex = _nextVectorSpaceZIndex++;
+        }
         
+        // Configure scrolling
+        if (enableScrolling) {
+            var smooth = scrollOptions?.smooth ?? true;
+            var speed = scrollOptions?.speed ?? 6.0;
+            
+            vectorSpace.enableScrolling(BUTTON_LEFT, smooth);
+            vectorSpace.setScrollSpeed(speed);
+            vectorSpace.setScrollThreshold(0.5);
+        }
+        
+        // Add to managed VectorSpaces
         _vectorSpaces.push(vectorSpace);
         
-        return result;
+        // Create a basic DimIndex for the container
+        var containerDim = bounds.clone();
+        var containerIndex = addUI(containerDim, renderType ?? Id.None, parentDimIndex != null ? DimIndexUtils.getDirectIndex(parentDimIndex) : -1);
+        
+        var containerResultIndex = containers.length - 1;
+        
+        return {
+            index: containerIndex,
+            space: vectorSpace,
+            containerIndex: containerResultIndex
+        };
     }
 
     /**
@@ -2045,6 +2075,17 @@ class GraphicsContext {
         addDimensionIndexToGroup(index);
 
         var result = DimIndex.Direct(index, renderType);
+
+        if (linkTo >= 0) {
+            var parentDimIndex = Direct(linkTo);
+            var parentVectorSpace = findVectorSpaceForDimension(parentDimIndex);
+            
+            if (parentVectorSpace != null) {
+                // Add this dimension to the parent's VectorSpace
+                parentVectorSpace.addChild(result);
+            }
+        }
+        
         return result;
     }
 

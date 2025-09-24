@@ -1,10 +1,13 @@
 package twinspire.ui;
 
+import twinspire.geom.Dim;
 import twinspire.ui.widgets.*;
 import twinspire.scenes.SceneObject;
 import twinspire.render.UpdateContext;
 import twinspire.render.GraphicsContext;
 import twinspire.IdAssoc;
+
+using StringTools;
 
 typedef ContainerState = {
     builderCallback: (IDimBuilder) -> Void,
@@ -20,7 +23,6 @@ class UITemplate extends Template {
     public static var checkboxId:Id;
     public static var boxId:Id;
     public static var tabPageId:Id;
-    
 
     public var containerStates:Map<String, ContainerState> = new Map();
 
@@ -31,7 +33,13 @@ class UITemplate extends Template {
         super();
         
         // Override builder callback to use UIBuilder
-        initBuilderCallback = (name:String, isUpdate:Bool) -> {
+        initBuilderCallback = (name:String, isUpdate:Bool, ?bounds:Dim, ?parentDimIndex:DimIndex) -> {
+            // Auto-detect parent for content builders
+            if (name.indexOf("_content") >= 0 && parentDimIndex == null) {
+                var controlName = name.replace("_content", "");
+                parentDimIndex = getParentDimIndexForContent(controlName);
+            }
+
             var existingBuilder = currentBuilders.get(name);
             
             if (existingBuilder != null && isUpdate) {
@@ -40,7 +48,7 @@ class UITemplate extends Template {
                 return existingBuilder;
             } else {
                 // Create new builder for first time or non-update scenarios
-                var newBuilder = new UIBuilder();
+                var newBuilder = new UIBuilder(bounds, parentDimIndex);
                 currentBuilders.set(name, newBuilder);
                 return newBuilder;
             }
@@ -99,8 +107,20 @@ class UITemplate extends Template {
         var builder = currentBuilders.get(name);
         return builder != null ? builder.removeSceneObject(index) : false;
     }
+
+    private function getParentDimIndexForContent(name:String):DimIndex {
+        // Look up the object's content container index
+        var objects = getUIObjects(name);
+        for (obj in objects) {
+            if (Std.isOfType(obj, TabControl)) {
+                var tabControl = cast(obj, TabControl);
+                return tabControl.tabContentIndex; // This becomes the parent
+            }
+        }
+        return null;
+    }
     
-    public override function addOrUpdateDim(name:String, builder:(IDimBuilder) -> Void, ?scope:AddLogic, ?dependsOn:String) {
+    public override function addOrUpdateDim(name:String, builder:(IDimBuilder) -> Void, ?scope:AddLogic, ?dependsOn:String, ?bounds:Dim, ?parentIndex:DimIndex) {
         if (!containerStates.exists(name)) {
             containerStates.set(name, {
                 builderCallback: builder,
@@ -114,7 +134,7 @@ class UITemplate extends Template {
             state.builderCallback = builder;
         }
 
-        super.addOrUpdateDim(name, builder, scope ?? AddLogic.Ui(), dependsOn);        
+        super.addOrUpdateDim(name, builder, scope ?? AddLogic.Ui(), dependsOn, bounds, parentIndex);        
     }
     
     // Lifecycle methods remain the same but use currentBuilders

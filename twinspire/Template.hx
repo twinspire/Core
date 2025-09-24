@@ -20,7 +20,9 @@ class Template {
     private var dependencies:Array<Dependent>;
 
 
-    private var initBuilderCallback:(String, Bool) -> IDimBuilder;
+    private var initBuilderCallback:(String, Bool, ?Dim, ?DimIndex) -> IDimBuilder = (name, isUpdate, ?bounds, ?parentDimIndex) -> {
+        return new DimBuilder([], isUpdate, bounds, parentDimIndex);
+    };
 
 
     /**
@@ -37,9 +39,9 @@ class Template {
         callbacks = [];
         dependencies = [];
 
-        initBuilderCallback = (name:String, isUpdate:Bool) -> { 
-            return new DimBuilder(dimensionRefs.get(name) ?? [], isUpdate);
-        }
+        initBuilderCallback = (name:String, isUpdate:Bool, ?bounds:Dim, ?parentDimIndex:DimIndex) -> {
+            return new DimBuilder([], isUpdate, bounds, parentDimIndex);
+        };
     }
 
     /**
@@ -54,12 +56,14 @@ class Template {
     * @param scope The `AddLogic` used to determine what type of dimension should be created in `GraphicsContext`.
     * @param dependsOn An optional string value specifying which `name` this dimension should depend on.
     **/
-    public function addOrUpdateDim(name:String, builder:(IDimBuilder) -> Void, ?scope:AddLogic, ?dependsOn:String) {
+    public function addOrUpdateDim(name:String, builder:(IDimBuilder) -> Void, ?scope:AddLogic, ?dependsOn:String, ?bounds:Dim, ?parentDimIndex:DimIndex) {
         var existingResults = dimensionRefs.get(name);
-        var existingGroups = groupRefs.get(name) ?? [];
         var isUpdate = existingResults != null;
         
-        var dimBuilder = initBuilderCallback(name, isUpdate);
+        // GraphicsContext automatically handles VectorSpace setup based on bounds and parentDimIndex
+        var dimBuilder = initBuilderCallback(name, isUpdate, bounds, parentDimIndex);
+        
+        // Rest unchanged
         if (isUpdate) {
             Dimensions.beginEdit();
         }
