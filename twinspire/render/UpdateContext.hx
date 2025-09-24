@@ -10,6 +10,7 @@ import twinspire.events.GameEventTimeNode;
 import twinspire.events.GameEvent;
 import twinspire.events.Buttons;
 import twinspire.events.EventDispatcher;
+import twinspire.render.vector.VectorSpace;
 import twinspire.render.GraphicsContext;
 import twinspire.render.RenderQuery;
 import twinspire.render.QueryType;
@@ -38,6 +39,25 @@ typedef KeyRepeatInfo = {
     var lastRepeatTime:Float;
 }
 
+typedef VectorSpaceHit = {
+    var vectorSpace:VectorSpace;
+    var bounds:Dim;
+    var zIndex:Int;
+    var nestingDepth:Int;
+    var canScrollVertically:Bool;
+    var canScrollHorizontally:Bool;
+    var isAtScrollLimit:Bool;
+    var scrollLimitDirection:ScrollDirection;
+}
+
+enum ScrollDirection {
+    None;
+    Up;
+    Down;
+    Left; 
+    Right;
+}
+
 @:allow(Application)
 class UpdateContext {
 
@@ -63,6 +83,10 @@ class UpdateContext {
     private var _keysDown:Array<Int>;
     private var _charString:String;
     private var _activatedIndex:Int;
+
+    private var _vectorSpaceHits:Array<VectorSpaceHit> = [];
+    private var _scrollEventConsumed:Bool = false;
+    private var _vectorSpaceScrollHandled:Bool = false;
 
     // button pressing down
     // floating points since some buttons allow pressure
@@ -204,6 +228,138 @@ class UpdateContext {
         }
 
         _hotkeyAssociations.remove(index);
+    }
+
+    /**
+    * Find all VectorSpaces under mouse position, sorted by priority
+    **/
+    private function findVectorSpacesUnderMouse():Array<VectorSpaceHit> {
+        var mousePos = GlobalEvents.getMousePosition();
+        var hits:Array<VectorSpaceHit> = [];
+        
+        // Get all VectorSpaces from GraphicsContext
+        var allVectorSpaces = _gctx.getAllVectorSpaces(); // Assuming this method exists
+        
+        for (vectorSpace in allVectorSpaces) {
+            if (!vectorSpace.scrollable) continue;
+            
+            var bounds = vectorSpace.bounds;
+            
+            // Check if mouse is within bounds
+            if (mousePos.x >= bounds.x && mousePos.x < bounds.x + bounds.width &&
+                mousePos.y >= bounds.y && mousePos.y < bounds.y + bounds.height) {
+                
+                hits.push({
+                    vectorSpace: vectorSpace,
+                    bounds: bounds,
+                    zIndex: vectorSpace.zIndex,
+                    nestingDepth: vectorSpace.getNestingDepth(allVectorSpaces),
+                    canScrollVertically: vectorSpace.canScrollVertically(),
+                    canScrollHorizontally: vectorSpace.canScrollHorizontally(),
+                    isAtScrollLimit: false,
+                    scrollLimitDirection: None
+                });
+            }
+        }
+        
+        // Sort by priority: higher nesting depth first, then by zIndex, then by event priority
+        hits.sort((a, b) -> {
+            // Primary: Nesting depth (deeper = higher priority)
+            if (a.nestingDepth != b.nestingDepth) {
+                return b.nestingDepth - a.nestingDepth;
+            }
+            
+            // Secondary: Z-index (higher = higher priority) 
+            if (a.zIndex != b.zIndex) {
+                return b.zIndex - a.zIndex;
+            }
+            
+            // Tertiary: Event priority
+            return b.vectorSpace.eventPriority - a.vectorSpace.eventPriority;
+        });
+        
+        return hits;
+    }
+    
+    /**
+    * Check if VectorSpace has reached scroll limit in given direction
+    **/
+    private function checkScrollLimit(vectorSpace:VectorSpace, scrollDeltaX:Float, scrollDeltaY:Float):ScrollDirection {
+        var currentScroll = vectorSpace.getScrollPosition();
+        
+        // Check vertical limits
+        if (scrollDeltaY != 0) {
+            if (scrollDeltaY > 0) { // Scrolling down
+                var maxScrollY = vectorSpace.getMaxScrollY();
+                if (currentScroll.y >= maxScrollY - 1) return Down;
+            } else { // Scrolling up
+                var minScrollY = vectorSpace.getMinScrollY();
+                if (currentScroll.y <= minScrollY + 1) return Up;
+            }
+        }
+        
+        // Check horizontal limits
+        if (scrollDeltaX != 0) {
+            if (scrollDeltaX > 0) { // Scrolling right
+                var maxScrollX = vectorSpace.getMaxScrollX();
+                if (currentScroll.x >= maxScrollX - 1) return Right;
+            } else { // Scrolling left
+                var minScrollX = vectorSpace.getMinScrollX();
+                if (currentScroll.x <= minScrollX + 1) return Left;
+            }
+        }
+        
+        return None;
+    }
+    
+    /**
+    * Handle hierarchical scroll event bubbling
+    **/
+    private function handleHierarchicalScrolling():Bool {
+        var scrollDelta = GlobalEvents.getMouseDelta();
+        if (scrollDelta == 0) return false;
+        
+        _scrollEventConsumed = false;
+        
+        // Determine scroll direction (shift for horizontal)
+        var keyMods = GlobalEvents.getCurrentKeyModifiers();
+        var shiftPressed = keyMods.contains(KeyCode.Shift);
+        
+        var scrollDeltaX = shiftPressed ? scrollDelta * 20.0 : 0.0;
+        var scrollDeltaY = !shiftPressed ? scrollDelta * 20.0 : 0.0;
+        
+        // Find all VectorSpaces under mouse, sorted by hierarchy/priority
+        _vectorSpaceHits = findVectorSpacesUnderMouse();
+        
+        // Try each VectorSpace in priority order until one consumes the event
+        for (hit in _vectorSpaceHits) {
+            if (_scrollEventConsumed) break;
+            
+            var vectorSpace = hit.vectorSpace;
+            
+            // Calculate effective scroll delta for this VectorSpace
+            var deltaX = hit.canScrollHorizontally ? scrollDeltaX : 0.0;
+            var deltaY = hit.canScrollVertically ? scrollDeltaY : 0.0;
+            
+            // Skip if can't scroll in requested direction
+            if (deltaX == 0 && deltaY == 0) continue;
+            
+            // Check scroll limits
+            var limitDirection = checkScrollLimit(vectorSpace, deltaX, deltaY);
+            hit.isAtScrollLimit = (limitDirection != None);
+            hit.scrollLimitDirection = limitDirection;
+            
+            // If not at limit, apply scroll and consume event
+            if (!hit.isAtScrollLimit) {
+                vectorSpace.scrollBy(deltaX, deltaY);
+                _scrollEventConsumed = true;
+                break; // Event consumed - stop bubbling
+            }
+            
+            // At limit - continue to next VectorSpace (event bubbles up)
+        }
+        
+        return _scrollEventConsumed;
     }
 
     /**
@@ -522,12 +678,140 @@ class UpdateContext {
     * Phase 4: Process container scrolling
     **/
     private function _processContainerScrolling() {
+        if (_tryVectorSpaceHierarchicalScrolling()) {
+            _vectorSpaceScrollHandled = true;
+            return;
+        }
+        
+        // FALLBACK: Existing Container system (unchanged)
         var containers = _gctx.getActiveContainers();
         var activeContainerIndex = _findActiveContainer(containers);
-        
         if (activeContainerIndex >= 0) {
             _handleContainerScrolling(activeContainerIndex);
         }
+    }
+
+    private function _findVectorSpacesUnderMouse():Array<VectorSpaceHit> {
+        var mousePos = GlobalEvents.getMousePosition();
+        var hits:Array<VectorSpaceHit> = [];
+        
+        // Get all VectorSpaces from GraphicsContext
+        var allVectorSpaces = _gctx.getAllVectorSpaces();
+        
+        for (vectorSpace in allVectorSpaces) {
+            if (!vectorSpace.scrollable) continue;
+            
+            var bounds = vectorSpace.bounds;
+            
+            // Check if mouse is within bounds
+            if (mousePos.x >= bounds.x && mousePos.x < bounds.x + bounds.width &&
+                mousePos.y >= bounds.y && mousePos.y < bounds.y + bounds.height) {
+                
+                hits.push({
+                    vectorSpace: vectorSpace,
+                    bounds: bounds,
+                    zIndex: vectorSpace.zIndex,
+                    nestingDepth: _calculateNestingDepth(vectorSpace, allVectorSpaces),
+                    canScrollVertically: vectorSpace.canScrollVertically(),
+                    canScrollHorizontally: vectorSpace.canScrollHorizontally(),
+                    isAtScrollLimit: false,
+                    scrollLimitDirection: None
+                });
+            }
+        }
+        
+        // Sort by hierarchy priority (deeper nesting = higher priority)
+        hits.sort((a, b) -> {
+            // Primary: Nesting depth (deeper = higher priority)
+            if (a.nestingDepth != b.nestingDepth) {
+                return b.nestingDepth - a.nestingDepth;
+            }
+            
+            // Secondary: Z-index (higher = higher priority)
+            if (a.zIndex != b.zIndex) {
+                return b.zIndex - a.zIndex;
+            }
+            
+            // Tertiary: Event priority
+            return b.vectorSpace.eventPriority - a.vectorSpace.eventPriority;
+        });
+        
+        return hits;
+    }
+
+    private function _calculateNestingDepth(vectorSpace:VectorSpace, allVectorSpaces:Array<VectorSpace>):Int {
+        if (vectorSpace.parentDimIndex == null) return 0;
+        
+        // Find parent VectorSpace
+        for (parentVectorSpace in allVectorSpaces) {
+            if (parentVectorSpace.hasChild(vectorSpace.parentDimIndex)) {
+                return 1 + _calculateNestingDepth(parentVectorSpace, allVectorSpaces);
+            }
+        }
+        
+        return 0; // Fallback if parent not found
+    }
+
+    private function _tryVectorSpaceHierarchicalScrolling():Bool {
+        // 1. Check if there's actually mouse wheel input
+        var scrollDelta = GlobalEvents.getMouseDelta();
+        if (scrollDelta == 0) return false;
+        
+        // 2. Find ALL VectorSpaces under the mouse cursor
+        var vectorSpaceHits = _findVectorSpacesUnderMouse();
+        if (vectorSpaceHits.length == 0) return false;
+        
+        var shiftPressed = GlobalEvents.isKeyDown(KeyCode.Shift);
+
+        // 3. Try each VectorSpace in priority order
+        for (hit in vectorSpaceHits) {
+            // Can this VectorSpace scroll in the requested direction?
+            var deltaX = shiftPressed && hit.canScrollHorizontally ? scrollDelta * 20 : 0;
+            var deltaY = !shiftPressed && hit.canScrollVertically ? scrollDelta * 20 : 0;
+            
+            if (deltaX == 0 && deltaY == 0) continue; // Can't scroll
+            
+            // Is this VectorSpace at its scroll limit?
+            var atLimit = _isVectorSpaceAtScrollLimit(hit.vectorSpace, deltaX, deltaY);
+            if (!atLimit) {
+                // Apply the scroll and consume the event
+                hit.vectorSpace.scrollBy(deltaX, deltaY);
+                return true; // Event consumed - stop trying other VectorSpaces
+            }
+            
+            // At scroll limit - try the next VectorSpace (bubbling up)
+        }
+        
+        return false; // No VectorSpace could handle the scroll
+    }
+
+    private function _isVectorSpaceAtScrollLimit(vectorSpace:VectorSpace, deltaX:Float, deltaY:Float):Bool {
+        var currentScroll = vectorSpace.getScrollPosition();
+        var tolerance = 1.0; // Small tolerance for float precision
+        
+        // Check vertical limits
+        if (deltaY != 0) {
+            if (deltaY > 0) { // Scrolling down
+                var maxScrollY = vectorSpace.getMaxScrollY();
+                if (currentScroll.y >= maxScrollY - tolerance) return true;
+            } else { // Scrolling up  
+                var minScrollY = vectorSpace.getMinScrollY();
+                if (currentScroll.y <= minScrollY + tolerance) return true;
+            }
+        }
+        
+        // Check horizontal limits
+        if (deltaX != 0) {
+            if (deltaX > 0) { // Scrolling right
+                var maxScrollX = vectorSpace.getMaxScrollX();
+                if (currentScroll.x >= maxScrollX - tolerance) return true;
+            } else { // Scrolling left
+                var minScrollX = vectorSpace.getMinScrollX();
+                if (currentScroll.x <= minScrollX + tolerance) return true;
+            }
+        }
+        
+        return false; // Not at limit
     }
     
     /**
@@ -1110,9 +1394,14 @@ class UpdateContext {
         return possibleActiveContainers.length > 0 ? 
             possibleActiveContainers[possibleActiveContainers.length - 1] : -1;
     }
+
+    
     
     private function _handleContainerScrolling(containerIndex:Int):Bool {
-        // Check if focused text input should handle mouse wheel events first
+        if (_vectorSpaceScrollHandled) {
+            return true; // Already handled by VectorSpace
+        }
+        
         if (_activatedIndex > -1 && _gctx.queries[_activatedIndex].acceptsTextInput) {
             var textInputDimIndex = _activatedIndex;
             
@@ -1125,7 +1414,6 @@ class UpdateContext {
             }
         }
         
-        // Handle normal container scrolling
         return _scrollContainerAtIndex(containerIndex);
     }
     
@@ -2615,6 +2903,7 @@ class UpdateContext {
         _isDragStart = -1;
         _isDragEnd = -1;
         _charString = "";
+        _vectorSpaceScrollHandled = false;
 
         // do container checks here.
         for (i in 0..._gctx.containers.length) {

@@ -1615,6 +1615,54 @@ class GraphicsContext {
         return index;
     }
 
+    public function getAllVectorSpaces():Array<VectorSpace> {
+        return _vectorSpaces.copy();
+    }
+
+    public function createVectorSpaceWithHierarchy(bounds:Dim, ?parentDimIndex:DimIndex = null, ?zIndex:Int = -1):VectorSpace {
+        var vectorSpace = new VectorSpace(bounds);
+        
+        // Set hierarchy information
+        if (parentDimIndex != null) {
+            vectorSpace.parentDimIndex = parentDimIndex;
+            
+            // Find parent VectorSpace to calculate appropriate z-index
+            var parentVectorSpace = findVectorSpaceForDimension(parentDimIndex);
+            if (parentVectorSpace != null) {
+                // Child VectorSpaces should have higher z-index than parents
+                vectorSpace.zIndex = zIndex >= 0 ? zIndex : (parentVectorSpace.zIndex + 1);
+            }
+        } else {
+            vectorSpace.zIndex = zIndex >= 0 ? zIndex : 0;
+        }
+        
+        // Add to managed VectorSpaces
+        _vectorSpaces.push(vectorSpace);
+        
+        return vectorSpace;
+    }
+
+    private function findVectorSpaceForDimension(index:DimIndex):Null<VectorSpace> {
+        for (vectorSpace in _vectorSpaces) {
+            if (vectorSpace.hasChild(index)) {
+                return vectorSpace;
+            }
+        }
+        return null;
+    }
+
+    public function updateVectorSpaceHierarchy():Void {
+        // Sort VectorSpaces by z-index for efficient processing
+        _vectorSpaces.sort((a, b) -> a.zIndex - b.zIndex);
+        
+        // Update all VectorSpace scrolling
+        for (vectorSpace in _vectorSpaces) {
+            if (vectorSpace.scrollable) {
+                vectorSpace.updateScrolling();
+            }
+        }
+    }
+
     /**
     * Create a container with the given bounds and render type. This function is used to create
     * a container that can hold dimensions and render them as a group.
@@ -1746,21 +1794,6 @@ class GraphicsContext {
         
         // No vector space - return original dimension
         return worldDim;
-    }
-
-    /**
-    * Finds the VectorSpace that contains the given dimension.
-    **/
-    private function findVectorSpaceForDimension(index:DimIndex):Null<VectorSpace> {
-        if (vectorSpace != null) {
-            for (childIndex in vectorSpace.children) {
-                if (DimIndexUtils.equals(childIndex, index)) {
-                    return vectorSpace;
-                }
-            }
-        }
-        
-        return null;
     }
 
     /**
@@ -2172,21 +2205,13 @@ class GraphicsContext {
         }
     }
 
-    private function updateVectorSpaces() {
-        for (vectorSpace in _vectorSpaces) {
-            if (vectorSpace.scrollable) {
-                vectorSpace.updateScrolling();
-            }
-        }
-    }
-
     /**
     * Begin the `GraphicsContext`.
     **/
     public function begin() {
         _ended = false;
 
-        updateVectorSpaces();
+        updateVectorSpaceHierarchy();
     }
 
     /**

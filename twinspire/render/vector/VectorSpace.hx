@@ -34,6 +34,25 @@ class VectorSpace {
 
     private var _alignment:VectorSpaceAlignment = TopLeft;
 
+    private var _zIndex:Int = 0;                    // Rendering/event priority order
+    private var _parentDimIndex:DimIndex = null;    // DimIndex of parent container (if nested)
+    private var _eventPriority:Int = 0;             // Higher = receives events first
+    
+    public var zIndex(get, set):Int;
+    function get_zIndex():Int { return _zIndex; }
+    function set_zIndex(value:Int):Int { return _zIndex = value; }
+    
+    public var parentDimIndex(get, set):DimIndex;
+    function get_parentDimIndex():DimIndex { return _parentDimIndex; }
+    function set_parentDimIndex(value:DimIndex):DimIndex { return _parentDimIndex = value; }
+    
+    public var eventPriority(get, set):Int;
+    function get_eventPriority():Int { return _eventPriority; }
+    function set_eventPriority(value:Int):Int { return _eventPriority = value; }
+    
+    public var bounds(get, never):Dim;
+    function get_bounds():Dim { return _bounds; }
+
     public var children(get, never):Array<DimIndex>;
     function get_children():Array<DimIndex> {
         return _children;
@@ -562,6 +581,32 @@ class VectorSpace {
         }
         
         return this;
+    }
+
+    /**
+    * Check if this VectorSpace is nested within another VectorSpace
+    **/
+    public function isNestedWithin(parentVectorSpace:VectorSpace):Bool {
+        if (_parentDimIndex == null) return false;
+        
+        // Check if our parent DimIndex is contained within the parent VectorSpace
+        return parentVectorSpace.hasChild(_parentDimIndex);
+    }
+    
+    /**
+    * Get nesting depth (0 = root, 1 = first level, etc.)
+    **/
+    public function getNestingDepth(allVectorSpaces:Array<VectorSpace>):Int {
+        if (_parentDimIndex == null) return 0;
+        
+        // Find parent VectorSpace and recursively calculate depth
+        for (vectorSpace in allVectorSpaces) {
+            if (vectorSpace.hasChild(_parentDimIndex)) {
+                return 1 + vectorSpace.getNestingDepth(allVectorSpaces);
+            }
+        }
+        
+        return 0; // Fallback if parent not found
     }
     
     // Update smooth scrolling - should be called every frame
