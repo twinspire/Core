@@ -2085,7 +2085,7 @@ class GraphicsContext {
                 parentVectorSpace.addChild(result);
             }
         }
-        
+
         return result;
     }
 
@@ -2383,6 +2383,20 @@ class GraphicsContext {
         return _activeContainers;
     }
 
+    public function getContainerByIndex(index:DimIndex):ContainerResult {
+        switch (index) {
+            case Direct(idx): {
+                if (idx > -1 && idx < this._activeContainers.length) {
+                    return this._activeContainers[idx];
+                }
+            }
+            case Group(idx): {
+                var groupIndices = getDimIndicesAtGroupIndex(idx);
+                return this._activeContainers[groupIndices[0]];
+            }
+        }
+    }
+ 
     private function findContainerForDimension(dimIndex:Int):Int {
         for (i in 0..._activeContainers.length) {
             if (_activeContainers[i].containerIndex == dimIndex) {

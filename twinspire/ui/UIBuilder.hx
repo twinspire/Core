@@ -359,6 +359,10 @@ class UIBuilder extends DimBuilder {
     * Create a tab page.
     **/
     public function tabPage(text:String, ?showClose:Bool = false, ?style:TabPageStyle = RoundedCorners, ?size:FastVector2):TabPage {
+        if (currentTabControl == null) {
+            throw "tabPage can only be called between beginTabControl and assignTabPageContent";
+        }
+
         var gtx = Application.instance.graphicsCtx;
         var id = getId(UITemplate.tabPageId);
 
@@ -483,9 +487,25 @@ class UIBuilder extends DimBuilder {
         }
 
         trackFlowElement(tabPage);
+
+        if (currentTabControl.pendingContentCallback != null) {
+            var tabIndex = currentTabControl.tabControl.addTabPage(
+                tabPage, 
+                currentTemplate, 
+                currentTabControl.pendingContentCallback
+            );
+            
+            currentTabControl.pendingContentCallback = null;
+        }
         
         return tabPage;
     }
+
+    private var currentTabControl:{
+        tabControl:TabControl,
+        name:String,
+        pendingContentCallback:(IDimBuilder) -> Void
+    };
 
     /**
     * Begin a new tab control.
@@ -498,22 +518,189 @@ class UIBuilder extends DimBuilder {
     * @param extraControlWidth (Optional) The width of the container used to contain any extra controls, flowing left from the right.
     **/
     public function beginTabControl(name:String, width:Float, height:Float, ?tabPageHeight:Float = 0.0, ?extraControls:Bool = false, ?extraControlWidth:Float = 0.0) {
-        // perform initial calculations and cache some of the results
+        var gtx = Application.instance.graphicsCtx;
+        var id = getId(UITemplate.tabControlId);
         
+        // Calculate tab page height if not provided
+        if (tabPageHeight <= 0) {
+            tabPageHeight = font != null ? font.height(fontSize) + 16 : 32; // 16px padding
+        }
+        
+        // Create main container for the entire tab control
+        var mainContainerDim = new Dim(0, 0, width, height);
+        var mainContainerResult = Dimensions.createFromDim(mainContainerDim, Ui(id));
+        add(mainContainerResult);
+        
+        // Position within parent container if exists
+        if (currentContainer != null) {
+            positionInContainer(mainContainerResult.dim, mainContainerResult.index);
+        }
+        
+        var dimIndex = advanceSceneObject();
+        var tabControl:TabControl;
+        
+        if (isUpdate && dimIndex < sceneObjects.length) {
+            tabControl = cast(sceneObjects[dimIndex], TabControl);
+            tabControl.lastChangedDim = mainContainerResult.dim;
+            
+            var containerDim = getDimension(mainContainerResult.index);
+            
+            // Update tabs container bounds if it exists
+            if (tabControl.tabsContainerIndex != null) {
+                var tabsContainerHeight = tabPageHeight;
+                var tabsContainerDim = new Dim(
+                    containerDim.x, 
+                    containerDim.y, 
+                    extraControls ? containerDim.width - extraControlWidth : containerDim.width, 
+                    tabsContainerHeight
+                );
+                gtx.setOrReinitDim(tabControl.tabsContainerIndex, tabsContainerDim);
+            }
+            
+            // Update content container bounds if it exists
+            if (tabControl.tabContentIndex != null) {
+                var contentContainerDim = new Dim(
+                    containerDim.x,
+                    containerDim.y + tabPageHeight,
+                    containerDim.width,
+                    containerDim.height - tabPageHeight
+                );
+                gtx.setOrReinitDim(tabControl.tabContentIndex, contentContainerDim);
+                
+                // Update VectorSpace bounds if it exists
+                if (tabControl.contentVectorSpace != null) {
+                    tabControl.contentVectorSpace.updateContentBounds(contentContainerDim);
+                }
+            }
+            
+            // Update extra controls container if it exists
+            if (extraControls && tabControl.tabsExtraIndex != null) {
+                var extraContainerDim = new Dim(
+                    containerDim.x + containerDim.width - extraControlWidth,
+                    containerDim.y,
+                    extraControlWidth,
+                    tabPageHeight
+                );
+                gtx.setOrReinitDim(tabControl.tabsExtraIndex, extraContainerDim);
+            }
+            
+        } else {
+            // Initial creation - create TabControl and all its containers
+            tabControl = new TabControl();
+            tabControl.type = UITemplate.tabControlId;
+            tabControl.name = name;
+            tabControl.index = mainContainerResult.index;
+            tabControl.targetContainer = mainContainerResult.dim.clone();
+            tabControl.ownerTemplate = currentTemplate;
+            tabControl.containerName = currentContainerName;
+            
+            if (dimIndex < sceneObjects.length) {
+                sceneObjects[dimIndex] = tabControl;
+            } else {
+                sceneObjects.push(tabControl);
+            }
+            
+            // Get container dimensions
+            var containerDim = getDimension(mainContainerResult.index);
+            
+            // 1. Container for tab buttons (top area) - only create during initial setup
+            var tabsContainerHeight = tabPageHeight;
+            var tabsContainerDim = new Dim(
+                containerDim.x, 
+                containerDim.y, 
+                extraControls ? containerDim.width - extraControlWidth : containerDim.width, 
+                tabsContainerHeight
+            );
+            var tabsContainerResult = gtx.createContainer(tabsContainerDim, id, mainContainerResult.index);
+            tabControl.tabsContainerIndex = tabsContainerResult.index;
+            
+            // 2. Container for tab content (remaining area) - only create during initial setup
+            var contentContainerDim = new Dim(
+                containerDim.x,
+                containerDim.y + tabsContainerHeight,
+                containerDim.width,
+                containerDim.height - tabsContainerHeight
+            );
+            var contentContainerResult = gtx.createContainer(contentContainerDim, id, mainContainerResult.index);
+            tabControl.tabContentIndex = contentContainerResult.index;
+            tabControl.contentVectorSpace = contentContainerResult.space;
+            
+            // 3. Optional extra controls container - only create during initial setup
+            if (extraControls) {
+                var extraContainerDim = new Dim(
+                    containerDim.x + containerDim.width - extraControlWidth,
+                    containerDim.y,
+                    extraControlWidth,
+                    tabsContainerHeight
+                );
+                var extraContainerResult = gtx.createContainer(extraContainerDim, id, mainContainerResult.index);
+                tabControl.tabsExtraIndex = extraContainerResult.index;
+            }
+        }
+        
+        // Store current tab control context for assignTabPageContent and endTabControl
+        currentTabControl = {
+            tabControl: tabControl,
+            name: name,
+            pendingContentCallback: null
+        };
+        
+        // Set up container context for tab button positioning
+        // We work within the tabs container bounds for laying out tab pages
+        var tabsContainerDim = getCurrentDimAtIndex(tabControl.tabsContainerIndex);
+        
+        // Push horizontal flow context for tab buttons
+        containerStack.push({
+            bounds: tabsContainerDim,
+            orientation: Horizontal,
+            spacing: 2, // Small gap between tabs
+            padding: 0,
+            offsetV: 0,
+            offsetH: 0,
+            nextX: 0,
+            nextY: 0
+        });
+        
+        trackFlowElement(tabControl);
+        
+        return tabControl;
     }
 
     /**
     * Assign into the tab control the content callback of the next tab page element to create.
     **/
     public function assignTabPageContent(contentCallback:(IDimBuilder) -> Void) {
-
+        if (currentTabControl == null) {
+            throw "assignTabPageContent can only be called between beginTabControl and endTabControl";
+        }
+        
+        currentTabControl.pendingContentCallback = contentCallback;
     }
 
     /**
     * End the current tab control, returning the final state.
     **/
     public function endTabControl():TabControl {
-        return new TabControl();
+        if (currentTabControl == null) {
+            throw "endTabControl called without matching beginTabControl";
+        }
+        
+        var tabControl = currentTabControl.tabControl;
+        
+        // Pop the container stack context for tabs
+        if (containerStack.length > 0) {
+            containerStack.pop();
+        }
+        
+        // We don't need to explicitly end containers here since we're working
+        // within the UIBuilder's container management system. The containers
+        // will be properly managed by the GraphicsContext during rendering.
+        
+        // Clean up context
+        var result = currentTabControl.tabControl;
+        currentTabControl = null;
+        
+        return result;
     }
 
     /**
